@@ -1,0 +1,47 @@
+name: Pulsar — Daily Music Discovery
+
+on:
+  # Run daily at 08:00 UTC
+  schedule:
+    - cron: '0 8 * * *'
+  # Allow manual trigger from GitHub UI
+  workflow_dispatch:
+    inputs:
+      run_on_start:
+        description: 'Run agent immediately'
+        required: false
+        default: 'true'
+        type: boolean
+
+jobs:
+  discover:
+    name: Run Music Discovery Agent
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Pulsar agent
+        run: npm run agent
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BRAVE_SEARCH_API_KEY: ${{ secrets.BRAVE_SEARCH_API_KEY }}
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Pulsar agent run failed. Check logs above."
