@@ -1,18 +1,27 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Release, AgentRelease } from "./types";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+// Lazy clients — read env vars at call time so agent/env.ts config() runs first
+let _supabase: ReturnType<typeof createClient> | null = null;
 
-// Public client — used in browser/server components for reads
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
+  get(_target, prop) {
+    if (!_supabase) {
+      _supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+    }
+    return (_supabase as unknown as Record<string | symbol, unknown>)[prop];
+  },
+});
 
-// Service-role client — used only in trusted server code (agent, API routes)
 export const supabaseAdmin = () =>
-  createClient(supabaseUrl, supabaseServiceKey, {
-    auth: { persistSession: false },
-  });
+  createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
 
 export async function getReleases(opts?: {
   limit?: number;

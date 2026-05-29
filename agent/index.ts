@@ -18,7 +18,7 @@ import type { AgentRunResult } from "../lib/types";
 import { config } from "./env";
 config();
 
-const MAX_ITERATIONS = 60; // Safety ceiling — discovery runs typically use 30–45 iterations
+const MAX_ITERATIONS = 20; // GHA timeout is 25 min; each iteration can take ~30-60s
 const MODEL = "claude-sonnet-4-6";
 
 // ─────────────────────────────────────────────
@@ -62,13 +62,21 @@ export async function runMusicDiscoveryAgent(): Promise<AgentRunResult> {
 
     console.log(`\n[Iteration ${iterations}/${MAX_ITERATIONS}]`);
 
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 4096,
-      system: SYSTEM_PROMPT,
-      tools: toolDefinitions,
-      messages,
-    });
+    let response: Anthropic.Message;
+    try {
+      response = await client.messages.create({
+        model: MODEL,
+        max_tokens: 4096,
+        system: SYSTEM_PROMPT,
+        tools: toolDefinitions,
+        messages,
+      });
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.error(`  ❌ Anthropic API error on iteration ${iterations}: ${errorMsg}`);
+      runResult.errors.push(`api_call: ${errorMsg}`);
+      break; // exit loop gracefully so summary + DB log still run
+    }
 
     console.log(`  Stop reason: ${response.stop_reason}`);
 
@@ -180,7 +188,8 @@ if (require.main === module || process.argv[1]?.endsWith("agent/index.ts")) {
   runMusicDiscoveryAgent()
     .then((result) => {
       console.log("Agent run complete:", result);
-      process.exit(result.success ? 0 : 1);
+      // Exit 0 if we saved any releases — partial runs are still useful
+      process.exit(result.releases_saved > 0 ? 0 : 1);
     })
     .catch((err) => {
       console.error("Agent fatal error:", err);
