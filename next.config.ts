@@ -15,9 +15,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "**.ytimg.com" },
     ],
   },
-  experimental: {
-    serverActions: { allowedOrigins: ["localhost:3000"] },
-  },
+  experimental: {},
 };
 
 export default nextConfig;

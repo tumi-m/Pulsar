@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
-export const maxDuration = 300; // 5 minutes (Vercel Pro)
 
 export async function POST(req: NextRequest) {
   // Verify secret to prevent unauthorized triggers
