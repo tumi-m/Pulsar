@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "**.supabase.co" },
       { protocol: "https", hostname: "f4.bcbits.com" },
       { protocol: "https", hostname: "**.ytimg.com" },
+      { protocol: "https", hostname: "upload.wikimedia.org" },
     ],
   },
   experimental: {},

@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "agent": "tsx agent/index.ts",
-    "agent:schedule": "tsx agent/scheduler.ts"
+    "agent:schedule": "tsx agent/scheduler.ts",
+    "seed": "tsx scripts/seed-music.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
