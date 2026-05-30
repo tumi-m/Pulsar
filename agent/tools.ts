@@ -216,7 +216,7 @@ export async function executeTool(
       );
 
     case "save_release":
-      return executeSaveRelease(toolInput as AgentRelease);
+      return executeSaveRelease(toolInput as unknown as AgentRelease);
 
     case "check_duplicate":
       return executeCheckDuplicate(toolInput as { artist: string; title: string });
