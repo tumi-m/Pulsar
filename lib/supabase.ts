@@ -1,15 +1,29 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Release, AgentRelease } from "./types";
 
-// Lazy clients — read env vars at call time so agent/env.ts config() runs first
+// Chainable no-op stub for build-time static generation (no env vars available)
+const resolved = Promise.resolve({ data: [], error: null, count: 0 });
+const buildTimeStub: unknown = new Proxy(resolved, {
+  get(target, prop) {
+    if (prop === "then" || prop === "catch" || prop === "finally") {
+      return (target as Promise<unknown>)[prop as "then"].bind(target);
+    }
+    return () => buildTimeStub;
+  },
+});
+
+// Lazy client — reads env vars at call time so agent/env.ts config() has already run
 let _supabase: ReturnType<typeof createClient> | null = null;
 
 export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
   get(_target, prop) {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      return () => buildTimeStub;
+    }
     if (!_supabase) {
       _supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
       );
     }
     return (_supabase as unknown as Record<string | symbol, unknown>)[prop];

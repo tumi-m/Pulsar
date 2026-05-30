@@ -1,7 +1,9 @@
 /**
  * Lightweight env loader for agent scripts running outside Next.js.
- * Reads .env.local and .env files.
+ * Reads .env.local and .env files. No-ops when running inside Next.js
+ * (env vars are already injected by the framework).
  */
+/* turbopackIgnore: true */
 import fs from "fs";
 import path from "path";
 
