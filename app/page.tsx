@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { getTodaysReleases, getReleases } from "@/lib/supabase";
 import { HeroSection } from "@/components/HeroSection";
 import { ReleaseGrid } from "@/components/ReleaseGrid";
+import { CATALOG } from "@/lib/catalog";
 import type { Release } from "@/lib/types";
 
 export const revalidate = 300; // ISR — revalidate every 5 minutes
@@ -25,8 +26,18 @@ async function getPageData(): Promise<{
 export default async function HomePage() {
   const { todaysReleases, allReleases } = await getPageData();
 
-  const featured = todaysReleases[0] ?? allReleases[0] ?? null;
-  const gridReleases = allReleases.length > 0 ? allReleases : todaysReleases;
+  // Always show music: fresh DB releases first; the built-in catalog
+  // fills the grid when the database is empty or unconfigured.
+  const dbReleases = allReleases.length > 0 ? allReleases : todaysReleases;
+  const dbKeys = new Set(
+    dbReleases.map((r) => `${r.artist.toLowerCase()}::${r.title.toLowerCase()}`)
+  );
+  const catalogFill = CATALOG.filter(
+    (r) => !dbKeys.has(`${r.artist.toLowerCase()}::${r.title.toLowerCase()}`)
+  );
+  const gridReleases = [...dbReleases, ...catalogFill];
+
+  const featured = todaysReleases[0] ?? gridReleases[0] ?? null;
 
   return (
     <div className="min-h-screen">
