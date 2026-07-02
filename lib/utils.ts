@@ -47,6 +47,58 @@ export const MOOD_LABELS: Record<string, string> = {
   tender: "TENDER",
 };
 
+// ─────────────────────────────────────────────
+// Genre buckets — broad, data-driven categories used for filtering.
+// The card still shows each release's full genre string; these are only
+// the filter pills.
+// ─────────────────────────────────────────────
+
+export const GENRE_BUCKETS = [
+  "Hip-Hop",
+  "Electronic",
+  "Rock",
+  "Metal",
+  "Soul / R&B",
+  "Pop",
+  "Jazz",
+  "Folk / Country",
+] as const;
+
+export type GenreBucket = (typeof GENRE_BUCKETS)[number];
+
+// Ordered keyword rules — first match wins.
+const GENRE_RULES: { bucket: GenreBucket; keywords: string[] }[] = [
+  { bucket: "Hip-Hop", keywords: ["hip-hop", "hip hop", "rap", "trap"] },
+  { bucket: "Metal", keywords: ["metal", "doom", "sludge", "stoner"] },
+  { bucket: "Electronic", keywords: ["electronic", "house", "techno", "idm", "ambient", "dance", "disco", "synth"] },
+  { bucket: "Soul / R&B", keywords: ["soul", "r&b", "rnb", "funk", "neo-soul"] },
+  { bucket: "Jazz", keywords: ["jazz"] },
+  { bucket: "Folk / Country", keywords: ["folk", "country", "americana", "singer-songwriter", "bluegrass"] },
+  { bucket: "Rock", keywords: ["rock", "punk", "grunge", "shoegaze", "psychedel", "indie", "alternative", "new wave", "art rock"] },
+  { bucket: "Pop", keywords: ["pop"] },
+];
+
+export function genreBucket(genre: string | null | undefined): GenreBucket | null {
+  if (!genre) return null;
+  const g = genre.toLowerCase();
+  for (const rule of GENRE_RULES) {
+    if (rule.keywords.some((k) => g.includes(k))) return rule.bucket;
+  }
+  return null;
+}
+
+// Color theming per bucket (reuses the neon palette).
+export const GENRE_COLORS: Record<GenreBucket, { text: string; bg: string }> = {
+  "Hip-Hop":        { text: "text-neon-amber",  bg: "bg-neon-amber/10" },
+  "Electronic":     { text: "text-neon-blue",   bg: "bg-neon-blue/10" },
+  "Rock":           { text: "text-neon-pink",   bg: "bg-neon-pink/10" },
+  "Metal":          { text: "text-neon-pink",   bg: "bg-neon-pink/10" },
+  "Soul / R&B":     { text: "text-neon-violet", bg: "bg-neon-violet/10" },
+  "Pop":            { text: "text-neon-green",   bg: "bg-neon-green/10" },
+  "Jazz":           { text: "text-neon-amber",   bg: "bg-neon-amber/10" },
+  "Folk / Country": { text: "text-star-white",   bg: "bg-star-white/5" },
+};
+
 export const PLATFORM_META = {
   spotify: {
     label: "Spotify",

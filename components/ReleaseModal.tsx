@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { Artwork } from "./Artwork";
 import type { Release } from "@/lib/types";
-import { MOOD_COLORS, MOOD_LABELS, formatDate } from "@/lib/utils";
+import { MOOD_COLORS, formatDate } from "@/lib/utils";
 import { PlatformLinks } from "./PlatformLinks";
 
 interface ReleaseModalProps {
@@ -94,9 +94,9 @@ export function ReleaseModal({ release, onClose }: ReleaseModalProps) {
                   {/* Info overlay on artwork */}
                   <div className="absolute bottom-0 left-0 right-0 p-6">
                     <div className="flex items-center gap-2 mb-2">
-                      {release.mood && (
+                      {release.genre && (
                         <span className={`text-[10px] font-mono font-bold tracking-widest ${moodStyle.text}`}>
-                          {MOOD_LABELS[release.mood]}
+                          {release.genre.toUpperCase()}
                         </span>
                       )}
                       <span className="text-[10px] font-mono text-dust/60 tracking-widest uppercase">
@@ -120,12 +120,6 @@ export function ReleaseModal({ release, onClose }: ReleaseModalProps) {
 
                   <div className="flex flex-wrap gap-3 text-xs font-mono text-dust">
                     <span>{formatDate(release.release_date)}</span>
-                    {release.genre && (
-                      <>
-                        <span className="text-mist/40">·</span>
-                        <span>{release.genre}</span>
-                      </>
-                    )}
                   </div>
 
                   {release.tags && release.tags.length > 0 && (

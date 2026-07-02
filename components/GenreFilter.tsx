@@ -1,29 +1,19 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { MOOD_COLORS, MOOD_LABELS } from "@/lib/utils";
-import type { MoodTag } from "@/lib/types";
+import { GENRE_BUCKETS, GENRE_COLORS, type GenreBucket } from "@/lib/utils";
 
-const MOODS: MoodTag[] = [
-  "euphoric",
-  "melancholic",
-  "energetic",
-  "ambient",
-  "raw",
-  "cinematic",
-  "hypnotic",
-  "tender",
-];
-
-interface MoodFilterProps {
-  active: MoodTag | null;
-  onChange: (mood: MoodTag | null) => void;
+interface GenreFilterProps {
+  active: GenreBucket | null;
+  onChange: (genre: GenreBucket | null) => void;
+  available: GenreBucket[];
 }
 
-export function MoodFilter({ active, onChange }: MoodFilterProps) {
+export function GenreFilter({ active, onChange, available }: GenreFilterProps) {
+  const genres = GENRE_BUCKETS.filter((g) => available.includes(g));
+
   return (
     <div className="relative">
-      {/* Scroll container */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
         {/* All */}
         <motion.button
@@ -42,25 +32,25 @@ export function MoodFilter({ active, onChange }: MoodFilterProps) {
           ALL
         </motion.button>
 
-        {MOODS.map((mood) => {
-          const style = MOOD_COLORS[mood];
-          const isActive = active === mood;
+        {genres.map((genre) => {
+          const style = GENRE_COLORS[genre];
+          const isActive = active === genre;
           return (
             <motion.button
-              key={mood}
+              key={genre}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.97 }}
-              onClick={() => onChange(isActive ? null : mood)}
+              onClick={() => onChange(isActive ? null : genre)}
               className={`
                 flex-shrink-0 text-[11px] font-mono font-bold tracking-widest
-                px-4 py-1.5 rounded-full border transition-all duration-200
+                px-4 py-1.5 rounded-full border transition-all duration-200 uppercase
                 ${isActive
                   ? `${style.bg} ${style.text} border-current/30`
                   : "border-mist/30 text-dust hover:border-mist/60 hover:text-star-white"
                 }
               `}
             >
-              {MOOD_LABELS[mood]}
+              {genre}
             </motion.button>
           );
         })}

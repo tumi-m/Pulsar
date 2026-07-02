@@ -2,23 +2,34 @@
 
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import type { Release, MoodTag } from "@/lib/types";
+import type { Release } from "@/lib/types";
 import { ReleaseCard } from "./ReleaseCard";
 import { ReleaseModal } from "./ReleaseModal";
-import { MoodFilter } from "./MoodFilter";
+import { GenreFilter } from "./GenreFilter";
+import { genreBucket, GENRE_BUCKETS, type GenreBucket } from "@/lib/utils";
 
 interface ReleaseGridProps {
   releases: Release[];
 }
 
 export function ReleaseGrid({ releases }: ReleaseGridProps) {
-  const [activeMood, setActiveMood] = useState<MoodTag | null>(null);
+  const [activeGenre, setActiveGenre] = useState<GenreBucket | null>(null);
   const [selectedRelease, setSelectedRelease] = useState<Release | null>(null);
 
+  // Which genre buckets actually appear in the current release set
+  const available = useMemo(() => {
+    const present = new Set<GenreBucket>();
+    for (const r of releases) {
+      const b = genreBucket(r.genre);
+      if (b) present.add(b);
+    }
+    return GENRE_BUCKETS.filter((g) => present.has(g));
+  }, [releases]);
+
   const filtered = useMemo(() => {
-    if (!activeMood) return releases;
-    return releases.filter((r) => r.mood === activeMood);
-  }, [releases, activeMood]);
+    if (!activeGenre) return releases;
+    return releases.filter((r) => genreBucket(r.genre) === activeGenre);
+  }, [releases, activeGenre]);
 
   return (
     <>
@@ -43,15 +54,15 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
           </div>
         </div>
 
-        {/* Mood filter */}
-        <MoodFilter active={activeMood} onChange={setActiveMood} />
+        {/* Genre filter */}
+        <GenreFilter active={activeGenre} onChange={setActiveGenre} available={available} />
       </motion.div>
 
       {/* Grid */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-32 text-center px-6">
           <p className="text-dust/40 font-mono text-sm tracking-widest">
-            NO RELEASES MATCH THIS MOOD
+            NO RELEASES IN THIS GENRE
           </p>
         </div>
       ) : (

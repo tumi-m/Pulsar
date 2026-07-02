@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Release } from "@/lib/types";
-import { MOOD_COLORS, MOOD_LABELS, formatDate, isToday, isYesterday } from "@/lib/utils";
+import { MOOD_COLORS, formatDate, isToday, isYesterday } from "@/lib/utils";
 import { PlatformLinks } from "./PlatformLinks";
 import { Artwork } from "./Artwork";
 
@@ -121,35 +121,26 @@ export function ReleaseCard({ release, index, onOpen }: ReleaseCardProps) {
 
         {/* Info */}
         <div className="mt-3 space-y-1 px-0.5">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-star-white font-medium text-sm leading-tight truncate">
-                {release.title}
-              </p>
-              <p className="text-dust text-xs mt-0.5 truncate">{release.artist}</p>
-            </div>
-            {release.mood && (
-              <span
-                className={`flex-shrink-0 text-[9px] font-mono font-bold tracking-wider ${moodStyle.text}`}
-              >
-                {MOOD_LABELS[release.mood]}
-              </span>
-            )}
-          </div>
+          <p className="text-star-white font-medium text-sm leading-tight truncate">
+            {release.title}
+          </p>
+          <p className="text-dust text-xs truncate">{release.artist}</p>
+
+          {release.genre && (
+            <p
+              className={`text-[10px] font-mono font-bold tracking-wider ${moodStyle.text} truncate`}
+            >
+              {release.genre.toUpperCase()}
+            </p>
+          )}
 
           {release.curator_note && (
             <motion.p
               animate={hovered ? { opacity: 1 } : { opacity: 0.5 }}
-              className="text-[11px] text-dust/70 leading-relaxed line-clamp-2 italic"
+              className="text-[11px] text-dust/70 leading-relaxed line-clamp-2 italic pt-0.5"
             >
               {release.curator_note}
             </motion.p>
-          )}
-
-          {release.genre && (
-            <p className="text-[10px] font-mono text-mist tracking-wide">
-              {release.genre}
-            </p>
           )}
         </div>
       </div>
