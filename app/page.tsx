@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { getTodaysReleases, getReleases } from "@/lib/supabase";
+import { getLiveFeed } from "@/lib/feed";
 import { HeroSection } from "@/components/HeroSection";
 import { ReleaseGrid } from "@/components/ReleaseGrid";
 import { CATALOG } from "@/lib/catalog";
@@ -7,44 +8,58 @@ import type { Release } from "@/lib/types";
 
 export const revalidate = 300; // ISR — revalidate every 5 minutes
 
+const key = (r: Release) => `${r.artist.toLowerCase()}::${r.title.toLowerCase()}`;
+
+/** Merge sources newest-first, removing duplicates (first occurrence wins). */
+function mergeReleases(...sources: Release[][]): Release[] {
+  const seen = new Set<string>();
+  const out: Release[] = [];
+  for (const src of sources) {
+    for (const r of src) {
+      const k = key(r);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(r);
+    }
+  }
+  return out;
+}
+
 async function getPageData(): Promise<{
   todaysReleases: Release[];
-  allReleases: Release[];
+  liveFeed: Release[];
+  dbReleases: Release[];
 }> {
-  try {
-    const [todaysReleases, allReleases] = await Promise.all([
-      getTodaysReleases(),
-      getReleases({ limit: 60 }),
-    ]);
-    return { todaysReleases, allReleases };
-  } catch (err) {
-    console.error("Failed to fetch releases:", err);
-    return { todaysReleases: [], allReleases: [] };
-  }
+  const [todaysReleases, dbReleases, liveFeed] = await Promise.all([
+    getTodaysReleases().catch(() => [] as Release[]),
+    getReleases({ limit: 200 }).catch(() => [] as Release[]),
+    getLiveFeed().catch(() => [] as Release[]),
+  ]);
+  return { todaysReleases, dbReleases, liveFeed };
 }
 
 export default async function HomePage() {
-  const { todaysReleases, allReleases } = await getPageData();
+  const { todaysReleases, dbReleases, liveFeed } = await getPageData();
 
-  // Always show music: fresh DB releases first; the built-in catalog
-  // fills the grid when the database is empty or unconfigured.
-  const dbReleases = allReleases.length > 0 ? allReleases : todaysReleases;
-  const dbKeys = new Set(
-    dbReleases.map((r) => `${r.artist.toLowerCase()}::${r.title.toLowerCase()}`)
-  );
-  const catalogFill = CATALOG.filter(
-    (r) => !dbKeys.has(`${r.artist.toLowerCase()}::${r.title.toLowerCase()}`)
-  );
-  const gridReleases = [...dbReleases, ...catalogFill];
+  // Priority: Supabase releases → live Apple feed → built-in catalog.
+  // The site always shows a large, fresh grid — with or without config.
+  const gridReleases = mergeReleases(dbReleases, liveFeed, CATALOG);
 
-  const featured = todaysReleases[0] ?? gridReleases[0] ?? null;
+  // "New today" counts genuine last-24h drops from DB + live feed.
+  const today = new Date().toISOString().split("T")[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+  const freshCount = mergeReleases(todaysReleases, liveFeed).filter(
+    (r) => r.release_date === today || r.release_date === yesterday
+  ).length;
+
+  const featured = liveFeed[0] ?? todaysReleases[0] ?? gridReleases[0] ?? null;
 
   return (
     <div className="min-h-screen">
       {/* Hero */}
       <HeroSection
         featured={featured}
-        totalToday={todaysReleases.length}
+        totalToday={freshCount}
       />
 
       {/* Release grid */}

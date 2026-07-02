@@ -12,16 +12,23 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Dynamically import to avoid loading agent code in edge runtime
-    const { runMusicDiscoveryAgent } = await import("@/agent/index");
-    const result = await runMusicDiscoveryAgent();
+    // Reliable path: ingest fresh releases from the free Apple RSS feeds
+    // into Supabase. Needs only the Supabase service key.
+    const { runIngest } = await import("@/agent/ingest");
+    const result = await runIngest();
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      success: result.saved > 0,
+      releases_found: result.found,
+      releases_saved: result.saved,
+      errors: [],
+      run_at: new Date().toISOString(),
+    });
   } catch (err) {
-    console.error("Agent trigger error:", err);
+    console.error("Ingest trigger error:", err);
     return NextResponse.json(
       {
-        error: "Agent run failed",
+        error: "Ingest run failed",
         message: err instanceof Error ? err.message : String(err),
       },
       { status: 500 }

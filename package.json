@@ -9,6 +9,7 @@
     "lint": "next lint",
     "agent": "tsx agent/index.ts",
     "agent:schedule": "tsx agent/scheduler.ts",
+    "ingest": "tsx agent/ingest.ts",
     "seed": "tsx scripts/seed-music.ts"
   },
   "dependencies": {

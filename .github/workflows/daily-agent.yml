@@ -32,15 +32,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Pulsar agent
-        run: npm run agent
+      # Daily ingest — pulls fresh releases from Apple's free RSS feeds
+      # and writes them to Supabase. Needs ONLY the Supabase credentials.
+      - name: Run Pulsar ingest
+        run: npm run ingest
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          BRAVE_SEARCH_API_KEY: ${{ secrets.BRAVE_SEARCH_API_KEY }}
-          AGENT_TRIGGER_SECRET: ${{ secrets.AGENT_TRIGGER_SECRET }}
 
       - name: Notify on failure
         if: failure()

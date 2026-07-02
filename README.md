@@ -73,25 +73,53 @@ npm run dev
 # Open http://localhost:3000
 ```
 
-### 5. Run the agent (first time)
+### 5. Populate with music
+
+**The site already shows a large, live grid with zero config** — the home
+page pulls fresh releases from Apple's free Marketing Tools RSS feeds on
+every revalidation. No API key required.
+
+To persist and grow the catalog in Supabase, run the daily ingest:
 
 ```bash
-npm run agent
+npm run ingest      # pulls new releases from the free Apple feed → Supabase
 ```
 
-The agent will:
-1. Get today's date
-2. Search Pitchfork, Bandcamp, Reddit, FADER, RA, and more
-3. For each release: find artwork + platform links
-4. Save to Supabase
-5. The website auto-refreshes via ISR (every 5 minutes)
+The ingest job:
+1. Fetches the most-recent albums + songs from Apple's RSS feeds (no key)
+2. Enriches each with hi-res artwork, genre, release date
+3. Builds five streaming links (real Apple Music URL + search deep-links
+   for Spotify, Tidal, SoundCloud, YouTube Music)
+4. Upserts into Supabase (deduped by artist + title)
+
+> **Two data paths.** `npm run ingest` is the reliable daily job — it needs
+> only the Supabase keys. `npm run agent` is the optional Claude-powered
+> curator (richer notes + editorial sources) and additionally needs
+> `ANTHROPIC_API_KEY` + a search API key.
+
+---
+
+## Where the music comes from
+
+| Source | Needs keys? | Role |
+|--------|-------------|------|
+| Apple RSS live feed | ❌ none | Home page always shows fresh releases |
+| Supabase (via `ingest`) | Supabase only | Persists + grows the catalog daily |
+| Built-in catalog (60 albums) | ❌ none | Final fallback so it's never blank |
+| Claude agent (`agent`) | Anthropic + search | Optional richer curation |
+
+The home page merges them: **Supabase → live Apple feed → catalog**, newest
+first, de-duplicated.
 
 ---
 
 ## Daily Scheduled Run
 
+The GitHub Actions workflow runs `npm run ingest` daily at 08:00 UTC
+(needs only the Supabase secrets). You can also run a local scheduler:
+
 ```bash
-# Start the scheduler (runs daily at 08:00 UTC)
+# Start the scheduler (runs the Claude agent daily at 08:00 UTC)
 npm run agent:schedule
 
 # Or trigger immediately
