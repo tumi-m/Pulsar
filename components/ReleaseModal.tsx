@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
+import { Artwork } from "./Artwork";
 import type { Release } from "@/lib/types";
 import { MOOD_COLORS, MOOD_LABELS, formatDate } from "@/lib/utils";
 import { PlatformLinks } from "./PlatformLinks";
@@ -82,12 +82,11 @@ export function ReleaseModal({ release, onClose }: ReleaseModalProps) {
               <div className="relative flex flex-col">
                 {/* Full-width artwork */}
                 <div className="relative aspect-square w-full">
-                  <Image
+                  <Artwork
                     src={release.artwork_url}
-                    alt={`${release.artist} — ${release.title}`}
-                    fill
+                    artist={release.artist}
+                    title={release.title}
                     sizes="512px"
-                    className="object-cover"
                   />
                   {/* Gradient overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-cosmos/90 via-transparent to-transparent" />

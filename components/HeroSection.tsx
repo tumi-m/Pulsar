@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import { motion, useScroll, useTransform } from "framer-motion";
+import { Artwork } from "./Artwork";
 import type { Release } from "@/lib/types";
 import { MOOD_COLORS } from "@/lib/utils";
 
@@ -110,12 +110,11 @@ export function HeroSection({ featured, totalToday }: HeroSectionProps) {
           />
           <div className="relative rounded-2xl overflow-hidden border border-mist/20 shadow-2xl">
             <div className="relative aspect-square">
-              <Image
+              <Artwork
                 src={featured.artwork_url}
-                alt={`${featured.artist} — ${featured.title}`}
-                fill
+                artist={featured.artist}
+                title={featured.title}
                 sizes="400px"
-                className="object-cover"
                 priority
               />
               <div className="absolute inset-0 bg-gradient-to-t from-void/80 via-transparent to-transparent" />

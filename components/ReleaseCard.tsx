@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Release } from "@/lib/types";
 import { MOOD_COLORS, MOOD_LABELS, formatDate, isToday, isYesterday } from "@/lib/utils";
 import { PlatformLinks } from "./PlatformLinks";
+import { Artwork } from "./Artwork";
 
 interface ReleaseCardProps {
   release: Release;
@@ -15,7 +15,6 @@ interface ReleaseCardProps {
 
 export function ReleaseCard({ release, index, onOpen }: ReleaseCardProps) {
   const [hovered, setHovered] = useState(false);
-  const [imgError, setImgError] = useState(false);
 
   const mood = release.mood ?? "ambient";
   const moodStyle = MOOD_COLORS[mood] ?? MOOD_COLORS.ambient;
@@ -65,22 +64,12 @@ export function ReleaseCard({ release, index, onOpen }: ReleaseCardProps) {
               : "0 8px 32px rgba(0,0,0,0.5)",
           }}
         >
-          {!imgError ? (
-            <Image
-              src={release.artwork_url}
-              alt={`${release.artist} — ${release.title}`}
-              fill
-              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              className="object-cover transition-transform duration-700 group-hover:scale-105"
-              onError={() => setImgError(true)}
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-nebula to-void flex items-center justify-center">
-              <span className="text-dust text-4xl font-bold">
-                {release.artist.charAt(0).toUpperCase()}
-              </span>
-            </div>
-          )}
+          <Artwork
+            src={release.artwork_url}
+            artist={release.artist}
+            title={release.title}
+            className="object-cover transition-transform duration-700 group-hover:scale-105"
+          />
 
           {/* Scanline overlay */}
           <div
