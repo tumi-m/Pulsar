@@ -9,6 +9,7 @@ import { GenreFilter } from "./GenreFilter";
 import { OnboardingQuiz } from "./OnboardingQuiz";
 import { FormatPicker } from "./FormatPicker";
 import { FloatingDock } from "./FloatingDock";
+import { Visualizer } from "./Visualizer";
 import { genreBucket, GENRE_BUCKETS, type GenreBucket } from "@/lib/utils";
 import { loadFormat, saveFormat, type MediaFormat } from "@/lib/format";
 import {
@@ -33,6 +34,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   const [activeLabel, setActiveLabel] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>("latest");
   const [selectedRelease, setSelectedRelease] = useState<Release | null>(null);
+  const [visualizing, setVisualizing] = useState<Release | null>(null);
   const [visible, setVisible] = useState(PAGE);
   const [profile, setProfile] = useState<TasteProfile | null>(null);
   const [showQuiz, setShowQuiz] = useState(false);
@@ -260,7 +262,14 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       <ReleaseModal
         release={selectedRelease}
         onClose={() => setSelectedRelease(null)}
+        onVisualize={(r) => {
+          setSelectedRelease(null);
+          setVisualizing(r);
+        }}
       />
+
+      {/* live audio-reactive 3D visualizer */}
+      <Visualizer release={visualizing} onClose={() => setVisualizing(null)} />
 
       {/* floating 3D dock — favorites / playlist / share */}
       <FloatingDock format={format} onOpen={setSelectedRelease} />

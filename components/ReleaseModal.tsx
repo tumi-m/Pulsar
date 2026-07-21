@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, Link as LinkIcon } from "lucide-react";
+import { X, Check, Link as LinkIcon, AudioLines } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { Artwork } from "./Artwork";
@@ -10,6 +10,7 @@ import { Artwork } from "./Artwork";
 interface ReleaseModalProps {
   release: Release | null;
   onClose: () => void;
+  onVisualize?: (release: Release) => void;
 }
 
 const PLATFORMS = [
@@ -74,7 +75,7 @@ const PLATFORMS = [
  * Listen panel — the whole point of Pulsar. One release, five services,
  * rendered as rich rows so the user taps whichever platform they pay for.
  */
-export function ReleaseModal({ release, onClose }: ReleaseModalProps) {
+export function ReleaseModal({ release, onClose, onVisualize }: ReleaseModalProps) {
   const [copied, setCopied] = useState<string | null>(null);
 
   useEffect(() => {
@@ -173,6 +174,34 @@ export function ReleaseModal({ release, onClose }: ReleaseModalProps) {
                 <p className="border-t border-star-white/5 px-4 py-3 text-[13px] italic leading-relaxed text-star-white/60">
                   “{release.curator_note}”
                 </p>
+              )}
+
+              {/* visualize / preview */}
+              {onVisualize && (
+                <div className="border-t border-star-white/5 p-2.5">
+                  <button
+                    onClick={() => onVisualize(release)}
+                    className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-neon-violet/10"
+                    style={{
+                      background: "linear-gradient(100deg, rgba(155,93,229,0.12), rgba(0,212,255,0.06))",
+                    }}
+                  >
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-neon-violet/20 text-neon-violet">
+                      <AudioLines size={18} />
+                    </span>
+                    <span className="flex-1 text-left">
+                      <span className="block text-sm font-bold uppercase tracking-wide text-star-white">
+                        Play & Visualize
+                      </span>
+                      <span className="block text-[11px] text-star-white/45">
+                        30-second preview · live 3D particle visuals
+                      </span>
+                    </span>
+                    <span className="text-star-white/30 transition-all group-hover:translate-x-0.5 group-hover:text-star-white/70">
+                      →
+                    </span>
+                  </button>
+                </div>
               )}
 
               {/* platform rows */}
