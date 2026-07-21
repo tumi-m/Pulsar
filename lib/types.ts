@@ -36,6 +36,9 @@ export interface Release {
   youtube_music: string | null;
   created_at: string;
   curator_note: string | null;
+  /** Cross-DSP chart strength (higher = more streamed right now).
+   *  Present only on releases currently charting; not persisted to DB. */
+  popularity?: number | null;
 }
 
 export interface AgentRelease {

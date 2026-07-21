@@ -117,24 +117,37 @@ interface DeezerAlbum {
   artist?: { name?: string };
 }
 
+function mapDeezer(a: DeezerAlbum, popularity: number | null): Release | null {
+  const artist = a.artist?.name?.trim();
+  const title = a.title?.trim();
+  const art = a.cover_xl ?? a.cover_big;
+  if (!artist || !title || !art) return null;
+  const type: ReleaseType =
+    a.record_type === "single" ? "single" : a.record_type === "ep" ? "ep" : "album";
+  const date =
+    a.release_date && /^\d{4}-\d{2}-\d{2}$/.test(a.release_date)
+      ? a.release_date
+      : todayISO();
+  const r = baseRelease(artist, title, type, art, date, null, null);
+  if (popularity != null) r.popularity = popularity;
+  return r;
+}
+
 async function fromDeezer(): Promise<Release[]> {
-  const data = (await fetchJSON("https://api.deezer.com/editorial/0/releases")) as {
-    data?: DeezerAlbum[];
-  } | null;
+  const [releases, chart] = await Promise.all([
+    fetchJSON("https://api.deezer.com/editorial/0/releases") as Promise<{ data?: DeezerAlbum[] } | null>,
+    fetchJSON("https://api.deezer.com/chart/0/albums?limit=100") as Promise<{ data?: DeezerAlbum[] } | null>,
+  ]);
   const out: Release[] = [];
-  for (const a of data?.data ?? []) {
-    const artist = a.artist?.name?.trim();
-    const title = a.title?.trim();
-    const art = a.cover_xl ?? a.cover_big;
-    if (!artist || !title || !art) continue;
-    const type: ReleaseType =
-      a.record_type === "single" ? "single" : a.record_type === "ep" ? "ep" : "album";
-    const date =
-      a.release_date && /^\d{4}-\d{2}-\d{2}$/.test(a.release_date)
-        ? a.release_date
-        : todayISO();
-    out.push(baseRelease(artist, title, type, art, date, null, null));
+  for (const a of releases?.data ?? []) {
+    const r = mapDeezer(a, null);
+    if (r) out.push(r);
   }
+  // Chart entries carry a popularity rank: position 1 => 200, 2 => 199...
+  (chart?.data ?? []).forEach((a, i) => {
+    const r = mapDeezer(a, 200 - i);
+    if (r) out.push(r);
+  });
   return out;
 }
 
@@ -174,9 +187,12 @@ async function fromApple(): Promise<Release[]> {
           r.releaseDate && /^\d{4}-\d{2}-\d{2}$/.test(r.releaseDate)
             ? r.releaseDate
             : todayISO();
-        out.push(
-          baseRelease(artist, title, type, appleHiRes(r.artworkUrl100), date, genre, r.url ?? null)
+        const rel = baseRelease(
+          artist, title, type, appleHiRes(r.artworkUrl100), date, genre, r.url ?? null
         );
+        // Feed order IS the most-played chart: rank 1 => 200, 2 => 199...
+        rel.popularity = 200 - out.length;
+        out.push(rel);
       }
     })
   );
@@ -195,12 +211,18 @@ export async function getLiveFeed(): Promise<Release[]> {
 
   const seen = new Set<string>();
   const all: Release[] = [];
+  const byKey = new Map<string, Release>();
   for (const r of [...deezer, ...apple]) {
     const key = `${r.artist.toLowerCase()}::${r.title.toLowerCase()}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    all.push(r);
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, r);
+      all.push(r);
+    } else if ((r.popularity ?? -1) > (existing.popularity ?? -1)) {
+      existing.popularity = r.popularity; // keep strongest chart signal
+    }
   }
+  void seen;
 
   return all.sort((a, b) => (a.release_date < b.release_date ? 1 : -1));
 }

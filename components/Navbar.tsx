@@ -29,8 +29,8 @@ export function Navbar() {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-star-white/60 opacity-60" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-star-white" />
           </span>
-          <span className="text-sm font-semibold tracking-[0.28em] text-star-white">
-            PULSAR
+          <span className="text-sm font-bold uppercase tracking-[0.28em] text-star-white">
+            “PULSAR”
           </span>
         </Link>
 

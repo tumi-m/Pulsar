@@ -19,16 +19,22 @@ const norm = (s: string) =>
 
 const key = (r: Release) => `${norm(r.artist)}::${norm(r.title)}`;
 
-/** Merge sources newest-first, removing duplicates (first occurrence wins). */
+/** Merge sources newest-first, removing duplicates (first occurrence wins).
+ *  Chart data (popularity) from a dropped duplicate is backfilled onto the
+ *  kept copy so "Most Streamed" works even when the DB copy wins. */
 function mergeReleases(...sources: Release[][]): Release[] {
-  const seen = new Set<string>();
+  const byKey = new Map<string, Release>();
   const out: Release[] = [];
   for (const src of sources) {
     for (const r of src) {
       const k = key(r);
-      if (seen.has(k)) continue;
-      seen.add(k);
-      out.push(r);
+      const existing = byKey.get(k);
+      if (!existing) {
+        byKey.set(k, r);
+        out.push(r);
+      } else if ((r.popularity ?? -1) > (existing.popularity ?? -1)) {
+        existing.popularity = r.popularity;
+      }
     }
   }
   return out;
