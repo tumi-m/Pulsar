@@ -17,6 +17,7 @@
 
 import { getLiveFeed } from "../lib/feed";
 import { saveRelease, supabaseAdmin } from "../lib/supabase";
+import { enrichReleases } from "./llm";
 import { config } from "./env";
 
 config();
@@ -25,6 +26,7 @@ export interface IngestResult {
   found: number;
   saved: number;
   failed: number;
+  enriched: number;
   skipped: boolean;
   reason?: string;
 }
@@ -46,11 +48,15 @@ export async function runIngest(): Promise<IngestResult> {
       "ℹ️  Supabase not configured — skipping ingest (the live site still\n" +
         "   shows fresh music from the Apple feed without a database).\n"
     );
-    return { found: 0, saved: 0, failed: 0, skipped: true, reason: "no-supabase-config" };
+    return { found: 0, saved: 0, failed: 0, enriched: 0, skipped: true, reason: "no-supabase-config" };
   }
 
-  const releases = await getLiveFeed();
-  console.log(`Fetched ${releases.length} releases from the live feed.\n`);
+  const feed = await getLiveFeed();
+  console.log(`Fetched ${feed.length} releases from the live feed.`);
+
+  // Optional editorial layer: an open model (Ollama) writes a curator note
+  // + mood for the newest releases. Skipped gracefully if Ollama is absent.
+  const { releases, enriched } = await enrichReleases(feed);
 
   let saved = 0;
   let failed = 0;
@@ -85,8 +91,9 @@ export async function runIngest(): Promise<IngestResult> {
   const durationMs = Date.now() - start;
   console.log(`\n${"─".repeat(56)}`);
   console.log(`✅ Ingest complete`);
-  console.log(`   Saved:   ${saved}`);
-  console.log(`   Failed:  ${failed}`);
+  console.log(`   Saved:    ${saved}`);
+  console.log(`   Enriched: ${enriched}`);
+  console.log(`   Failed:   ${failed}`);
   console.log(`   Duration: ${(durationMs / 1000).toFixed(1)}s`);
   if (errors.length) console.log(`   First errors:\n     ${errors.join("\n     ")}`);
   console.log(`${"─".repeat(56)}\n`);
@@ -104,7 +111,7 @@ export async function runIngest(): Promise<IngestResult> {
     /* non-fatal */
   }
 
-  return { found: releases.length, saved, failed, skipped: false };
+  return { found: releases.length, saved, failed, enriched, skipped: false };
 }
 
 // CLI entry — only when run directly (not when imported by the API route).

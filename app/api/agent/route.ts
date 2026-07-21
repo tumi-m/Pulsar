@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
       success: result.saved > 0,
       releases_found: result.found,
       releases_saved: result.saved,
+      releases_enriched: result.enriched,
       errors: [],
       run_at: new Date().toISOString(),
     });

@@ -105,11 +105,45 @@ The ingest job:
 |--------|-------------|------|
 | Apple RSS live feed | ❌ none | Home page always shows fresh releases |
 | Supabase (via `ingest`) | Supabase only | Persists + grows the catalog daily |
+| Ollama curation | ❌ (local) / key (cloud) | Adds curator notes + mood per release |
 | Built-in catalog (60 albums) | ❌ none | Final fallback so it's never blank |
-| Claude agent (`agent`) | Anthropic + search | Optional richer curation |
+| Claude agent (`agent`) | Anthropic + search | Optional web-browsing curator |
 
 The home page merges them: **Supabase → live Apple feed → catalog**, newest
 first, de-duplicated.
+
+---
+
+## Open-model curation (Ollama)
+
+The ingest job can enrich each release with an editorial **curator note** and
+**mood** using an open model via Ollama — no paid API. It only generates
+text about releases we already have (artwork + links come from the feed), so
+there is zero risk of hallucinated links.
+
+```bash
+# Local Ollama
+ollama pull llama3.1
+export OLLAMA_BASE_URL=http://localhost:11434
+export OLLAMA_MODEL=llama3.1
+npm run ingest        # releases are saved with AI curator notes + mood
+
+# Ollama Cloud / Turbo instead of local
+export OLLAMA_BASE_URL=https://ollama.com
+export OLLAMA_API_KEY=your-ollama-key
+export OLLAMA_MODEL=gpt-oss:120b   # or any model your plan offers
+npm run ingest
+```
+
+Tuning: `ENRICH_LIMIT` (newest N releases to enrich, default 30) and
+`ENRICH_CONCURRENCY` (parallel requests, default 3). If Ollama is
+unreachable the job saves releases without notes — it never fails.
+
+> **Note on GitHub Actions:** a local Ollama isn't reachable from GitHub's
+> runners. For enrichment in the daily cloud job, use **Ollama Cloud/Turbo**
+> (set `OLLAMA_BASE_URL=https://ollama.com` + `OLLAMA_API_KEY` as repo
+> secrets). To enrich with a *local* model, run `npm run ingest` on your own
+> machine / a box where Ollama is running.
 
 ---
 
