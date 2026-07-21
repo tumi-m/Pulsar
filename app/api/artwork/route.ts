@@ -77,23 +77,38 @@ export async function GET(req: NextRequest) {
     }
 
     if (!best?.artworkUrl100) {
-      return NextResponse.json({ error: "no confident match" }, { status: 404 });
+      return NextResponse.json(
+        { error: "no confident match" },
+        { status: 404, headers: { "Cache-Control": "no-store", "Netlify-Vary": "query" } }
+      );
     }
 
     const artworkUrl = best.artworkUrl100.replace("100x100bb", "1200x1200bb");
     const imgRes = await fetch(artworkUrl, { signal: AbortSignal.timeout(10000) });
     if (!imgRes.ok || !imgRes.body) {
-      return NextResponse.json({ error: "artwork fetch failed" }, { status: 502 });
+      return NextResponse.json(
+        { error: "artwork fetch failed" },
+        { status: 502, headers: { "Cache-Control": "no-store", "Netlify-Vary": "query" } }
+      );
     }
 
     return new NextResponse(imgRes.body, {
       headers: {
         "Content-Type": imgRes.headers.get("content-type") ?? "image/jpeg",
-        "Cache-Control": "public, max-age=31536000, s-maxage=31536000, immutable",
+        "Cache-Control": "public, max-age=31536000, immutable",
+        // Netlify caches function responses by PATH ONLY unless told to key
+        // on the query string — without this, every album got served the
+        // first cached cover. This header is the fix.
+        "Netlify-Vary": "query",
+        // Persist in Netlify's durable (global) cache too
+        "Netlify-CDN-Cache-Control": "public, durable, s-maxage=31536000, immutable",
       },
     });
   } catch (err) {
     console.error("artwork proxy error:", err);
-    return NextResponse.json({ error: "artwork lookup failed" }, { status: 502 });
+    return NextResponse.json(
+      { error: "artwork lookup failed" },
+      { status: 502, headers: { "Cache-Control": "no-store", "Netlify-Vary": "query" } }
+    );
   }
 }

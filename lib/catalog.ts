@@ -901,8 +901,9 @@ export type CatalogEntry = (typeof RELEASES)[number];
 
 export const CATALOG_DATA = RELEASES;
 
-// Fully-typed Release[] with deterministic ids, newest first
-export const CATALOG: Release[] = RELEASES.map((r, i) => ({
+import { EXPANSION } from "./catalog-expansion";
+
+const CORE: Release[] = RELEASES.map((r, i) => ({
   id: `catalog-${String(i).padStart(3, "0")}`,
   artist: r.artist,
   title: r.title,
@@ -919,4 +920,19 @@ export const CATALOG: Release[] = RELEASES.map((r, i) => ({
   youtube_music: r.youtube_music,
   created_at: r.release_date + "T00:00:00Z",
   curator_note: r.curator_note ?? null,
-})).sort((a, b) => (a.release_date < b.release_date ? 1 : -1));
+}));
+
+// Merge: EXPANSION first (guaranteed-correct proxy artwork wins on
+// duplicates), then the original core entries. Newest first.
+const dedupeKey = (r: Release) =>
+  `${r.artist.toLowerCase().replace(/^the\s+/, "")}::${r.title.toLowerCase()}`;
+
+const seenKeys = new Set<string>();
+export const CATALOG: Release[] = [...EXPANSION, ...CORE]
+  .filter((r) => {
+    const k = dedupeKey(r);
+    if (seenKeys.has(k)) return false;
+    seenKeys.add(k);
+    return true;
+  })
+  .sort((a, b) => (a.release_date < b.release_date ? 1 : -1));

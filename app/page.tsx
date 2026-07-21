@@ -7,7 +7,17 @@ import type { Release } from "@/lib/types";
 
 export const revalidate = 300; // ISR — revalidate every 5 minutes
 
-const key = (r: Release) => `${r.artist.toLowerCase()}::${r.title.toLowerCase()}`;
+// Normalized dedupe key: ignore "(Remastered)", "[Deluxe]", "- Single",
+// punctuation and a leading "the" so the same record never appears twice.
+const norm = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/\(.*?\)|\[.*?\]/g, "")
+    .replace(/\s*-\s*(single|ep|deluxe.*|remaster.*|anniversary.*)$/i, "")
+    .replace(/^the\s+/, "")
+    .replace(/[^a-z0-9]/g, "");
+
+const key = (r: Release) => `${norm(r.artist)}::${norm(r.title)}`;
 
 /** Merge sources newest-first, removing duplicates (first occurrence wins). */
 function mergeReleases(...sources: Release[][]): Release[] {
