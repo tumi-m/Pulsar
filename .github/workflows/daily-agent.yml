@@ -1,23 +1,17 @@
-name: Pulsar — Daily Music Discovery
+name: Pulsar — Daily Ingest
 
 on:
   # Run daily at 08:00 UTC
   schedule:
     - cron: '0 8 * * *'
-  # Allow manual trigger from GitHub UI
+  # Allow manual trigger from the GitHub Actions tab
   workflow_dispatch:
-    inputs:
-      run_on_start:
-        description: 'Run agent immediately'
-        required: false
-        default: 'true'
-        type: boolean
 
 jobs:
-  discover:
-    name: Run Music Discovery Agent
+  ingest:
+    name: Ingest new releases
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -32,16 +26,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Daily ingest — pulls fresh releases from Apple's free RSS feeds
-      # and writes them to Supabase. Needs ONLY the Supabase credentials.
+      # Only run the ingest when Supabase is configured. If the secret is
+      # missing the step is skipped and the job still succeeds — so GitHub
+      # never emails a failure for an unconfigured repo.
+      - name: Check configuration
+        id: cfg
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -n "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Supabase secrets not set — skipping ingest. The live site still shows fresh music from the Apple feed."
+          fi
+
       - name: Run Pulsar ingest
+        if: steps.cfg.outputs.configured == 'true'
         run: npm run ingest
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-
-      - name: Notify on failure
-        if: failure()
-        run: |
-          echo "::error::Pulsar agent run failed. Check logs above."

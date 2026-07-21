@@ -21,12 +21,33 @@ import { config } from "./env";
 
 config();
 
-export async function runIngest() {
+export interface IngestResult {
+  found: number;
+  saved: number;
+  failed: number;
+  skipped: boolean;
+  reason?: string;
+}
+
+export async function runIngest(): Promise<IngestResult> {
   const start = Date.now();
   console.log(`\n${"─".repeat(56)}`);
   console.log(`🎵 PULSAR — Daily Ingest`);
   console.log(`   Started: ${new Date().toISOString()}`);
   console.log(`${"─".repeat(56)}\n`);
+
+  // If Supabase isn't configured there's nothing to persist to. Treat this
+  // as a clean no-op (NOT a failure) so scheduled runs never error out.
+  if (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.SUPABASE_SERVICE_ROLE_KEY
+  ) {
+    console.log(
+      "ℹ️  Supabase not configured — skipping ingest (the live site still\n" +
+        "   shows fresh music from the Apple feed without a database).\n"
+    );
+    return { found: 0, saved: 0, failed: 0, skipped: true, reason: "no-supabase-config" };
+  }
 
   const releases = await getLiveFeed();
   console.log(`Fetched ${releases.length} releases from the live feed.\n`);
@@ -83,13 +104,16 @@ export async function runIngest() {
     /* non-fatal */
   }
 
-  return { found: releases.length, saved, failed };
+  return { found: releases.length, saved, failed, skipped: false };
 }
 
-// CLI entry — only when run directly (not when imported by the API route)
+// CLI entry — only when run directly (not when imported by the API route).
+// A completed run is a SUCCESS (exit 0) even if it saved 0 (feed empty, all
+// duplicates, or unconfigured) — the scheduled job only errors on a genuine
+// crash, so it never emails you a "failed run" for a normal quiet day.
 if (process.argv[1] && /ingest\.ts$/.test(process.argv[1])) {
   runIngest()
-    .then((r) => process.exit(r.saved > 0 ? 0 : 1))
+    .then(() => process.exit(0))
     .catch((err) => {
       console.error("Ingest fatal error:", err);
       process.exit(1);
