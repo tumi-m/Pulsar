@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Play, Pause, Sparkles } from "lucide-react";
+import { X, Play, Pause, Sparkles, Repeat } from "lucide-react";
 import type { Release } from "@/lib/types";
 
 interface VisualizerProps {
@@ -41,10 +41,16 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
   const [playing, setPlaying] = useState(false);
   const [status, setStatus] = useState<"loading" | "ready" | "none">("loading");
   const [trackName, setTrackName] = useState<string>("");
+  const [loop, setLoop] = useState(true); // repeat the preview so visuals never stop
 
   useEffect(() => {
     modeRef.current = mode;
   }, [mode]);
+
+  // keep the audio element's loop flag in sync with the toggle
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.loop = loop;
+  }, [loop]);
 
   // ── init particles ──────────────────────────────────────────────
   const initParticles = useCallback(() => {
@@ -120,6 +126,7 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
         const audio = audioRef.current;
         if (audio) {
           audio.crossOrigin = "anonymous";
+          audio.loop = loop;
           audio.src = data.previewUrl;
           audio.load();
           setStatus("ready");
@@ -396,26 +403,51 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
             </div>
 
             {/* transport */}
-            <button
-              onClick={togglePlay}
-              disabled={status !== "ready"}
-              aria-label={playing ? "Pause" : "Play"}
-              className="flex h-16 w-16 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95 disabled:opacity-40"
-              style={{
-                background: "linear-gradient(160deg, #f0f0f4, #c4c4cc)",
-                boxShadow: "0 8px 24px rgba(155,93,229,0.4), inset 0 1px 0 rgba(255,255,255,0.7)",
-              }}
-            >
-              {status === "loading" ? (
-                <Sparkles size={22} className="animate-pulse text-void" />
-              ) : playing ? (
-                <Pause size={24} className="text-void" fill="currentColor" />
-              ) : (
-                <Play size={24} className="ml-0.5 text-void" fill="currentColor" />
-              )}
-            </button>
+            <div className="flex items-center gap-4">
+              {/* loop toggle */}
+              <button
+                onClick={() => setLoop((v) => !v)}
+                aria-label={loop ? "Loop on" : "Loop off"}
+                aria-pressed={loop}
+                title={loop ? "Looping preview" : "Play once"}
+                className={`flex h-11 w-11 items-center justify-center rounded-full border transition-colors ${
+                  loop
+                    ? "border-neon-violet/60 bg-neon-violet/20 text-neon-violet"
+                    : "border-white/15 bg-void/50 text-star-white/45 hover:text-star-white"
+                }`}
+              >
+                <Repeat size={16} />
+              </button>
+
+              {/* play / pause */}
+              <button
+                onClick={togglePlay}
+                disabled={status !== "ready"}
+                aria-label={playing ? "Pause" : "Play"}
+                className="flex h-16 w-16 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95 disabled:opacity-40"
+                style={{
+                  background: "linear-gradient(160deg, #f0f0f4, #c4c4cc)",
+                  boxShadow: "0 8px 24px rgba(155,93,229,0.4), inset 0 1px 0 rgba(255,255,255,0.7)",
+                }}
+              >
+                {status === "loading" ? (
+                  <Sparkles size={22} className="animate-pulse text-void" />
+                ) : playing ? (
+                  <Pause size={24} className="text-void" fill="currentColor" />
+                ) : (
+                  <Play size={24} className="ml-0.5 text-void" fill="currentColor" />
+                )}
+              </button>
+
+              {/* spacer to keep play button visually centered */}
+              <span className="h-11 w-11" aria-hidden />
+            </div>
             <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-star-white/35">
-              {status === "ready" ? `30s preview · ${trackName}` : status === "loading" ? "finding preview…" : "no audio"}
+              {status === "ready"
+                ? `30s preview${loop ? " · looping" : ""} · ${trackName}`
+                : status === "loading"
+                ? "finding preview…"
+                : "no audio"}
             </p>
           </div>
         </motion.div>
