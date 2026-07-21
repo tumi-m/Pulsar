@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 import { useState } from "react";
+import { CalabiYau } from "./CalabiYau";
 
 export function Navbar() {
   const { scrollY } = useScroll();
@@ -25,10 +26,7 @@ export function Navbar() {
     >
       <div className="mx-auto flex h-full max-w-screen-2xl items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-star-white/60 opacity-60" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-star-white" />
-          </span>
+          <CalabiYau size={20} />
           <span className="text-sm font-bold uppercase tracking-[0.28em] text-star-white">
             “PULSAR”
           </span>
