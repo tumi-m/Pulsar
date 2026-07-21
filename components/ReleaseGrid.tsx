@@ -7,7 +7,10 @@ import { ReleaseCard } from "./ReleaseCard";
 import { ReleaseModal } from "./ReleaseModal";
 import { GenreFilter } from "./GenreFilter";
 import { OnboardingQuiz } from "./OnboardingQuiz";
+import { FormatPicker } from "./FormatPicker";
+import { FloatingDock } from "./FloatingDock";
 import { genreBucket, GENRE_BUCKETS, type GenreBucket } from "@/lib/utils";
+import { loadFormat, saveFormat, type MediaFormat } from "@/lib/format";
 import {
   loadProfile,
   clearProfile,
@@ -27,11 +30,13 @@ type ViewMode = "latest" | "streamed" | "foryou";
 
 export function ReleaseGrid({ releases }: ReleaseGridProps) {
   const [activeGenre, setActiveGenre] = useState<GenreBucket | null>(null);
+  const [activeLabel, setActiveLabel] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>("latest");
   const [selectedRelease, setSelectedRelease] = useState<Release | null>(null);
   const [visible, setVisible] = useState(PAGE);
   const [profile, setProfile] = useState<TasteProfile | null>(null);
   const [showQuiz, setShowQuiz] = useState(false);
+  const [format, setFormat] = useState<MediaFormat>("vinyl");
 
   // First visit → show the visual taste quiz (client-only, no hydration mismatch)
   useEffect(() => {
@@ -41,7 +46,20 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     } else if (!localStorage.getItem(SKIP_KEY)) {
       setShowQuiz(true);
     }
+    setFormat(loadFormat());
   }, []);
+
+  // Labels present in the current data, most-common first
+  const labels = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of releases) {
+      if (r.label) counts.set(r.label, (counts.get(r.label) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .filter(([, n]) => n >= 2)
+      .sort((a, b) => b[1] - a[1])
+      .map(([l]) => l);
+  }, [releases]);
 
   const available = useMemo(() => {
     const present = new Set<GenreBucket>();
@@ -71,8 +89,9 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
         .map(({ r }) => r);
     }
     if (activeGenre) list = list.filter((r) => genreBucket(r.genre) === activeGenre);
+    if (activeLabel) list = list.filter((r) => r.label === activeLabel);
     return list;
-  }, [releases, activeGenre, view, profile]);
+  }, [releases, activeGenre, activeLabel, view, profile]);
 
   const shown = filtered.slice(0, visible);
   const sizes = useMemo(() => tileSizes(shown, profile), [shown, profile]);
@@ -139,9 +158,15 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
             >
               {profile ? "“Retake Quiz” →" : "“Take the Quiz” →"}
             </button>
-            <span className="ml-auto hidden flex-shrink-0 font-mono text-[10px] tracking-[0.2em] text-star-white/30 md:block">
-              {filtered.length} RELEASES
-            </span>
+            <div className="ml-auto flex flex-shrink-0 items-center">
+              <FormatPicker
+                active={format}
+                onChange={(f) => {
+                  setFormat(f);
+                  saveFormat(f);
+                }}
+              />
+            </div>
           </div>
           {/* genres */}
           <GenreFilter
@@ -152,6 +177,41 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
             }}
             available={available}
           />
+          {/* record labels — the crate dividers */}
+          {labels.length > 0 && (
+            <div className="scrollbar-none flex items-center gap-1 overflow-x-auto">
+              <span className="flex-shrink-0 pr-1 text-[9px] font-bold uppercase tracking-[0.24em] text-star-white/30">
+                “Label”
+              </span>
+              <button
+                onClick={() => {
+                  setActiveLabel(null);
+                  setVisible(PAGE);
+                }}
+                className={`flex-shrink-0 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                  activeLabel === null ? "text-star-white" : "text-star-white/35 hover:text-star-white/70"
+                }`}
+              >
+                All
+              </button>
+              {labels.map((l) => (
+                <button
+                  key={l}
+                  onClick={() => {
+                    setActiveLabel(activeLabel === l ? null : l);
+                    setVisible(PAGE);
+                  }}
+                  className={`flex-shrink-0 whitespace-nowrap border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                    activeLabel === l
+                      ? "border-neon-green/60 bg-neon-green/10 text-neon-green"
+                      : "border-star-white/15 text-star-white/40 hover:border-star-white/40 hover:text-star-white"
+                  }`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </motion.div>
 
@@ -178,6 +238,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               index={i}
               size={(sizes[i] ?? 0) as 0 | 1 | 2}
               forYou={Boolean(profile) && (sizes[i] ?? 0) > 0}
+              format={format}
               onOpen={setSelectedRelease}
             />
           ))}
@@ -200,6 +261,9 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
         release={selectedRelease}
         onClose={() => setSelectedRelease(null)}
       />
+
+      {/* floating 3D dock — favorites / playlist / share */}
+      <FloatingDock format={format} onOpen={setSelectedRelease} />
     </>
   );
 }

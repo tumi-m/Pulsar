@@ -39,6 +39,8 @@ export interface Release {
   /** Cross-DSP chart strength (higher = more streamed right now).
    *  Present only on releases currently charting; not persisted to DB. */
   popularity?: number | null;
+  /** Record label (e.g. "Sub Pop", "Griselda"). Optional metadata. */
+  label?: string | null;
 }
 
 export interface AgentRelease {

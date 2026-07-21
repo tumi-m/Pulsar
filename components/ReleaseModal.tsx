@@ -154,6 +154,11 @@ export function ReleaseModal({ release, onClose }: ReleaseModalProps) {
                     {release.type} · {formatDate(release.release_date)}
                     {release.genre ? ` · ${release.genre}` : ""}
                   </p>
+                  {release.label && (
+                    <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.2em] text-neon-green/70">
+                      ▪ {release.label}
+                    </p>
+                  )}
                 </div>
                 <button
                   onClick={onClose}

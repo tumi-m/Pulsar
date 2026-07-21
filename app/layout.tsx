@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { ParticleField } from "@/components/ParticleField";
+import { FloatingObjects } from "@/components/FloatingObjects";
 
 export const metadata: Metadata = {
   title: "PULSAR — Daily Music Discovery",
@@ -43,6 +44,9 @@ export default function RootLayout({
 
         {/* Particle field */}
         <ParticleField />
+
+        {/* Immersive drifting physical-media silhouettes */}
+        <FloatingObjects />
 
         {/* Navigation */}
         <Navbar />
