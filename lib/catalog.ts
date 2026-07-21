@@ -902,6 +902,7 @@ export type CatalogEntry = (typeof RELEASES)[number];
 export const CATALOG_DATA = RELEASES;
 
 import { EXPANSION } from "./catalog-expansion";
+import { EXPANSION2 } from "./catalog-expansion-2";
 
 const CORE: Release[] = RELEASES.map((r, i) => ({
   id: `catalog-${String(i).padStart(3, "0")}`,
@@ -928,7 +929,7 @@ const dedupeKey = (r: Release) =>
   `${r.artist.toLowerCase().replace(/^the\s+/, "")}::${r.title.toLowerCase()}`;
 
 const seenKeys = new Set<string>();
-export const CATALOG: Release[] = [...EXPANSION, ...CORE]
+export const CATALOG: Release[] = [...EXPANSION, ...EXPANSION2, ...CORE]
   .filter((r) => {
     const k = dedupeKey(r);
     if (seenKeys.has(k)) return false;
