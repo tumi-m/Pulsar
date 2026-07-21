@@ -9,57 +9,38 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
 
   useMotionValueEvent(scrollY, "change", (y) => {
-    setScrolled(y > 40);
+    setScrolled(y > 24);
   });
 
   return (
     <motion.nav
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.6 }}
       className={`
-        fixed top-0 left-0 right-0 z-40 px-6 md:px-12 py-4
-        transition-all duration-500
-        ${scrolled
-          ? "bg-void/80 backdrop-blur-xl border-b border-mist/10"
-          : "bg-transparent"
-        }
+        fixed inset-x-0 top-0 z-40 h-14 px-5 md:px-10
+        transition-colors duration-500
+        ${scrolled ? "border-b border-star-white/[0.06] bg-void/70 backdrop-blur-xl" : "bg-transparent"}
       `}
     >
-      <div className="max-w-screen-xl mx-auto flex items-center justify-between">
-        {/* Logo */}
-        <Link href="/" className="group flex items-center gap-3">
-          {/* Pulse indicator */}
-          <div className="relative w-3 h-3">
-            <div className="absolute inset-0 rounded-full bg-neon-violet" />
-            <motion.div
-              animate={{ scale: [1, 2, 1], opacity: [0.8, 0, 0.8] }}
-              transition={{ duration: 2, repeat: Infinity }}
-              className="absolute inset-0 rounded-full bg-neon-violet"
-            />
-          </div>
-          <span className="text-star-white font-bold text-lg tracking-tight">
+      <div className="mx-auto flex h-full max-w-screen-2xl items-center justify-between">
+        <Link href="/" className="flex items-center gap-2.5">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-star-white/60 opacity-60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-star-white" />
+          </span>
+          <span className="text-sm font-semibold tracking-[0.28em] text-star-white">
             PULSAR
           </span>
         </Link>
 
-        {/* Right nav */}
-        <div className="flex items-center gap-6">
-          <Link
-            href="/"
-            className="text-[11px] font-mono tracking-widest text-dust hover:text-star-white transition-colors"
-          >
-            DISCOVER
-          </Link>
-          <div className="w-px h-4 bg-mist/30" />
-          <span className="text-[11px] font-mono tracking-widest text-dust/40">
-            {new Date().toLocaleDateString("en-US", {
-              weekday: "short",
-              month: "short",
-              day: "numeric",
-            }).toUpperCase()}
-          </span>
-        </div>
+        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-star-white/35">
+          {new Date().toLocaleDateString("en-US", {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+          })}
+        </span>
       </div>
     </motion.nav>
   );

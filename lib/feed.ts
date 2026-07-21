@@ -1,39 +1,28 @@
 /**
  * Pulsar — Live Music Feed
  *
- * Pulls genuinely new releases from Apple's Marketing Tools RSS feeds.
- * These are FREE and require NO API KEY, so the site self-updates daily
- * with real artwork, real Apple Music links, genre, and release date.
- * The four remaining platform links are deep search links to the exact
- * release. Results are cached (ISR) and merged with Supabase + catalog.
+ * Pulls current + genuinely new releases from FREE, keyless APIs so the
+ * site self-updates daily with real artwork and platform links:
+ *
+ *   • Deezer editorial new releases  — this week's actual album drops
+ *     https://api.deezer.com/editorial/0/releases   (no auth)
+ *   • Apple Marketing Tools RSS      — most-played albums + songs now
+ *     https://rss.applemarketingtools.com/api/v2/...  (no auth)
+ *
+ * Every source is best-effort: a dead endpoint yields fewer results,
+ * never an error. Results are merged, de-duplicated, newest first.
  */
 
 import type { Release, ReleaseType, MoodTag } from "./types";
 
-// Apple Marketing Tools RSS — no auth required. We try several feeds and
-// merge whatever succeeds, so a single dead endpoint never breaks the site.
-const FEED_URLS = [
-  "https://rss.applemarketingtools.com/api/v2/us/music/most-recent/100/albums.json",
-  "https://rss.applemarketingtools.com/api/v2/us/music/most-recent/100/songs.json",
-];
-
-interface AppleFeedResult {
-  artistName?: string;
-  name?: string;
-  releaseDate?: string;
-  kind?: string;
-  artworkUrl100?: string;
-  genres?: { name: string }[];
-  url?: string;
-}
-
 // ── platform deep links ──────────────────────
 const sp = (q: string) => `https://open.spotify.com/search/${encodeURIComponent(q)}`;
+const am = (q: string) => `https://music.apple.com/search?term=${encodeURIComponent(q)}`;
 const td = (q: string) => `https://tidal.com/search?q=${encodeURIComponent(q)}`;
 const sc = (q: string) => `https://soundcloud.com/search?q=${encodeURIComponent(q)}`;
 const yt = (q: string) => `https://music.youtube.com/search?q=${encodeURIComponent(q)}`;
 
-// Map an Apple genre string onto one of our mood accent colors.
+// Map a genre string onto one of our mood accent colors.
 const GENRE_MOOD: Record<string, MoodTag> = {
   "hip-hop/rap": "energetic",
   "hip hop/rap": "energetic",
@@ -64,11 +53,6 @@ function moodFor(genre: string): MoodTag {
   return "cinematic";
 }
 
-function hiResArtwork(url: string): string {
-  // Apple thumbnails end in /{w}x{h}bb.jpg — request a large, crisp version.
-  return url.replace(/\/\d+x\d+bb\.(jpg|png)/, "/1500x1500bb.$1");
-}
-
 function stableId(artist: string, title: string): string {
   let h = 0;
   const s = `${artist}::${title}`.toLowerCase();
@@ -78,32 +62,28 @@ function stableId(artist: string, title: string): string {
   return `feed-${(h >>> 0).toString(36)}`;
 }
 
-function mapResult(r: AppleFeedResult): Release | null {
-  const artist = r.artistName?.trim();
-  const title = r.name?.trim();
-  if (!artist || !title || !r.artworkUrl100) return null;
-
-  const type: ReleaseType = r.kind?.includes("song") ? "single" : "album";
-  const genre =
-    r.genres?.map((g) => g.name).find((n) => n && n !== "Music") ?? "Music";
+function baseRelease(
+  artist: string,
+  title: string,
+  type: ReleaseType,
+  artworkUrl: string,
+  releaseDate: string,
+  genre: string | null,
+  appleUrl: string | null
+): Release {
   const q = `${artist} ${title}`;
-  const releaseDate =
-    r.releaseDate && /^\d{4}-\d{2}-\d{2}$/.test(r.releaseDate)
-      ? r.releaseDate
-      : new Date().toISOString().split("T")[0];
-
   return {
     id: stableId(artist, title),
     artist,
     title,
     type,
-    artwork_url: hiResArtwork(r.artworkUrl100),
+    artwork_url: artworkUrl,
     release_date: releaseDate,
     genre,
-    tags: r.genres?.map((g) => g.name.toLowerCase()).filter((n) => n !== "music") ?? [],
-    mood: moodFor(genre),
+    tags: genre ? [genre.toLowerCase()] : [],
+    mood: genre ? moodFor(genre) : "cinematic",
     spotify: sp(q),
-    apple_music: r.url ?? null,
+    apple_music: appleUrl ?? am(q),
     tidal: td(q),
     soundcloud: sc(q),
     youtube_music: yt(q),
@@ -112,37 +92,115 @@ function mapResult(r: AppleFeedResult): Release | null {
   };
 }
 
+const todayISO = () => new Date().toISOString().split("T")[0];
+
+async function fetchJSON(url: string): Promise<unknown | null> {
+  try {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(8000),
+      next: { revalidate: 1800 }, // refresh at most every 30 min
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+// ── Source 1: Deezer editorial new releases (genuinely new) ──────────
+interface DeezerAlbum {
+  title?: string;
+  cover_xl?: string;
+  cover_big?: string;
+  release_date?: string;
+  record_type?: string;
+  artist?: { name?: string };
+}
+
+async function fromDeezer(): Promise<Release[]> {
+  const data = (await fetchJSON("https://api.deezer.com/editorial/0/releases")) as {
+    data?: DeezerAlbum[];
+  } | null;
+  const out: Release[] = [];
+  for (const a of data?.data ?? []) {
+    const artist = a.artist?.name?.trim();
+    const title = a.title?.trim();
+    const art = a.cover_xl ?? a.cover_big;
+    if (!artist || !title || !art) continue;
+    const type: ReleaseType =
+      a.record_type === "single" ? "single" : a.record_type === "ep" ? "ep" : "album";
+    const date =
+      a.release_date && /^\d{4}-\d{2}-\d{2}$/.test(a.release_date)
+        ? a.release_date
+        : todayISO();
+    out.push(baseRelease(artist, title, type, art, date, null, null));
+  }
+  return out;
+}
+
+// ── Source 2: Apple most-played albums + songs (current, popular) ────
+interface AppleFeedResult {
+  artistName?: string;
+  name?: string;
+  releaseDate?: string;
+  kind?: string;
+  artworkUrl100?: string;
+  genres?: { name: string }[];
+  url?: string;
+}
+
+const APPLE_FEEDS = [
+  "https://rss.applemarketingtools.com/api/v2/us/music/most-played/100/albums.json",
+  "https://rss.applemarketingtools.com/api/v2/us/music/most-played/100/songs.json",
+];
+
+function appleHiRes(url: string): string {
+  return url.replace(/\/\d+x\d+bb\.(jpg|png)/, "/1500x1500bb.$1");
+}
+
+async function fromApple(): Promise<Release[]> {
+  const out: Release[] = [];
+  await Promise.all(
+    APPLE_FEEDS.map(async (url) => {
+      const data = (await fetchJSON(url)) as { feed?: { results?: AppleFeedResult[] } } | null;
+      for (const r of data?.feed?.results ?? []) {
+        const artist = r.artistName?.trim();
+        const title = r.name?.trim();
+        if (!artist || !title || !r.artworkUrl100) continue;
+        const type: ReleaseType = r.kind?.includes("song") ? "single" : "album";
+        const genre =
+          r.genres?.map((g) => g.name).find((n) => n && n !== "Music") ?? null;
+        const date =
+          r.releaseDate && /^\d{4}-\d{2}-\d{2}$/.test(r.releaseDate)
+            ? r.releaseDate
+            : todayISO();
+        out.push(
+          baseRelease(artist, title, type, appleHiRes(r.artworkUrl100), date, genre, r.url ?? null)
+        );
+      }
+    })
+  );
+  return out;
+}
+
 /**
  * Fetch the live feed. Returns a de-duplicated, newest-first Release[].
  * Never throws — on total failure it returns an empty array.
  */
 export async function getLiveFeed(): Promise<Release[]> {
-  const all: Release[] = [];
-  const seen = new Set<string>();
-
-  await Promise.all(
-    FEED_URLS.map(async (url) => {
-      try {
-        const res = await fetch(url, {
-          signal: AbortSignal.timeout(8000),
-          next: { revalidate: 1800 }, // refresh at most every 30 min
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        const results: AppleFeedResult[] = data?.feed?.results ?? [];
-        for (const r of results) {
-          const mapped = mapResult(r);
-          if (!mapped) continue;
-          const key = `${mapped.artist.toLowerCase()}::${mapped.title.toLowerCase()}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          all.push(mapped);
-        }
-      } catch {
-        // ignore a single dead feed
-      }
-    })
+  const [deezer, apple] = await Promise.all([fromDeezer(), fromApple()]);
+  console.log(
+    `[feed] deezer new releases: ${deezer.length} · apple most-played: ${apple.length}`
   );
+
+  const seen = new Set<string>();
+  const all: Release[] = [];
+  for (const r of [...deezer, ...apple]) {
+    const key = `${r.artist.toLowerCase()}::${r.title.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    all.push(r);
+  }
 
   return all.sort((a, b) => (a.release_date < b.release_date ? 1 : -1));
 }

@@ -1,149 +1,99 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import type { Release } from "@/lib/types";
-import { MOOD_COLORS, formatDate, isToday, isYesterday } from "@/lib/utils";
-import { PlatformLinks } from "./PlatformLinks";
+import { isToday, isYesterday } from "@/lib/utils";
 import { Artwork } from "./Artwork";
 
 interface ReleaseCardProps {
   release: Release;
   index: number;
+  featured?: boolean;
   onOpen: (release: Release) => void;
 }
 
-export function ReleaseCard({ release, index, onOpen }: ReleaseCardProps) {
+/**
+ * Cosmos-style tile: pure artwork, edge-to-edge. On hover the image dims
+ * and the essentials fade in. Click opens the Listen panel.
+ */
+export function ReleaseCard({ release, index, featured = false, onOpen }: ReleaseCardProps) {
   const [hovered, setHovered] = useState(false);
 
-  const mood = release.mood ?? "ambient";
-  const moodStyle = MOOD_COLORS[mood] ?? MOOD_COLORS.ambient;
-
-  const dateLabel = isToday(release.release_date)
-    ? "TODAY"
-    : isYesterday(release.release_date)
-    ? "YESTERDAY"
-    : formatDate(release.release_date).toUpperCase();
+  const isFresh = isToday(release.release_date) || isYesterday(release.release_date);
 
   return (
-    <motion.article
-      initial={{ opacity: 0, y: 40 }}
+    <motion.button
+      type="button"
+      initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{
-        duration: 0.6,
-        delay: Math.min(index * 0.08, 0.8),
-        ease: [0.25, 0.46, 0.45, 0.94],
+        duration: 0.5,
+        delay: Math.min((index % 12) * 0.04, 0.5),
+        ease: [0.22, 1, 0.36, 1],
       }}
       onHoverStart={() => setHovered(true)}
       onHoverEnd={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
       onClick={() => onOpen(release)}
-      className="group relative cursor-pointer select-none"
+      aria-label={`${release.artist} — ${release.title}. Open listen options`}
+      className={`
+        group relative block w-full overflow-hidden rounded-xl bg-cosmos
+        outline-none focus-visible:ring-2 focus-visible:ring-star-white/40
+        ${featured ? "col-span-2 row-span-2" : ""}
+      `}
     >
-      {/* Floating glow on hover */}
-      <AnimatePresence>
-        {hovered && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ duration: 0.3 }}
-            className={`absolute -inset-4 rounded-2xl pointer-events-none blur-xl ${moodStyle.bg} z-0`}
-          />
+      <div className="relative aspect-square w-full">
+        <Artwork
+          src={release.artwork_url}
+          artist={release.artist}
+          title={release.title}
+          sizes={featured ? "(max-width: 640px) 100vw, 40vw" : undefined}
+          className={`object-cover transition-all duration-500 ${
+            hovered ? "scale-[1.03] brightness-[0.45]" : "scale-100"
+          }`}
+        />
+
+        {/* fresh-drop dot */}
+        {isFresh && !hovered && (
+          <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-star-white shadow-[0_0_10px_rgba(232,232,244,0.9)]" />
         )}
-      </AnimatePresence>
 
-      <div className="relative z-10">
-        {/* Artwork */}
-        <motion.div
-          animate={hovered ? { scale: 1.02, y: -6 } : { scale: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="relative aspect-square w-full overflow-hidden rounded-xl"
-          style={{
-            boxShadow: hovered
-              ? `0 30px 80px rgba(0,0,0,0.8), 0 0 40px ${moodStyle.bg.replace("bg-", "rgba(").replace("/10", ", 0.3)")}`
-              : "0 8px 32px rgba(0,0,0,0.5)",
-          }}
+        {/* hover veil — essentials only, cosmos-minimal */}
+        <div
+          className={`
+            absolute inset-0 flex flex-col justify-end p-3.5 text-left
+            transition-opacity duration-300
+            ${hovered ? "opacity-100" : "opacity-0"}
+          `}
         >
-          <Artwork
-            src={release.artwork_url}
-            artist={release.artist}
-            title={release.title}
-            className="object-cover transition-transform duration-700 group-hover:scale-105"
-          />
-
-          {/* Scanline overlay */}
-          <div
-            className="absolute inset-0 pointer-events-none opacity-5"
-            style={{
-              background:
-                "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px)",
-            }}
-          />
-
-          {/* Date badge */}
-          <div className="absolute top-3 left-3">
-            <span
-              className={`
-                text-[10px] font-mono font-bold tracking-widest
-                px-2 py-0.5 rounded-full border backdrop-blur-sm
-                ${moodStyle.text} ${moodStyle.bg} border-current/20
-              `}
-            >
-              {dateLabel}
-            </span>
-          </div>
-
-          {/* Type badge */}
-          <div className="absolute top-3 right-3">
-            <span className="text-[9px] font-mono tracking-widest px-2 py-0.5 rounded-full bg-void/70 text-dust border border-mist/30 backdrop-blur-sm">
-              {release.type.toUpperCase()}
-            </span>
-          </div>
-
-          {/* Hover overlay — platform links */}
-          <AnimatePresence>
-            {hovered && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="absolute inset-0 bg-void/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3 p-4"
-              >
-                <p className="text-xs text-dust font-mono tracking-widest uppercase mb-1">
-                  Listen on
-                </p>
-                <PlatformLinks release={release} variant="card" />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-
-        {/* Info */}
-        <div className="mt-3 space-y-1 px-0.5">
-          <p className="text-star-white font-medium text-sm leading-tight truncate">
+          <p className={`font-medium leading-snug text-star-white ${featured ? "text-xl" : "text-sm"} line-clamp-2`}>
             {release.title}
           </p>
-          <p className="text-dust text-xs truncate">{release.artist}</p>
-
+          <p className={`mt-0.5 text-star-white/60 ${featured ? "text-sm" : "text-xs"} truncate`}>
+            {release.artist}
+          </p>
           {release.genre && (
-            <p
-              className={`text-[10px] font-mono font-bold tracking-wider ${moodStyle.text} truncate`}
-            >
-              {release.genre.toUpperCase()}
+            <p className="mt-1.5 text-[9px] font-mono uppercase tracking-[0.18em] text-star-white/40 truncate">
+              {release.genre}
             </p>
           )}
-
-          {release.curator_note && (
-            <motion.p
-              animate={hovered ? { opacity: 1 } : { opacity: 0.5 }}
-              className="text-[11px] text-dust/70 leading-relaxed line-clamp-2 italic pt-0.5"
-            >
-              {release.curator_note}
-            </motion.p>
-          )}
+          <span
+            className={`
+              mt-3 inline-flex w-fit items-center gap-1.5 rounded-full
+              border border-star-white/25 bg-void/40 px-3 py-1
+              text-[10px] font-mono uppercase tracking-widest text-star-white/90
+              backdrop-blur-sm
+            `}
+          >
+            Listen
+            <svg viewBox="0 0 12 12" className="h-2.5 w-2.5 fill-current">
+              <path d="M3 1.5v9l7-4.5-7-4.5z" />
+            </svg>
+          </span>
         </div>
       </div>
-    </motion.article>
+    </motion.button>
   );
 }

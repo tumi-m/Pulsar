@@ -1,7 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { GENRE_BUCKETS, GENRE_COLORS, type GenreBucket } from "@/lib/utils";
+import { GENRE_BUCKETS, type GenreBucket } from "@/lib/utils";
 
 interface GenreFilterProps {
   active: GenreBucket | null;
@@ -12,49 +11,27 @@ interface GenreFilterProps {
 export function GenreFilter({ active, onChange, available }: GenreFilterProps) {
   const genres = GENRE_BUCKETS.filter((g) => available.includes(g));
 
-  return (
-    <div className="relative">
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-        {/* All */}
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={() => onChange(null)}
-          className={`
-            flex-shrink-0 text-[11px] font-mono font-bold tracking-widest
-            px-4 py-1.5 rounded-full border transition-all duration-200
-            ${active === null
-              ? "bg-star-white/10 border-star-white/30 text-star-white"
-              : "border-mist/30 text-dust hover:border-mist/60 hover:text-star-white"
-            }
-          `}
-        >
-          ALL
-        </motion.button>
+  const pill = (isActive: boolean) =>
+    `flex-shrink-0 rounded-full px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] transition-all duration-200 ${
+      isActive
+        ? "bg-star-white text-void"
+        : "text-star-white/45 hover:bg-star-white/[0.07] hover:text-star-white"
+    }`;
 
-        {genres.map((genre) => {
-          const style = GENRE_COLORS[genre];
-          const isActive = active === genre;
-          return (
-            <motion.button
-              key={genre}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => onChange(isActive ? null : genre)}
-              className={`
-                flex-shrink-0 text-[11px] font-mono font-bold tracking-widest
-                px-4 py-1.5 rounded-full border transition-all duration-200 uppercase
-                ${isActive
-                  ? `${style.bg} ${style.text} border-current/30`
-                  : "border-mist/30 text-dust hover:border-mist/60 hover:text-star-white"
-                }
-              `}
-            >
-              {genre}
-            </motion.button>
-          );
-        })}
-      </div>
+  return (
+    <div className="scrollbar-none flex items-center gap-1 overflow-x-auto">
+      <button className={pill(active === null)} onClick={() => onChange(null)}>
+        All
+      </button>
+      {genres.map((genre) => (
+        <button
+          key={genre}
+          className={pill(active === genre)}
+          onClick={() => onChange(active === genre ? null : genre)}
+        >
+          {genre}
+        </button>
+      ))}
     </div>
   );
 }
