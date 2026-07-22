@@ -12,6 +12,9 @@ import { genreBucket, type GenreBucket } from "./utils";
 export interface TasteProfile {
   genres: Partial<Record<GenreBucket, number>>;
   moods: Partial<Record<MoodTag, number>>;
+  /** Learned affinities from favorites + crate (recommender). */
+  artists?: Record<string, number>;
+  labels?: Record<string, number>;
   completedAt: string;
 }
 
@@ -171,7 +174,47 @@ export function scoreRelease(r: Release, profile: TasteProfile): number {
   const bucket = genreBucket(r.genre);
   if (bucket && profile.genres[bucket]) score += profile.genres[bucket]!;
   if (r.mood && profile.moods[r.mood]) score += profile.moods[r.mood]!;
+  // Learned affinities — strong signal because they come from real actions.
+  const a = profile.artists?.[r.artist.toLowerCase()];
+  if (a) score += a * 4; // same artist you loved/crated → big boost
+  const l = r.label ? profile.labels?.[r.label.toLowerCase()] : undefined;
+  if (l) score += l * 2;
   return score;
+}
+
+/**
+ * Recommender — fold the user's real actions (favorites + crate) into the
+ * quiz profile so scoring aligns ever more closely with their inputs.
+ * Each saved release reinforces its genre bucket, mood, artist and label.
+ */
+export function learnedProfile(
+  base: TasteProfile | null,
+  favorites: Release[],
+  crate: Release[]
+): TasteProfile | null {
+  const collection = [...favorites, ...crate];
+  if (!base && collection.length === 0) return base;
+
+  const profile: TasteProfile = {
+    genres: { ...(base?.genres ?? {}) },
+    moods: { ...(base?.moods ?? {}) },
+    artists: { ...(base?.artists ?? {}) },
+    labels: { ...(base?.labels ?? {}) },
+    completedAt: base?.completedAt ?? new Date(0).toISOString(),
+  };
+
+  const bump = <K extends string>(rec: Record<K, number>, key: K, w: number) => {
+    rec[key] = (rec[key] ?? 0) + w;
+  };
+
+  for (const r of collection) {
+    const b = genreBucket(r.genre);
+    if (b) bump(profile.genres as Record<string, number>, b, 1);
+    if (r.mood) bump(profile.moods as Record<string, number>, r.mood, 1);
+    bump(profile.artists!, r.artist.toLowerCase(), 1);
+    if (r.label) bump(profile.labels!, r.label.toLowerCase(), 1);
+  }
+  return profile;
 }
 
 /**

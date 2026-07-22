@@ -151,6 +151,32 @@ async function fromDeezer(): Promise<Release[]> {
   return out;
 }
 
+// ── Source 1b: every genre's chart + editorial (thousands of albums) ──
+async function fromDeezerGenres(): Promise<Release[]> {
+  const genres = (await fetchJSON("https://api.deezer.com/genre")) as {
+    data?: { id: number; name: string }[];
+  } | null;
+  const ids = (genres?.data ?? []).map((g) => g.id).filter((id) => id > 0).slice(0, 24);
+  const out: Release[] = [];
+  await Promise.all(
+    ids.map(async (id) => {
+      const [chart, editorial] = await Promise.all([
+        fetchJSON(`https://api.deezer.com/chart/${id}/albums?limit=100`) as Promise<{ data?: DeezerAlbum[] } | null>,
+        fetchJSON(`https://api.deezer.com/editorial/${id}/releases?limit=100`) as Promise<{ data?: DeezerAlbum[] } | null>,
+      ]);
+      for (const a of chart?.data ?? []) {
+        const r = mapDeezer(a, null);
+        if (r) out.push(r);
+      }
+      for (const a of editorial?.data ?? []) {
+        const r = mapDeezer(a, null);
+        if (r) out.push(r);
+      }
+    })
+  );
+  return out;
+}
+
 // ── Source 2: Apple most-played albums + songs (current, popular) ────
 interface AppleFeedResult {
   artistName?: string;
@@ -204,15 +230,20 @@ async function fromApple(): Promise<Release[]> {
  * Never throws — on total failure it returns an empty array.
  */
 export async function getLiveFeed(): Promise<Release[]> {
-  const [deezer, apple] = await Promise.all([fromDeezer(), fromApple()]);
+  const [deezer, apple, genres] = await Promise.all([
+    fromDeezer(),
+    fromApple(),
+    fromDeezerGenres(),
+  ]);
   console.log(
-    `[feed] deezer new releases: ${deezer.length} · apple most-played: ${apple.length}`
+    `[feed] deezer: ${deezer.length} · apple: ${apple.length} · genres: ${genres.length}`
   );
 
   const seen = new Set<string>();
   const all: Release[] = [];
   const byKey = new Map<string, Release>();
-  for (const r of [...deezer, ...apple]) {
+  // Apple + deezer chart first (best popularity signal), then the genre sweep.
+  for (const r of [...apple, ...deezer, ...genres]) {
     const key = `${r.artist.toLowerCase()}::${r.title.toLowerCase()}`;
     const existing = byKey.get(key);
     if (!existing) {

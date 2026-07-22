@@ -17,8 +17,10 @@ import {
   clearProfile,
   scoreRelease,
   tileSizes,
+  learnedProfile,
   type TasteProfile,
 } from "@/lib/taste";
+import { getFavorites, getPlaylist } from "@/lib/collection";
 
 interface ReleaseGridProps {
   releases: Release[];
@@ -45,12 +47,24 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
 
   const detailOpen = Boolean(selectedRelease);
 
+  // bumps whenever the user favorites/crates something → recompute recs
+  const [collectionVersion, setCollectionVersion] = useState(0);
+
   useEffect(() => {
     const p = loadProfile();
     if (p) setProfile(p);
     else if (!localStorage.getItem(SKIP_KEY)) setShowQuiz(true);
     setFormat(loadFormat());
+    const onChange = () => setCollectionVersion((v) => v + 1);
+    window.addEventListener("pulsar-collection-change", onChange);
+    return () => window.removeEventListener("pulsar-collection-change", onChange);
   }, []);
+
+  // The recommender profile: quiz taste + learned affinities from actions.
+  const recProfile = useMemo(
+    () => learnedProfile(profile, getFavorites(), getPlaylist()),
+    [profile, collectionVersion]
+  );
 
   const labels = useMemo(() => {
     const counts = new Map<string, number>();
@@ -78,9 +92,9 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     let list = releases;
     if (view === "streamed") {
       list = list.filter((r) => (r.popularity ?? 0) > 0).sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
-    } else if (view === "foryou" && profile) {
+    } else if (view === "foryou" && recProfile) {
       list = list
-        .map((r) => ({ r, s: scoreRelease(r, profile) }))
+        .map((r) => ({ r, s: scoreRelease(r, recProfile) }))
         .filter(({ s }) => s > 0)
         .sort((a, b) => b.s - a.s)
         .map(({ r }) => r);
@@ -99,10 +113,10 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       );
     }
     return list;
-  }, [releases, activeGenre, activeType, activeLabel, view, profile, query]);
+  }, [releases, activeGenre, activeType, activeLabel, view, recProfile, query]);
 
   const shown = filtered.slice(0, visible);
-  const sizes = useMemo(() => tileSizes(shown, profile), [shown, profile]);
+  const sizes = useMemo(() => tileSizes(shown, recProfile), [shown, recProfile]);
   const hasMore = visible < filtered.length;
 
   const resetPage = () => setVisible(PAGE);
@@ -361,7 +375,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 release={release}
                 index={i}
                 size={(sizes[i] ?? 0) as 0 | 1 | 2}
-                forYou={Boolean(profile) && (sizes[i] ?? 0) > 0}
+                forYou={Boolean(recProfile) && (sizes[i] ?? 0) > 0}
                 format={format}
                 onOpen={setSelectedRelease}
               />
