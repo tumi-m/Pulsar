@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Heart, Plus, Check } from "lucide-react";
 import type { Release } from "@/lib/types";
@@ -20,13 +20,32 @@ interface ReleaseCardProps {
 
 export function ReleaseCard({ release, index, size = 0, forYou = false, format, onOpen }: ReleaseCardProps) {
   const [hovered, setHovered] = useState(false);
+  // `armed` gates the physical-media animation: it only turns on after the
+  // cursor has rested on the tile for 3 seconds, so the grid stays calm.
+  const [armed, setArmed] = useState(false);
   const [fav, setFav] = useState(false);
   const [inList, setInList] = useState(false);
+  const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setFav(isFavorite(release.id));
     setInList(inPlaylist(release.id));
   }, [release.id]);
+
+  useEffect(() => () => {
+    if (armTimer.current) clearTimeout(armTimer.current);
+  }, []);
+
+  const enter = () => {
+    setHovered(true);
+    if (armTimer.current) clearTimeout(armTimer.current);
+    armTimer.current = setTimeout(() => setArmed(true), 3000);
+  };
+  const leave = () => {
+    setHovered(false);
+    setArmed(false);
+    if (armTimer.current) clearTimeout(armTimer.current);
+  };
 
   const isFresh = isToday(release.release_date) || isYesterday(release.release_date);
   const big = size === 2;
@@ -40,15 +59,15 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
         delay: Math.min((index % 12) * 0.04, 0.5),
         ease: [0.22, 1, 0.36, 1],
       }}
-      onHoverStart={() => setHovered(true)}
-      onHoverEnd={() => setHovered(false)}
+      onHoverStart={enter}
+      onHoverEnd={leave}
       className={`group relative ${size === 2 ? "col-span-2 row-span-2" : size === 1 ? "col-span-2" : ""}`}
     >
       <button
         type="button"
         onClick={() => onOpen(release)}
-        onFocus={() => setHovered(true)}
-        onBlur={() => setHovered(false)}
+        onFocus={enter}
+        onBlur={leave}
         aria-label={`${release.artist} — ${release.title}. Open listen options`}
         className="block w-full outline-none focus-visible:ring-2 focus-visible:ring-star-white/40"
       >
@@ -58,26 +77,26 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
             artist={release.artist}
             title={release.title}
             format={format}
-            hovered={hovered}
+            hovered={armed}
             big={big}
           />
 
           {/* fresh-drop dot */}
-          {isFresh && !hovered && (
+          {isFresh && !armed && (
             <span className="absolute right-1 top-1 z-10 h-2 w-2 rounded-full bg-star-white shadow-[0_0_10px_rgba(232,232,244,0.9)]" />
           )}
 
           {/* taste badge */}
-          {forYou && size > 0 && !hovered && (
+          {forYou && size > 0 && !armed && (
             <span className="absolute left-1 top-1 z-10 border border-white/50 bg-void/50 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.22em] text-white backdrop-blur-sm">
               “FOR YOU”
             </span>
           )}
 
-          {/* hover caption */}
+          {/* caption — appears with the animation, after the 3s dwell */}
           <div
             className={`pointer-events-none absolute inset-x-0 bottom-0 flex flex-col p-2.5 text-left transition-opacity duration-300 ${
-              hovered ? "opacity-100" : "opacity-0"
+              armed ? "opacity-100" : "opacity-0"
             }`}
           >
             <p className={`font-bold uppercase leading-tight text-star-white ${big ? "text-base" : "text-[11px]"} line-clamp-1`}>
