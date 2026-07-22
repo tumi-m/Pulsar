@@ -7,6 +7,7 @@ import type { Release } from "@/lib/types";
 import { genreBucket, type GenreBucket } from "@/lib/utils";
 import { usePlayer } from "./player/PlayerProvider";
 import { togglePlaylist, inPlaylist } from "@/lib/collection";
+import { loadAiMode } from "@/lib/settings";
 import { Artwork } from "./Artwork";
 
 interface AiChatProps {
@@ -85,6 +86,19 @@ export function AiChat({ releases }: AiChatProps) {
   const [text, setText] = useState("");
   const [result, setResult] = useState<Release[] | null>(null);
 
+  // The navbar AI button fires "pulsar-ai-activate"; honor the chosen mode.
+  useEffect(() => {
+    const activate = () => {
+      if (loadAiMode() === "survey") {
+        window.dispatchEvent(new CustomEvent("pulsar-retake-quiz"));
+      } else {
+        setOpen(true);
+      }
+    };
+    window.addEventListener("pulsar-ai-activate", activate);
+    return () => window.removeEventListener("pulsar-ai-activate", activate);
+  }, []);
+
   const run = () => {
     if (!text.trim()) return;
     setResult(buildList(releases, parse(text)));
@@ -106,22 +120,6 @@ export function AiChat({ releases }: AiChatProps) {
 
   return (
     <>
-      {/* floating AI button (bottom-left) */}
-      <button
-        onClick={() => setOpen(true)}
-        aria-label="AI mood assistant"
-        className={`fixed left-5 z-40 flex h-14 items-center gap-2 rounded-full px-4 transition-all duration-300 hover:scale-105 active:scale-95 ${
-          current ? "bottom-24" : "bottom-5"
-        }`}
-        style={{
-          background: "linear-gradient(120deg, #9b5de5, #ff5fa2 60%, #ffb347)",
-          boxShadow: "0 6px 20px rgba(155,93,229,0.5)",
-        }}
-      >
-        <Sparkles size={20} className="text-white" />
-        <span className="text-[11px] font-bold uppercase tracking-widest text-white">AI</span>
-      </button>
-
       <AnimatePresence>
         {open && (
           <>

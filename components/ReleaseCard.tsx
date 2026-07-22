@@ -18,9 +18,10 @@ interface ReleaseCardProps {
   forYou?: boolean;
   format: MediaFormat;
   onOpen: (release: Release) => void;
+  onVisualize?: (release: Release) => void;
 }
 
-export function ReleaseCard({ release, index, size = 0, forYou = false, format, onOpen }: ReleaseCardProps) {
+export function ReleaseCard({ release, index, size = 0, forYou = false, format, onOpen, onVisualize }: ReleaseCardProps) {
   const player = usePlayer();
   const isCurrent = player.current?.id === release.id;
   const isPlayingThis = isCurrent && player.playing;
@@ -144,22 +145,29 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
         </div>
       </button>
 
-      {/* persistent play button, bottom-left (Spotify-style quick preview) */}
+      {/* liquid-glass play triangle — center. Plays + opens the visualiser. */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           player.play(release);
+          onVisualize?.(release);
         }}
-        aria-label={isPlayingThis ? "Pause preview" : "Play preview"}
-        className={`absolute bottom-1.5 left-1.5 z-20 flex h-9 w-9 items-center justify-center rounded-full shadow-lg transition-all duration-200 ${
-          isCurrent || hovered ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
-        }`}
-        style={{ background: "linear-gradient(160deg, #f0f0f4, #c4c4cc)" }}
+        aria-label={isPlayingThis ? "Pause" : "Play & visualize"}
+        className={`absolute left-1/2 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full ring-1 ring-white/40 transition-all duration-200 ${
+          big ? "h-20 w-20" : "h-14 w-14"
+        } ${isCurrent || hovered ? "scale-100 opacity-100" : "scale-90 opacity-0"}`}
+        style={{
+          background: "rgba(255,255,255,0.14)",
+          backdropFilter: "blur(10px) saturate(140%)",
+          WebkitBackdropFilter: "blur(10px) saturate(140%)",
+          boxShadow:
+            "0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -2px 6px rgba(0,0,0,0.25)",
+        }}
       >
         {isPlayingThis ? (
-          <Pause size={15} className="text-void" fill="currentColor" />
+          <Pause size={big ? 26 : 18} className="text-white drop-shadow" fill="currentColor" />
         ) : (
-          <Play size={15} className="ml-0.5 text-void" fill="currentColor" />
+          <Play size={big ? 26 : 18} className="ml-0.5 text-white drop-shadow" fill="currentColor" />
         )}
       </button>
 

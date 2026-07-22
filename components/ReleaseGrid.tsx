@@ -58,6 +58,10 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     setFormat(loadFormat());
     const onChange = () => setCollectionVersion((v) => v + 1);
     const onFormat = (e: Event) => setFormat((e as CustomEvent<MediaFormat>).detail);
+    const onType = (e: Event) => {
+      setActiveType((e as CustomEvent<"all" | "album" | "ep" | "single">).detail);
+      setVisible(PAGE);
+    };
     const onRetake = () => {
       clearProfile();
       localStorage.removeItem(SKIP_KEY);
@@ -67,10 +71,12 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     };
     window.addEventListener("pulsar-collection-change", onChange);
     window.addEventListener("pulsar-format-change", onFormat);
+    window.addEventListener("pulsar-type-change", onType);
     window.addEventListener("pulsar-retake-quiz", onRetake);
     return () => {
       window.removeEventListener("pulsar-collection-change", onChange);
       window.removeEventListener("pulsar-format-change", onFormat);
+      window.removeEventListener("pulsar-type-change", onType);
       window.removeEventListener("pulsar-retake-quiz", onRetake);
     };
   }, []);
@@ -212,50 +218,6 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
             )}
           </div>
 
-          {/* Albums / EPs / Tracks — beveled segmented control (like CD picker) */}
-          <div className="mb-3 flex justify-center">
-            <div
-              className="flex items-center gap-0.5 rounded-lg p-1"
-              style={{
-                background: "linear-gradient(160deg, #26262e, #14141a)",
-                boxShadow:
-                  "inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -2px 4px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4)",
-              }}
-            >
-              {(
-                [
-                  ["all", "All"],
-                  ["album", "Albums"],
-                  ["ep", "EPs"],
-                  ["single", "Tracks"],
-                ] as const
-              ).map(([t, label]) => (
-                <button
-                  key={t}
-                  onClick={() => {
-                    setActiveType(t);
-                    resetPage();
-                  }}
-                  className={`relative rounded-md px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors ${
-                    activeType === t ? "text-void" : "text-star-white/55 hover:text-star-white"
-                  }`}
-                >
-                  {activeType === t && (
-                    <motion.span
-                      layoutId="type-active"
-                      className="absolute inset-0 rounded-md"
-                      style={{
-                        background: "linear-gradient(160deg, #f0f0f4, #c8c8d0)",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.6)",
-                      }}
-                      transition={{ type: "spring", stiffness: 400, damping: 32 }}
-                    />
-                  )}
-                  <span className="relative">{label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
 
           <div className="flex items-center gap-4">
             <div className="min-w-0 flex-1">
@@ -393,6 +355,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 forYou={Boolean(recProfile) && (sizes[i] ?? 0) > 0}
                 format={format}
                 onOpen={setSelectedRelease}
+                onVisualize={setVisualizing}
               />
             ))}
           </div>

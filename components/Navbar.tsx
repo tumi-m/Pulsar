@@ -45,9 +45,21 @@ export function Navbar() {
           </Link>
         </div>
 
-        <span className="hidden font-mono text-[9px] uppercase tracking-[0.24em] text-star-white/30 sm:block">
-          Music discovery service
-        </span>
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent("pulsar-ai-activate"))}
+          aria-label="AI assistant"
+          className="flex items-center gap-2 rounded-full px-4 py-2 transition-transform hover:scale-105 active:scale-95"
+          style={{
+            background: "linear-gradient(120deg, #9b5de5, #ff5fa2 60%, #ffb347)",
+            boxShadow: "0 4px 16px rgba(155,93,229,0.45)",
+          }}
+        >
+          <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white">AI</span>
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute h-full w-full animate-ping rounded-full bg-white/80" />
+            <span className="relative h-1.5 w-1.5 rounded-full bg-white" />
+          </span>
+        </button>
       </div>
     </motion.nav>
   );

@@ -6,6 +6,14 @@ import { X, Heart, ListMusic, Sparkles } from "lucide-react";
 import { FORMATS, loadFormat, saveFormat, type MediaFormat } from "@/lib/format";
 import { THEMES, loadTheme, saveTheme } from "@/lib/theme";
 import { getFavorites, getPlaylist } from "@/lib/collection";
+import {
+  loadAiMode,
+  saveAiMode,
+  loadShowType,
+  saveShowType,
+  type AiMode,
+  type ShowType,
+} from "@/lib/settings";
 
 /**
  * Left slide-in sidebar — the hub for Crates, look & feel (format),
@@ -16,6 +24,8 @@ export function Sidebar() {
   const [open, setOpen] = useState(false);
   const [format, setFormat] = useState<MediaFormat>("vinyl");
   const [themeId, setThemeId] = useState("nebula");
+  const [aiMode, setAiMode] = useState<AiMode>("chat");
+  const [showType, setShowType] = useState<ShowType>("all");
   const [counts, setCounts] = useState({ fav: 0, crate: 0 });
 
   const refresh = () => setCounts({ fav: getFavorites().length, crate: getPlaylist().length });
@@ -23,6 +33,8 @@ export function Sidebar() {
   useEffect(() => {
     setFormat(loadFormat());
     setThemeId(loadTheme().id);
+    setAiMode(loadAiMode());
+    setShowType(loadShowType());
     refresh();
     const toggle = () => setOpen((v) => !v);
     const change = () => refresh();
@@ -61,8 +73,8 @@ export function Sidebar() {
             initial={{ x: "-100%" }}
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
-            transition={{ type: "spring", stiffness: 340, damping: 36 }}
-            className="fixed inset-y-0 left-0 z-[55] flex w-[86%] max-w-xs flex-col overflow-y-auto border-r border-star-white/10 bg-[#08080f]/95 backdrop-blur-xl"
+            transition={{ type: "spring", stiffness: 520, damping: 42 }}
+            className="fixed inset-y-0 left-0 z-[55] flex w-[86%] max-w-xs transform-gpu flex-col overflow-y-auto border-r border-star-white/10 bg-[#08080f]/95 backdrop-blur-xl"
           >
             <div className="flex items-center justify-between px-5 py-5">
               <span className="text-sm font-bold uppercase tracking-[0.3em] text-star-white">Pulsar</span>
@@ -158,6 +170,65 @@ export function Sidebar() {
                   </button>
                 ))}
               </div>
+            </Section>
+
+            {/* Show — release type */}
+            <Section label="Show">
+              <div className="grid grid-cols-4 gap-1">
+                {(
+                  [
+                    ["all", "All"],
+                    ["album", "Albums"],
+                    ["ep", "EPs"],
+                    ["single", "Tracks"],
+                  ] as [ShowType, string][]
+                ).map(([t, label]) => (
+                  <button
+                    key={t}
+                    onClick={() => {
+                      setShowType(t);
+                      saveShowType(t);
+                    }}
+                    className={`rounded-lg border py-2 text-[10px] font-bold uppercase tracking-wide transition-colors ${
+                      showType === t
+                        ? "border-star-white/40 bg-star-white/[0.06] text-star-white"
+                        : "border-star-white/10 text-star-white/50 hover:text-star-white"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </Section>
+
+            {/* AI Mode */}
+            <Section label="AI Mode">
+              <div className="grid grid-cols-2 gap-1.5">
+                {(
+                  [
+                    ["survey", "Visual Survey"],
+                    ["chat", "Chat"],
+                  ] as [AiMode, string][]
+                ).map(([m, label]) => (
+                  <button
+                    key={m}
+                    onClick={() => {
+                      setAiMode(m);
+                      saveAiMode(m);
+                    }}
+                    className={`rounded-lg border px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide transition-colors ${
+                      aiMode === m
+                        ? "border-neon-violet/50 bg-neon-violet/10 text-star-white"
+                        : "border-star-white/10 text-star-white/50 hover:text-star-white"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-[10px] leading-relaxed text-star-white/35">
+                The AI button uses this: a visual taste quiz, or a chat to describe your mood.
+              </p>
             </Section>
 
             {/* Taste */}

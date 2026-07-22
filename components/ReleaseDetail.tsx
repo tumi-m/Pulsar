@@ -97,15 +97,23 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
 
           <motion.aside
             key={release.id}
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", stiffness: 320, damping: 36 }}
-            className="fixed right-0 top-14 bottom-0 z-40 flex w-full flex-col border-l border-star-white/10 bg-[#08080f]/95 backdrop-blur-xl lg:w-1/2"
+            initial={{ y: "100%", x: 0 }}
+            animate={{ y: 0, x: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", stiffness: 520, damping: 42 }}
+            drag="y"
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0, bottom: 0.6 }}
+            onDragEnd={(_e, info) => {
+              if (info.offset.y > 120 || info.velocity.y > 700) onClose();
+            }}
+            className="fixed inset-x-0 bottom-0 z-40 flex h-[72vh] transform-gpu touch-pan-y flex-col rounded-t-2xl border-t border-star-white/10 bg-[#08080f]/95 backdrop-blur-xl lg:inset-x-auto lg:right-0 lg:top-14 lg:bottom-0 lg:h-auto lg:w-1/2 lg:rounded-none lg:border-l lg:border-t-0"
             role="dialog"
             aria-modal="false"
             aria-label={`${release.title} by ${release.artist}`}
           >
+            {/* mobile grab handle */}
+            <div className="mx-auto mt-2 h-1 w-10 flex-shrink-0 rounded-full bg-star-white/25 lg:hidden" />
             {/* header row — artwork, meta, close */}
             <div className="flex items-start gap-4 border-b border-star-white/5 p-5">
               <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg">

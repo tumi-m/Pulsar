@@ -312,7 +312,7 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
           onDragEnd={(_e, info) => {
             if (info.offset.y > 110 || info.velocity.y > 600) handleClose();
           }}
-          className="fixed inset-x-2 top-16 z-40 h-[60vh] touch-none overflow-hidden rounded-2xl border border-star-white/12 bg-void shadow-2xl md:inset-x-4"
+          className="fixed inset-x-2 top-16 z-40 h-[56vh] transform-gpu touch-none overflow-hidden rounded-2xl border border-star-white/12 bg-void shadow-2xl md:inset-x-4"
         >
           <div className="absolute left-1/2 top-2 z-10 h-1 w-10 -translate-x-1/2 rounded-full bg-star-white/25" />
           <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
