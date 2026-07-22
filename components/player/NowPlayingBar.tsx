@@ -19,10 +19,8 @@ export function NowPlayingBar() {
   const [expanded, setExpanded] = useState<Release | null>(null);
 
   function openVisualizer() {
-    if (current) {
-      toggle(); // pause the mini player; the visualizer runs its own audio
-      setExpanded(current);
-    }
+    // The visualizer now reads the SHARED player audio — keep it playing.
+    if (current) setExpanded(current);
   }
 
   return (

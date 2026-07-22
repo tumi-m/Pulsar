@@ -10,6 +10,7 @@ import { OnboardingQuiz } from "./OnboardingQuiz";
 import { FormatPicker } from "./FormatPicker";
 import { FloatingDock } from "./FloatingDock";
 import { Visualizer } from "./Visualizer";
+import { AiChat } from "./AiChat";
 import { genreBucket, GENRE_BUCKETS, type GenreBucket } from "@/lib/utils";
 import { loadFormat, saveFormat, type MediaFormat } from "@/lib/format";
 import {
@@ -421,8 +422,11 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       {/* live audio-reactive 3D visualizer */}
       <Visualizer release={visualizing} onClose={() => setVisualizing(null)} />
 
-      {/* floating 3D dock — favorites / playlist / share */}
+      {/* floating 3D dock — favorites / crate / share */}
       <FloatingDock format={format} onOpen={setSelectedRelease} />
+
+      {/* AI mood/taste assistant */}
+      <AiChat releases={releases} />
     </>
   );
 }

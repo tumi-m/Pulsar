@@ -146,7 +146,10 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
               {onVisualize && (
                 <div className="border-b border-star-white/5 p-3">
                   <button
-                    onClick={() => onVisualize(release)}
+                    onClick={() => {
+                      player.play(release); // start the shared audio (gesture)
+                      onVisualize(release);
+                    }}
                     className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-neon-violet/10"
                     style={{ background: "linear-gradient(100deg, rgba(155,93,229,0.12), rgba(0,212,255,0.06))" }}
                   >

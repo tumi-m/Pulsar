@@ -109,3 +109,13 @@ body {
 .glow-blue  { text-shadow: 0 0 20px rgba(0, 212, 255, 0.8); }
 .glow-pink  { text-shadow: 0 0 20px rgba(255, 0, 128, 0.8); }
 .glow-violet { text-shadow: 0 0 20px rgba(155, 93, 229, 0.8); }
+
+/* ─── Floating tiles (featured) ─────────────── */
+@keyframes tileFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.tile-float {
+  animation: tileFloat 7s ease-in-out infinite;
+  will-change: transform;
+}

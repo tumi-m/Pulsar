@@ -2,62 +2,50 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Play, Pause, Sparkles, Repeat } from "lucide-react";
+import { X, Play, Pause } from "lucide-react";
 import type { Release } from "@/lib/types";
+import { usePlayer } from "./player/PlayerProvider";
 
 interface VisualizerProps {
   release: Release | null;
   onClose: () => void;
 }
 
-type Mode = "nebula" | "silhouette" | "aurora";
+type Mode = "nebula" | "silhouette" | "aurora" | "crowd";
 const MODES: { id: Mode; label: string }[] = [
   { id: "nebula", label: "Nebula" },
   { id: "silhouette", label: "Silhouette" },
   { id: "aurora", label: "Aurora" },
+  { id: "crowd", label: "Crowd" },
 ];
 
 interface Particle {
-  // home position on a unit sphere (nebula) or art target (silhouette)
   hx: number; hy: number; hz: number;
-  // live position
   x: number; y: number; z: number;
   hue: number;
 }
 
 export function Visualizer({ release, onClose }: VisualizerProps) {
+  const player = usePlayer();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const ctxRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const rafRef = useRef<number>(0);
   const particlesRef = useRef<Particle[]>([]);
   const artTargetsRef = useRef<{ x: number; y: number }[]>([]);
   const modeRef = useRef<Mode>("nebula");
   const rotRef = useRef(0);
-
   const [mode, setMode] = useState<Mode>("nebula");
-  const [playing, setPlaying] = useState(false);
-  const [status, setStatus] = useState<"loading" | "ready" | "none">("loading");
-  const [trackName, setTrackName] = useState<string>("");
-  const [loop, setLoop] = useState(true); // repeat the preview so visuals never stop
 
   useEffect(() => {
     modeRef.current = mode;
   }, [mode]);
 
-  // keep the audio element's loop flag in sync with the toggle
-  useEffect(() => {
-    if (audioRef.current) audioRef.current.loop = loop;
-  }, [loop]);
+  const playing = player.playing;
 
   // ── init particles ──────────────────────────────────────────────
   const initParticles = useCallback(() => {
-    const COUNT = Math.min(1400, Math.floor((window.innerWidth * window.innerHeight) / 900));
+    const COUNT = Math.min(1200, Math.floor((window.innerWidth * window.innerHeight) / 1100));
     const ps: Particle[] = [];
     for (let i = 0; i < COUNT; i++) {
-      // even distribution on a sphere (golden spiral)
       const t = i / COUNT;
       const phi = Math.acos(1 - 2 * t);
       const theta = Math.PI * (1 + Math.sqrt(5)) * i;
@@ -72,7 +60,7 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
     particlesRef.current = ps;
   }, []);
 
-  // ── sample album art into silhouette targets (same-origin proxy) ─
+  // ── sample album art into silhouette targets ────────────────────
   const sampleArt = useCallback((artist: string, title: string) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -87,14 +75,13 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
       try {
         data = octx.getImageData(0, 0, S, S).data;
       } catch {
-        return; // tainted — skip silhouette
+        return;
       }
       const targets: { x: number; y: number }[] = [];
       for (let y = 0; y < S; y += 2) {
         for (let x = 0; x < S; x += 2) {
           const idx = (y * S + x) * 4;
           const lum = (data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114) / 255;
-          // keep the brighter pixels — forms the lit silhouette
           if (lum > 0.32 && Math.random() < 0.7) {
             targets.push({ x: (x / S) * 2 - 1, y: (y / S) * 2 - 1 });
           }
@@ -105,83 +92,13 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
     img.src = `/api/artwork?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`;
   }, []);
 
-  // ── fetch preview + wire Web Audio ──────────────────────────────
   useEffect(() => {
     if (!release) return;
-    setStatus("loading");
-    setPlaying(false);
     initParticles();
     sampleArt(release.artist, release.title);
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(
-          `/api/preview?artist=${encodeURIComponent(release.artist)}&title=${encodeURIComponent(release.title)}`
-        );
-        if (!res.ok) throw new Error("no preview");
-        const data = await res.json();
-        if (cancelled) return;
-        setTrackName(data.track ?? release.title);
-        const audio = audioRef.current;
-        if (audio) {
-          audio.crossOrigin = "anonymous";
-          audio.loop = loop;
-          audio.src = data.previewUrl;
-          audio.load();
-          setStatus("ready");
-        }
-      } catch {
-        if (!cancelled) setStatus("none");
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
   }, [release, initParticles, sampleArt]);
 
-  // ── audio graph + play/pause ────────────────────────────────────
-  const ensureGraph = useCallback(() => {
-    const audio = audioRef.current;
-    if (!audio) return null;
-    if (!ctxRef.current) {
-      const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      const ctx = new AC();
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 1024; // finer bands
-      analyser.smoothingTimeConstant = 0.55; // snappier, less lag → tighter sync
-      const source = ctx.createMediaElementSource(audio);
-      source.connect(analyser);
-      analyser.connect(ctx.destination);
-      ctxRef.current = ctx;
-      analyserRef.current = analyser;
-      sourceRef.current = source;
-    }
-    return ctxRef.current;
-  }, []);
-
-  const togglePlay = useCallback(async () => {
-    const audio = audioRef.current;
-    if (!audio || status !== "ready") return;
-    const ctx = ensureGraph();
-    if (ctx?.state === "suspended") await ctx.resume();
-    if (audio.paused) {
-      await audio.play().catch(() => {});
-      setPlaying(true);
-    } else {
-      audio.pause();
-      setPlaying(false);
-    }
-  }, [ensureGraph, status]);
-
-  // auto-play once ready
-  useEffect(() => {
-    if (status === "ready") togglePlay();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
-
-  // ── render loop ─────────────────────────────────────────────────
+  // ── render loop (reads the SHARED player analyser) ──────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -203,17 +120,54 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
 
     const freq = new Uint8Array(1024);
     let prevBass = 0;
-    let kick = 0; // transient beat impulse, decays each frame
+    let kick = 0;
+
+    // draw one glowing dancer silhouette
+    const person = (
+      x: number, y: number, s: number, hue: number, alpha: number, armsUp: number
+    ) => {
+      ctx.fillStyle = `hsla(${hue}, 90%, 60%, ${alpha})`;
+      // head
+      ctx.beginPath();
+      ctx.arc(x, y - s, s * 0.32, 0, Math.PI * 2);
+      ctx.fill();
+      // torso
+      ctx.beginPath();
+      ctx.moveTo(x - s * 0.28, y - s * 0.55);
+      ctx.lineTo(x + s * 0.28, y - s * 0.55);
+      ctx.lineTo(x + s * 0.18, y + s * 0.5);
+      ctx.lineTo(x - s * 0.18, y + s * 0.5);
+      ctx.closePath();
+      ctx.fill();
+      // arms — raise with the beat
+      const ay = y - s * 0.4 - armsUp * s * 0.7;
+      ctx.lineWidth = s * 0.16;
+      ctx.strokeStyle = `hsla(${hue}, 90%, 65%, ${alpha})`;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x - s * 0.24, y - s * 0.4);
+      ctx.lineTo(x - s * 0.5, ay);
+      ctx.moveTo(x + s * 0.24, y - s * 0.4);
+      ctx.lineTo(x + s * 0.5, ay);
+      ctx.stroke();
+      // legs
+      ctx.beginPath();
+      ctx.moveTo(x - s * 0.1, y + s * 0.5);
+      ctx.lineTo(x - s * 0.22, y + s * 1.05);
+      ctx.moveTo(x + s * 0.1, y + s * 0.5);
+      ctx.lineTo(x + s * 0.22, y + s * 1.05);
+      ctx.stroke();
+    };
 
     const draw = () => {
       const W = canvas.clientWidth || window.innerWidth;
       const H = canvas.clientHeight || window.innerHeight;
       const cx = W / 2;
       const cy = H / 2;
+      const time = performance.now() / 1000;
 
-      // audio bands (or gentle idle sim if not playing)
-      let bass = 0.12, mid = 0.1, treble = 0.08, level = 0.1;
-      const analyser = analyserRef.current;
+      let bass = 0.12, treble = 0.08, level = 0.1;
+      const analyser = player.getAnalyser();
       if (analyser && playing) {
         analyser.getByteFrequencyData(freq);
         const n = analyser.frequencyBinCount;
@@ -224,23 +178,18 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
           return s / ((hi - lo) * 255);
         };
         bass = avg(0, 0.06);
-        mid = avg(0.06, 0.3);
         treble = avg(0.3, 1);
         level = avg(0, 1);
       } else {
-        const t = performance.now() / 1000;
-        bass = 0.12 + Math.sin(t * 1.5) * 0.05;
-        treble = 0.08 + Math.sin(t * 3) * 0.03;
+        bass = 0.12 + Math.sin(time * 1.5) * 0.05;
+        treble = 0.08 + Math.sin(time * 3) * 0.03;
         level = 0.1;
       }
 
-      // beat detector — a sharp rise in bass fires a decaying "kick" that
-      // drives the on-beat burst, so the physics snaps with the rhythm.
       const rise = bass - prevBass;
       prevBass = bass;
       kick = Math.max(kick * 0.86, rise > 0.05 ? Math.min(1, rise * 5) : 0);
 
-      // fade trail
       ctx.fillStyle = "rgba(4,4,10,0.22)";
       ctx.fillRect(0, 0, W, H);
       ctx.globalCompositeOperation = "lighter";
@@ -249,58 +198,70 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
       rotRef.current += 0.0016 + bass * 0.02;
       const rot = rotRef.current;
 
-      if (m === "aurora") {
-        // radial spectrum corona
+      if (m === "crowd") {
+        // rows of glowing dancers jumping to the beat (depth = parallax)
+        const rows = 3;
+        for (let r = rows - 1; r >= 0; r--) {
+          const rowY = H * (0.58 + r * 0.14);
+          const count = 12 + r * 6;
+          const sizeF = 1 - r * 0.24;
+          const baseHue = 250 + r * 30;
+          for (let i = 0; i < count; i++) {
+            const x = ((i + 0.5) / count) * W + Math.sin(i * 3 + r) * 10;
+            const phase = i * 1.3 + r * 2;
+            const jumpAmt = 0.35 + bass * 1.4 + kick * 2.4;
+            const jump = jumpAmt * (26 * sizeF) * Math.abs(Math.sin(time * 4 + phase));
+            const y = rowY - jump;
+            const hue = (baseHue + i * 6 + treble * 60) % 360;
+            const alpha = (0.18 + level * 0.5) * (1 - r * 0.2);
+            const armsUp = Math.min(1, bass * 1.5 + kick * 1.5);
+            person(x, y, 26 * sizeF, hue, alpha, armsUp);
+          }
+        }
+        // floor shimmer
+        const floor = ctx.createLinearGradient(0, H * 0.85, 0, H);
+        floor.addColorStop(0, `hsla(280, 90%, 60%, ${0.04 + kick * 0.1})`);
+        floor.addColorStop(1, "transparent");
+        ctx.fillStyle = floor;
+        ctx.fillRect(0, H * 0.85, W, H * 0.15);
+      } else if (m === "aurora") {
         const bins = 96;
         const baseR = Math.min(W, H) * 0.16;
         for (let i = 0; i < bins; i++) {
           const mag = analyser && playing ? freq[Math.floor((i / bins) * 200)] / 255 : 0.15 + Math.sin(i + rot * 6) * 0.1;
           const a = (i / bins) * Math.PI * 2 + rot;
           const len = baseR + mag * Math.min(W, H) * 0.32;
-          const x1 = cx + Math.cos(a) * baseR;
-          const y1 = cy + Math.sin(a) * baseR;
-          const x2 = cx + Math.cos(a) * len;
-          const y2 = cy + Math.sin(a) * len;
           const hue = (i * 3 + rot * 60 + 200) % 360;
           ctx.strokeStyle = `hsla(${hue}, 90%, ${45 + mag * 35}%, ${0.35 + mag * 0.5})`;
           ctx.lineWidth = 2 + mag * 3;
           ctx.beginPath();
-          ctx.moveTo(x1, y1);
-          ctx.lineTo(x2, y2);
+          ctx.moveTo(cx + Math.cos(a) * baseR, cy + Math.sin(a) * baseR);
+          ctx.lineTo(cx + Math.cos(a) * len, cy + Math.sin(a) * len);
           ctx.stroke();
         }
       } else {
-        // particle field (nebula or silhouette)
         const ps = particlesRef.current;
         const targets = artTargetsRef.current;
         const useArt = m === "silhouette" && targets.length > 0;
         const scale = Math.min(W, H) * (useArt ? 0.34 : 0.3) * (1 + bass * 0.6 + kick * 0.5);
         const cosR = Math.cos(rot), sinR = Math.sin(rot);
-        const burst = 1 + bass * 0.8 + kick * 1.4; // snaps outward on each beat
+        const burst = 1 + bass * 0.8 + kick * 1.4;
 
         for (let i = 0; i < ps.length; i++) {
           const p = ps[i];
           let tx: number, ty: number, tz: number;
           if (useArt) {
             const t = targets[i % targets.length];
-            tx = t.x * burst;
-            ty = t.y * burst;
-            tz = Math.sin(i * 0.5 + rot) * 0.2;
+            tx = t.x * burst; ty = t.y * burst; tz = Math.sin(i * 0.5 + rot) * 0.2;
           } else {
-            // rotate home sphere around Y then X
             const rx = p.hx * cosR - p.hz * sinR;
             const rz = p.hx * sinR + p.hz * cosR;
-            tx = rx * (1 + treble * 0.4);
-            ty = p.hy * (1 + treble * 0.4);
-            tz = rz;
+            tx = rx * (1 + treble * 0.4); ty = p.hy * (1 + treble * 0.4); tz = rz;
           }
-          // ease — faster follow (and even faster on a beat) → in sync
           const follow = 0.24 + kick * 0.35;
           p.x += (tx - p.x) * follow;
           p.y += (ty - p.y) * follow;
           p.z += (tz - p.z) * follow;
-
-          // perspective project
           const persp = 1.8 / (1.8 - p.z);
           const sx = cx + p.x * scale * persp;
           const sy = cy + p.y * scale * persp;
@@ -315,7 +276,6 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
         }
       }
 
-      // central bloom — pulses on the beat
       const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(W, H) * (0.2 + bass * 0.3 + kick * 0.25));
       glow.addColorStop(0, `hsla(265, 90%, 65%, ${0.06 + level * 0.14 + kick * 0.15})`);
       glow.addColorStop(1, "transparent");
@@ -332,19 +292,11 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
       window.removeEventListener("resize", resize);
       ro.disconnect();
     };
-  }, [playing]);
+  }, [playing, player]);
 
-  // Non-modal — the page stays scrollable/clickable so the user can keep
-  // browsing albums while the visualizer plays. (No scroll lock.)
+  const handleClose = useCallback(() => onClose(), [onClose]);
 
-  const handleClose = useCallback(() => {
-    const audio = audioRef.current;
-    if (audio) {
-      audio.pause();
-      audio.src = "";
-    }
-    onClose();
-  }, [onClose]);
+  const hasAudio = player.hasAudio;
 
   return (
     <AnimatePresence>
@@ -360,55 +312,44 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
           onDragEnd={(_e, info) => {
             if (info.offset.y > 110 || info.velocity.y > 600) handleClose();
           }}
-          className="fixed inset-x-2 top-16 z-40 h-[62vh] touch-none overflow-hidden rounded-2xl border border-star-white/12 bg-void shadow-2xl md:inset-x-4"
+          className="fixed inset-x-2 top-16 z-40 h-[60vh] touch-none overflow-hidden rounded-2xl border border-star-white/12 bg-void shadow-2xl md:inset-x-4"
         >
-          {/* swipe-down handle */}
           <div className="absolute left-1/2 top-2 z-10 h-1 w-10 -translate-x-1/2 rounded-full bg-star-white/25" />
           <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <audio ref={audioRef} playsInline onEnded={() => setPlaying(false)} />
 
           {/* top bar */}
-          <div className="absolute inset-x-0 top-0 flex items-start justify-between p-5 md:p-8">
-            <div>
+          <div className="absolute inset-x-0 top-0 flex items-start justify-between p-4 md:p-6">
+            <div className="min-w-0">
               <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-star-white/40">
                 Now Visualizing
               </p>
-              <h2 className="mt-1 text-xl font-bold uppercase tracking-tight text-star-white md:text-3xl">
+              <h2 className="mt-1 truncate text-lg font-bold uppercase tracking-tight text-star-white md:text-2xl">
                 {release.title}
               </h2>
-              <p className="text-sm text-star-white/60">{release.artist}</p>
-              {status === "none" && (
-                <p className="mt-2 text-[10px] font-bold uppercase tracking-widest text-neon-amber/70">
-                  No preview found · idle visual
+              <p className="truncate text-sm text-star-white/60">{release.artist}</p>
+              {!hasAudio && (
+                <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-neon-amber/70">
+                  No preview · idle visual
                 </p>
               )}
             </div>
             <button
               onClick={handleClose}
               aria-label="Close visualizer"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-void/50 text-star-white/70 backdrop-blur transition-colors hover:border-white/60 hover:text-star-white"
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-star-white/20 bg-void/50 text-star-white/70 backdrop-blur transition-colors hover:border-white/60 hover:text-star-white"
             >
-              <X size={18} />
+              <X size={16} />
             </button>
           </div>
 
-          {/* bottom controls — WMP-inspired */}
-          <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-4 p-6 md:p-10">
-            {/* mode switch */}
-            <div
-              className="flex items-center gap-0.5 rounded-full p-1"
-              style={{
-                background: "linear-gradient(160deg, rgba(40,40,50,0.7), rgba(15,15,22,0.7))",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.1), 0 4px 16px rgba(0,0,0,0.5)",
-                backdropFilter: "blur(8px)",
-              }}
-            >
+          {/* bottom controls */}
+          <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 p-4 md:p-6">
+            <div className="scrollbar-none flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full bg-[#141420]/70 p-1 backdrop-blur">
               {MODES.map((mo) => (
                 <button
                   key={mo.id}
                   onClick={() => setMode(mo.id)}
-                  className={`rounded-full px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                  className={`flex-shrink-0 rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
                     mode === mo.id ? "bg-star-white text-void" : "text-star-white/55 hover:text-star-white"
                   }`}
                 >
@@ -416,53 +357,21 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
                 </button>
               ))}
             </div>
-
-            {/* transport */}
-            <div className="flex items-center gap-4">
-              {/* loop toggle */}
-              <button
-                onClick={() => setLoop((v) => !v)}
-                aria-label={loop ? "Loop on" : "Loop off"}
-                aria-pressed={loop}
-                title={loop ? "Looping preview" : "Play once"}
-                className={`flex h-11 w-11 items-center justify-center rounded-full border transition-colors ${
-                  loop
-                    ? "border-neon-violet/60 bg-neon-violet/20 text-neon-violet"
-                    : "border-white/15 bg-void/50 text-star-white/45 hover:text-star-white"
-                }`}
-              >
-                <Repeat size={16} />
-              </button>
-
-              {/* play / pause */}
-              <button
-                onClick={togglePlay}
-                disabled={status !== "ready"}
-                aria-label={playing ? "Pause" : "Play"}
-                className="flex h-16 w-16 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95 disabled:opacity-40"
-                style={{
-                  background: "linear-gradient(160deg, #f0f0f4, #c4c4cc)",
-                  boxShadow: "0 8px 24px rgba(155,93,229,0.4), inset 0 1px 0 rgba(255,255,255,0.7)",
-                }}
-              >
-                {status === "loading" ? (
-                  <Sparkles size={22} className="animate-pulse text-void" />
-                ) : playing ? (
-                  <Pause size={24} className="text-void" fill="currentColor" />
-                ) : (
-                  <Play size={24} className="ml-0.5 text-void" fill="currentColor" />
-                )}
-              </button>
-
-              {/* spacer to keep play button visually centered */}
-              <span className="h-11 w-11" aria-hidden />
-            </div>
-            <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-star-white/35">
-              {status === "ready"
-                ? `30s preview${loop ? " · looping" : ""} · ${trackName}`
-                : status === "loading"
-                ? "finding preview…"
-                : "no audio"}
+            <button
+              onClick={() => player.toggle()}
+              disabled={!hasAudio}
+              aria-label={playing ? "Pause" : "Play"}
+              className="flex h-14 w-14 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95 disabled:opacity-40"
+              style={{ background: "linear-gradient(160deg, #f0f0f4, #c4c4cc)" }}
+            >
+              {playing ? (
+                <Pause size={22} className="text-void" fill="currentColor" />
+              ) : (
+                <Play size={22} className="ml-0.5 text-void" fill="currentColor" />
+              )}
+            </button>
+            <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-star-white/30">
+              Swipe down to close · keep browsing below
             </p>
           </div>
         </motion.div>

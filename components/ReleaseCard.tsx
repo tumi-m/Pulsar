@@ -80,7 +80,12 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
         aria-label={`${release.artist} — ${release.title}. Open listen options`}
         className="block w-full outline-none focus-visible:ring-2 focus-visible:ring-star-white/40"
       >
-        <div className={`relative w-full overflow-hidden rounded-2xl ring-1 ring-star-white/[0.06] ${size === 1 ? "aspect-[2/1]" : "aspect-square"}`}>
+        <div
+          className={`relative w-full overflow-hidden rounded-2xl ring-1 ring-star-white/[0.06] ${
+            size === 1 ? "aspect-[2/1]" : "aspect-square"
+          } ${size > 0 ? "tile-float" : ""}`}
+          style={size > 0 ? { animationDelay: `${(index % 5) * 0.8}s` } : undefined}
+        >
           {/* default: plain album cover */}
           <Artwork
             src={release.artwork_url}
