@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Heart, Plus, Check, Play, Pause } from "lucide-react";
+import { Heart, Plus, Check, Play, Pause, Share2 } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { isToday, isYesterday } from "@/lib/utils";
 import type { MediaFormat } from "@/lib/format";
@@ -178,11 +178,19 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
         )}
       </button>
 
-      {/* quick actions — appear on hover, top-right */}
+      {/* quick actions — a full-width liquid-glass bar (matches the play
+          triangle): Favorite · Crate · Share, spanning the tile's width */}
       <div
-        className={`absolute right-1.5 top-1.5 z-20 flex gap-1 transition-all duration-200 ${
-          hovered ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0"
+        className={`absolute inset-x-2 top-2 z-20 flex items-stretch overflow-hidden rounded-full ring-1 ring-white/40 transition-all duration-200 ${
+          hovered ? "translate-y-0 opacity-100" : "-translate-y-1.5 opacity-0"
         }`}
+        style={{
+          background: "rgba(255,255,255,0.14)",
+          backdropFilter: "blur(10px) saturate(140%)",
+          WebkitBackdropFilter: "blur(10px) saturate(140%)",
+          boxShadow:
+            "0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -2px 6px rgba(0,0,0,0.25)",
+        }}
       >
         <button
           onClick={(e) => {
@@ -190,23 +198,46 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
             setFav(toggleFavorite(release));
           }}
           aria-label={fav ? "Remove from favorites" : "Add to favorites"}
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-void/70 backdrop-blur-sm transition-colors hover:border-white/60"
+          className={`flex flex-1 items-center justify-center transition-colors hover:bg-white/10 ${big ? "h-12" : "h-10"}`}
         >
-          <Heart size={16} className={fav ? "fill-neon-pink text-neon-pink" : "text-star-white/80"} />
+          <Heart size={big ? 22 : 19} className={fav ? "fill-neon-pink text-neon-pink" : "text-white drop-shadow"} />
         </button>
+        <span className="my-2 w-px bg-white/25" />
         <button
           onClick={(e) => {
             e.stopPropagation();
             setInList(togglePlaylist(release));
           }}
           aria-label={inList ? "Remove from crate" : "Add to crate"}
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-void/70 backdrop-blur-sm transition-colors hover:border-white/60"
+          className={`flex flex-1 items-center justify-center transition-colors hover:bg-white/10 ${big ? "h-12" : "h-10"}`}
         >
           {inList ? (
-            <Check size={16} className="text-neon-green" />
+            <Check size={big ? 22 : 19} className="text-neon-green drop-shadow" />
           ) : (
-            <Plus size={16} className="text-star-white/80" />
+            <Plus size={big ? 22 : 19} className="text-white drop-shadow" />
           )}
+        </button>
+        <span className="my-2 w-px bg-white/25" />
+        <button
+          onClick={async (e) => {
+            e.stopPropagation();
+            const url = typeof window !== "undefined" ? window.location.href : "";
+            const data = {
+              title: `${release.title} — ${release.artist}`,
+              text: "Found on PULSAR",
+              url,
+            };
+            try {
+              if (navigator.share) await navigator.share(data);
+              else await navigator.clipboard.writeText(url);
+            } catch {
+              /* cancelled / unavailable */
+            }
+          }}
+          aria-label="Share"
+          className={`flex flex-1 items-center justify-center transition-colors hover:bg-white/10 ${big ? "h-12" : "h-10"}`}
+        >
+          <Share2 size={big ? 20 : 17} className="text-white drop-shadow" />
         </button>
       </div>
     </motion.div>
