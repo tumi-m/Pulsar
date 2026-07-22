@@ -99,7 +99,7 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
             <div className="flex-1 overflow-y-auto">
               {release.curator_note && (
                 <p className="border-b border-star-white/5 px-5 py-4 text-sm italic leading-relaxed text-star-white/60">
-                  “{release.curator_note}”
+                  {release.curator_note}
                 </p>
               )}
 

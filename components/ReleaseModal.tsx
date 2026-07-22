@@ -172,7 +172,7 @@ export function ReleaseModal({ release, onClose, onVisualize }: ReleaseModalProp
 
               {release.curator_note && (
                 <p className="border-t border-star-white/5 px-4 py-3 text-[13px] italic leading-relaxed text-star-white/60">
-                  “{release.curator_note}”
+                  {release.curator_note}
                 </p>
               )}
 

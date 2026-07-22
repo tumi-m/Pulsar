@@ -149,7 +149,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-star-white/40">
-                    {panel === "favorites" ? "“The Crate”" : "“Your Mixtape”"}
+                    {panel === "favorites" ? "The Crate" : "Your Mixtape"}
                   </p>
                   <h3 className="text-lg font-bold uppercase tracking-tight text-star-white">
                     {panel === "favorites" ? "Favorites" : "Playlist"} · {items.length}
@@ -167,7 +167,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               {items.length === 0 ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
                   <p className="text-sm font-bold uppercase tracking-widest text-star-white/40">
-                    “Empty {panel === "favorites" ? "crate" : "mixtape"}”
+                    Empty {panel === "favorites" ? "crate" : "mixtape"}
                   </p>
                   <p className="text-xs text-star-white/35">
                     Hover any album and tap the {panel === "favorites" ? "♥ heart" : "＋ plus"} to

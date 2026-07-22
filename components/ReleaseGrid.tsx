@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Release } from "@/lib/types";
 import { ReleaseCard } from "./ReleaseCard";
@@ -101,8 +101,24 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
 
   const shown = filtered.slice(0, visible);
   const sizes = useMemo(() => tileSizes(shown, profile), [shown, profile]);
+  const hasMore = visible < filtered.length;
 
   const resetPage = () => setVisible(PAGE);
+
+  // Infinite scroll — auto-load the next page as the sentinel nears view.
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) setVisible((v) => v + PAGE);
+      },
+      { rootMargin: "800px 0px" } // prefetch well before the bottom
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, filtered.length]);
 
   // Grid columns reflow when the half-page detail is open.
   const gridCols = detailOpen
@@ -288,7 +304,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
         {/* grid */}
         {shown.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-6 py-32 text-center">
-            <p className="font-mono text-sm tracking-widest text-star-white/30">“NOTHING HERE YET”</p>
+            <p className="font-mono text-sm tracking-widest text-star-white/30">NOTHING HERE YET</p>
           </div>
         ) : (
           <div className={`grid grid-flow-dense gap-2.5 px-3 md:gap-3 md:px-5 ${gridCols}`}>
@@ -306,15 +322,13 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
           </div>
         )}
 
-        {/* load more */}
-        {visible < filtered.length && (
-          <div className="flex justify-center py-12">
-            <button
-              onClick={() => setVisible((v) => v + PAGE)}
-              className="border border-star-white/20 px-8 py-2.5 text-[11px] font-bold uppercase tracking-[0.22em] text-star-white/60 transition-colors hover:border-star-white hover:text-star-white"
-            >
-              “More” · {filtered.length - visible} left ↓
-            </button>
+        {/* infinite-scroll sentinel + subtle loader */}
+        {hasMore && (
+          <div ref={sentinelRef} className="flex justify-center py-14">
+            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.25em] text-star-white/30">
+              <span className="h-1.5 w-1.5 animate-ping rounded-full bg-neon-violet" />
+              Loading more
+            </div>
           </div>
         )}
       </div>

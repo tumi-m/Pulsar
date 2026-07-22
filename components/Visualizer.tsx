@@ -149,8 +149,8 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
       const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new AC();
       const analyser = ctx.createAnalyser();
-      analyser.fftSize = 512;
-      analyser.smoothingTimeConstant = 0.82;
+      analyser.fftSize = 1024; // finer bands
+      analyser.smoothingTimeConstant = 0.55; // snappier, less lag → tighter sync
       const source = ctx.createMediaElementSource(audio);
       source.connect(analyser);
       analyser.connect(ctx.destination);
@@ -197,7 +197,9 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
     resize();
     window.addEventListener("resize", resize);
 
-    const freq = new Uint8Array(256);
+    const freq = new Uint8Array(1024);
+    let prevBass = 0;
+    let kick = 0; // transient beat impulse, decays each frame
 
     const draw = () => {
       const W = window.innerWidth;
@@ -210,16 +212,16 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
       const analyser = analyserRef.current;
       if (analyser && playing) {
         analyser.getByteFrequencyData(freq);
-        const n = freq.length;
+        const n = analyser.frequencyBinCount;
         const avg = (a: number, b: number) => {
           let s = 0;
           const lo = Math.floor(n * a), hi = Math.floor(n * b);
           for (let i = lo; i < hi; i++) s += freq[i];
           return s / ((hi - lo) * 255);
         };
-        bass = avg(0, 0.08);
-        mid = avg(0.08, 0.35);
-        treble = avg(0.35, 1);
+        bass = avg(0, 0.06);
+        mid = avg(0.06, 0.3);
+        treble = avg(0.3, 1);
         level = avg(0, 1);
       } else {
         const t = performance.now() / 1000;
@@ -227,6 +229,12 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
         treble = 0.08 + Math.sin(t * 3) * 0.03;
         level = 0.1;
       }
+
+      // beat detector — a sharp rise in bass fires a decaying "kick" that
+      // drives the on-beat burst, so the physics snaps with the rhythm.
+      const rise = bass - prevBass;
+      prevBass = bass;
+      kick = Math.max(kick * 0.86, rise > 0.05 ? Math.min(1, rise * 5) : 0);
 
       // fade trail
       ctx.fillStyle = "rgba(4,4,10,0.22)";
@@ -262,9 +270,9 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
         const ps = particlesRef.current;
         const targets = artTargetsRef.current;
         const useArt = m === "silhouette" && targets.length > 0;
-        const scale = Math.min(W, H) * (useArt ? 0.34 : 0.3) * (1 + bass * 0.5);
+        const scale = Math.min(W, H) * (useArt ? 0.34 : 0.3) * (1 + bass * 0.6 + kick * 0.5);
         const cosR = Math.cos(rot), sinR = Math.sin(rot);
-        const burst = 1 + bass * bass * 2.2; // beat push
+        const burst = 1 + bass * 0.8 + kick * 1.4; // snaps outward on each beat
 
         for (let i = 0; i < ps.length; i++) {
           const p = ps[i];
@@ -282,10 +290,11 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
             ty = p.hy * (1 + treble * 0.4);
             tz = rz;
           }
-          // ease
-          p.x += (tx - p.x) * 0.12;
-          p.y += (ty - p.y) * 0.12;
-          p.z += (tz - p.z) * 0.12;
+          // ease — faster follow (and even faster on a beat) → in sync
+          const follow = 0.24 + kick * 0.35;
+          p.x += (tx - p.x) * follow;
+          p.y += (ty - p.y) * follow;
+          p.z += (tz - p.z) * follow;
 
           // perspective project
           const persp = 1.8 / (1.8 - p.z);
@@ -302,9 +311,9 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
         }
       }
 
-      // central bloom
-      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(W, H) * (0.2 + bass * 0.3));
-      glow.addColorStop(0, `hsla(265, 80%, 60%, ${0.05 + level * 0.12})`);
+      // central bloom — pulses on the beat
+      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(W, H) * (0.2 + bass * 0.3 + kick * 0.25));
+      glow.addColorStop(0, `hsla(265, 90%, 65%, ${0.06 + level * 0.14 + kick * 0.15})`);
       glow.addColorStop(1, "transparent");
       ctx.fillStyle = glow;
       ctx.fillRect(0, 0, W, H);
@@ -357,7 +366,7 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
           <div className="absolute inset-x-0 top-0 flex items-start justify-between p-5 md:p-8">
             <div>
               <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-star-white/40">
-                “Now Visualizing”
+                Now Visualizing
               </p>
               <h2 className="mt-1 text-xl font-bold uppercase tracking-tight text-star-white md:text-3xl">
                 {release.title}

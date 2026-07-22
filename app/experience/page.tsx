@@ -17,10 +17,10 @@ function Fallback() {
   return (
     <div className="fixed inset-0 flex flex-col items-center justify-center bg-void px-6 text-center">
       <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-star-white/40">
-        “2D Baseline”
+        2D Baseline
       </p>
       <h1 className="mt-3 text-3xl font-bold uppercase tracking-tight text-star-white">
-        “A universe of music”
+        A universe of music
       </h1>
       <p className="mt-3 max-w-sm text-sm text-star-white/45">
         Your device or preferences opted out of the immersive 3D layer — the
@@ -39,7 +39,7 @@ export default function ExperiencePage() {
 
       {/* P0 dev HUD — Off-White industrial readout */}
       <div className="pointer-events-none fixed left-5 top-16 z-10 font-mono text-[10px] uppercase tracking-[0.2em] text-star-white/50">
-        <p>“P0 · Foundations”</p>
+        <p>P0 · Foundations</p>
         <p className="mt-1 text-star-white/30">
           {perf ? `${perf.fps} fps · ${perf.frameMs.toFixed(1)}ms${perf.overBudget ? " · over" : ""}` : "probing…"}
         </p>
@@ -47,7 +47,7 @@ export default function ExperiencePage() {
 
       <div className="pointer-events-none fixed bottom-6 left-1/2 z-10 -translate-x-1/2 text-center">
         <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-star-white/35">
-          “Observatory” — starfield proof · adaptive DPR · perf-gated
+          Observatory — starfield proof · adaptive DPR · perf-gated
         </p>
       </div>
     </>

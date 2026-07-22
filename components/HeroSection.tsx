@@ -20,7 +20,7 @@ export function HeroSection({ totalReleases, totalToday }: HeroSectionProps) {
         transition={{ duration: 0.6 }}
         className="text-[10px] font-bold uppercase tracking-[0.4em] text-star-white/40"
       >
-        “Music Discovery” — est. 2026
+        Music Discovery — est. 2026
       </motion.p>
 
       <motion.h1
@@ -29,9 +29,9 @@ export function HeroSection({ totalReleases, totalToday }: HeroSectionProps) {
         transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         className="mx-auto mt-4 max-w-4xl text-4xl font-bold uppercase leading-[1.02] tracking-tight text-star-white md:text-7xl"
       >
-        “A universe
+        A universe
         <br />
-        of music”
+        of music
       </motion.h1>
 
       <motion.p
@@ -51,17 +51,17 @@ export function HeroSection({ totalReleases, totalToday }: HeroSectionProps) {
         transition={{ delay: 0.35, duration: 0.7 }}
         className="mt-8 flex items-center justify-center gap-6 text-[10px] font-bold uppercase tracking-[0.24em] text-star-white/35"
       >
-        <span>“{totalReleases}” releases</span>
+        <span>{totalReleases} releases</span>
         <span className="h-3 w-px bg-star-white/15" />
         <span className="flex items-center gap-2">
           <span className="relative flex h-1.5 w-1.5">
             <span className="absolute h-full w-full animate-ping rounded-full bg-star-white/70" />
             <span className="relative h-1.5 w-1.5 rounded-full bg-star-white" />
           </span>
-          “{totalToday}” new today
+          {totalToday} new today
         </span>
         <span className="h-3 w-px bg-star-white/15" />
-        <span>“5” platforms</span>
+        <span>5 platforms</span>
       </motion.div>
     </section>
   );

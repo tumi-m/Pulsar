@@ -16,7 +16,7 @@ export function FormatPicker({ active, onChange }: FormatPickerProps) {
   return (
     <div className="flex items-center gap-2">
       <span className="hidden text-[9px] font-bold uppercase tracking-[0.24em] text-star-white/35 sm:block">
-        “Format”
+        Format
       </span>
       <div
         className="flex items-center gap-0.5 rounded-lg p-1"

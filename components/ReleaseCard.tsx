@@ -93,7 +93,7 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
           {/* taste badge */}
           {forYou && size > 0 && !armed && (
             <span className="absolute left-1 top-1 z-10 border border-white/50 bg-void/50 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.22em] text-white backdrop-blur-sm">
-              “FOR YOU”
+              FOR YOU
             </span>
           )}
 

@@ -35,12 +35,26 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body className="noise-overlay vignette bg-void min-h-screen">
-        {/* Cosmic background gradient */}
+        {/* Neon nebula background — brighter, more colour */}
         <div
           className="fixed inset-0 pointer-events-none z-0"
           style={{
             background:
-              "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(155,93,229,0.06) 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, rgba(0,212,255,0.04) 0%, transparent 60%), #04040a",
+              "radial-gradient(ellipse 70% 55% at 50% -5%, rgba(155,93,229,0.22) 0%, transparent 60%)," +
+              "radial-gradient(ellipse 55% 45% at 82% 78%, rgba(0,212,255,0.16) 0%, transparent 62%)," +
+              "radial-gradient(ellipse 50% 40% at 12% 68%, rgba(255,0,128,0.14) 0%, transparent 62%)," +
+              "radial-gradient(ellipse 45% 40% at 88% 12%, rgba(0,255,136,0.10) 0%, transparent 60%)," +
+              "radial-gradient(ellipse 60% 50% at 30% 110%, rgba(255,165,0,0.08) 0%, transparent 60%)," +
+              "#06061a",
+          }}
+        />
+        {/* soft animated nebula bloom */}
+        <div
+          className="fixed inset-0 pointer-events-none z-0 animate-pulse-glow"
+          style={{
+            background:
+              "radial-gradient(ellipse 40% 30% at 65% 40%, rgba(155,93,229,0.10) 0%, transparent 70%)",
+            opacity: 0.6,
           }}
         />
 

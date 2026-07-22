@@ -28,7 +28,7 @@ export function Navbar() {
         <Link href="/" className="flex items-center gap-2.5">
           <CalabiYau size={20} />
           <span className="text-sm font-bold uppercase tracking-[0.28em] text-star-white">
-            “PULSAR”
+            PULSAR
           </span>
         </Link>
 

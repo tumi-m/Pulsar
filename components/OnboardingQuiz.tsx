@@ -184,13 +184,13 @@ export function OnboardingQuiz({ onComplete, onSkip }: OnboardingQuizProps) {
       {/* industrial header */}
       <div className="flex items-center justify-between px-6 pt-6 md:px-10">
         <span className="text-xs font-bold uppercase tracking-[0.3em] text-star-white">
-          “PULSAR”
+          PULSAR
         </span>
         <button
           onClick={onSkip}
           className="text-[10px] font-bold uppercase tracking-[0.25em] text-star-white/40 transition-colors hover:text-star-white"
         >
-          “SKIP” →
+          SKIP →
         </button>
       </div>
 
@@ -211,7 +211,7 @@ export function OnboardingQuiz({ onComplete, onSkip }: OnboardingQuizProps) {
           transition={{ delay: 0.05 }}
           className="mt-3 text-2xl font-bold uppercase tracking-tight text-star-white md:text-4xl"
         >
-          “WHICH ONE?”
+          WHICH ONE?
         </motion.h2>
         <p className="mt-2 text-[10px] uppercase tracking-[0.25em] text-star-white/35">
           Tap the one that feels like you — no wrong answers
@@ -241,7 +241,7 @@ export function OnboardingQuiz({ onComplete, onSkip }: OnboardingQuizProps) {
                 <Visual kind={opt.visual} />
                 {/* Off-White corner marks */}
                 <span className="absolute left-2 top-2 text-[9px] font-bold uppercase tracking-[0.25em] text-white/70">
-                  “{String.fromCharCode(65 + i)}”
+                  {String.fromCharCode(65 + i)}
                 </span>
                 <span className="absolute bottom-2 right-2 text-[9px] font-bold text-white/50">
                   ✕
