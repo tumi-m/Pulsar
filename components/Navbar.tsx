@@ -2,24 +2,30 @@
 
 import Link from "next/link";
 import { motion, useScroll, useMotionValueEvent } from "framer-motion";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { CalabiYau } from "./CalabiYau";
 
 export function Navbar() {
   const { scrollY } = useScroll();
   const [scrolled, setScrolled] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const prevY = useRef(0);
 
   useMotionValueEvent(scrollY, "change", (y) => {
     setScrolled(y > 24);
+    // Hide the header when swiping/scrolling down; reveal on the way up.
+    if (y > prevY.current && y > 90) setHidden(true);
+    else if (y < prevY.current - 4) setHidden(false);
+    prevY.current = y;
   });
 
   return (
     <motion.nav
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.6 }}
+      initial={{ opacity: 0, y: 0 }}
+      animate={{ opacity: 1, y: hidden ? -64 : 0 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
       className={`
-        fixed inset-x-0 top-0 z-40 h-14 px-5 md:px-10
+        fixed inset-x-0 top-0 z-40 h-14 transform-gpu px-5 md:px-10
         transition-colors duration-500
         ${scrolled ? "border-b border-star-white/[0.06] bg-void/70 backdrop-blur-xl" : "bg-transparent"}
       `}

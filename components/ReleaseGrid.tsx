@@ -44,6 +44,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   const [showQuiz, setShowQuiz] = useState(false);
   const [format, setFormat] = useState<MediaFormat>("vinyl");
   const [showRefine, setShowRefine] = useState(false);
+  const [showGenres, setShowGenres] = useState(false);
   const [query, setQuery] = useState("");
 
   const detailOpen = Boolean(selectedRelease);
@@ -219,21 +220,36 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
           </div>
 
 
-          <div className="flex items-center gap-4">
-            <div className="min-w-0 flex-1">
-              <GenreFilter
-                active={activeGenre}
-                onChange={(g) => {
-                  setActiveGenre(g);
+          <div className="flex items-center gap-3">
+            {/* expandable Genre button */}
+            <button
+              onClick={() => setShowGenres((v) => !v)}
+              aria-expanded={showGenres}
+              className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                activeGenre
+                  ? "border-star-white/40 bg-star-white/[0.06] text-star-white"
+                  : "border-star-white/15 text-star-white/55 hover:border-star-white/40 hover:text-star-white"
+              }`}
+            >
+              {activeGenre ?? "Genre"}
+              <span className={`transition-transform ${showGenres ? "rotate-180" : ""}`}>⌄</span>
+            </button>
+            {activeGenre && (
+              <button
+                onClick={() => {
+                  setActiveGenre(null);
                   resetPage();
                 }}
-                available={available}
-              />
-            </div>
+                aria-label="Clear genre"
+                className="text-[10px] font-bold uppercase tracking-widest text-star-white/35 hover:text-star-white"
+              >
+                Clear
+              </button>
+            )}
             <button
               onClick={() => setShowRefine((v) => !v)}
               aria-expanded={showRefine}
-              className={`flex flex-shrink-0 items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] transition-colors ${
+              className={`ml-auto flex flex-shrink-0 items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] transition-colors ${
                 showRefine || refineActive ? "text-star-white" : "text-star-white/40 hover:text-star-white"
               }`}
             >
@@ -242,6 +258,31 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               <span className={`transition-transform ${showRefine ? "rotate-180" : ""}`}>⌄</span>
             </button>
           </div>
+
+          {/* genre drawer — pills, hidden until the Genre button is tapped */}
+          <AnimatePresence>
+            {showGenres && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.22 }}
+                className="overflow-hidden"
+              >
+                <div className="pt-3">
+                  <GenreFilter
+                    active={activeGenre}
+                    onChange={(g) => {
+                      setActiveGenre(g);
+                      resetPage();
+                      setShowGenres(false);
+                    }}
+                    available={available}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* refine drawer — advanced controls, hidden by default */}
           <AnimatePresence>
