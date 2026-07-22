@@ -3,6 +3,28 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { QUIZ, buildProfile, saveProfile, type TasteProfile } from "@/lib/taste";
+import { saveTheme } from "@/lib/theme";
+
+// Each vibe choice leans toward a theme; the majority wins.
+const OPTION_THEME: Record<string, string> = {
+  sunrise: "solaris",
+  storm: "solaris",
+  night: "sagan",
+  ocean: "sagan",
+  grid: "nebula",
+  static: "escher",
+  silk: "dream",
+  vinyl: "dream",
+};
+
+function themeFromPicks(picks: string[]): string {
+  const tally: Record<string, number> = {};
+  for (const p of picks) {
+    const t = OPTION_THEME[p];
+    if (t) tally[t] = (tally[t] ?? 0) + 1;
+  }
+  return Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "nebula";
+}
 
 interface OnboardingQuizProps {
   onComplete: (profile: TasteProfile) => void;
@@ -170,6 +192,7 @@ export function OnboardingQuiz({ onComplete, onSkip }: OnboardingQuizProps) {
     } else {
       const profile = buildProfile(next);
       saveProfile(profile);
+      saveTheme(themeFromPicks(next)); // set a starting theme from their vibe
       onComplete(profile);
     }
   }

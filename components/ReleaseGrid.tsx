@@ -56,8 +56,22 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     else if (!localStorage.getItem(SKIP_KEY)) setShowQuiz(true);
     setFormat(loadFormat());
     const onChange = () => setCollectionVersion((v) => v + 1);
+    const onFormat = (e: Event) => setFormat((e as CustomEvent<MediaFormat>).detail);
+    const onRetake = () => {
+      clearProfile();
+      localStorage.removeItem(SKIP_KEY);
+      setProfile(null);
+      setView("latest");
+      setShowQuiz(true);
+    };
     window.addEventListener("pulsar-collection-change", onChange);
-    return () => window.removeEventListener("pulsar-collection-change", onChange);
+    window.addEventListener("pulsar-format-change", onFormat);
+    window.addEventListener("pulsar-retake-quiz", onRetake);
+    return () => {
+      window.removeEventListener("pulsar-collection-change", onChange);
+      window.removeEventListener("pulsar-format-change", onFormat);
+      window.removeEventListener("pulsar-retake-quiz", onRetake);
+    };
   }, []);
 
   // The recommender profile: quiz taste + learned affinities from actions.

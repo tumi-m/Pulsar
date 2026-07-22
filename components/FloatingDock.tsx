@@ -35,8 +35,16 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   useEffect(() => {
     refresh();
     const h = () => refresh();
+    const openFromSidebar = (e: Event) => {
+      const which = (e as CustomEvent<"favorites" | "playlist">).detail;
+      setPanel(which);
+    };
     window.addEventListener("pulsar-collection-change", h);
-    return () => window.removeEventListener("pulsar-collection-change", h);
+    window.addEventListener("pulsar-open-crate", openFromSidebar);
+    return () => {
+      window.removeEventListener("pulsar-collection-change", h);
+      window.removeEventListener("pulsar-open-crate", openFromSidebar);
+    };
   }, []);
 
   async function share() {

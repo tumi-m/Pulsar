@@ -25,12 +25,25 @@ export function Navbar() {
       `}
     >
       <div className="mx-auto flex h-full max-w-screen-2xl items-center justify-between">
-        <Link href="/" className="flex items-center gap-2.5">
-          <CalabiYau size={22} />
-          <span className="text-sm font-bold uppercase tracking-[0.3em] text-star-white">
-            PULSAR
-          </span>
-        </Link>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
+            aria-label="Open menu"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-star-white/70 transition-colors hover:bg-star-white/10 hover:text-star-white"
+          >
+            <span className="flex flex-col gap-[3px]">
+              <span className="h-[1.5px] w-4 rounded-full bg-current" />
+              <span className="h-[1.5px] w-4 rounded-full bg-current" />
+              <span className="h-[1.5px] w-4 rounded-full bg-current" />
+            </span>
+          </button>
+          <Link href="/" className="flex items-center gap-2.5">
+            <CalabiYau size={22} />
+            <span className="text-sm font-bold uppercase tracking-[0.3em] text-star-white">
+              PULSAR
+            </span>
+          </Link>
+        </div>
 
         <span className="hidden font-mono text-[9px] uppercase tracking-[0.24em] text-star-white/30 sm:block">
           Music discovery service
