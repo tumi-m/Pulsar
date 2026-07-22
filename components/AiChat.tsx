@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, X, Play, Plus, Check } from "lucide-react";
+import { Sparkles, X, Play, Plus, Check, LayoutGrid, MessagesSquare } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { genreBucket, type GenreBucket } from "@/lib/utils";
 import { usePlayer } from "./player/PlayerProvider";
 import { togglePlaylist, inPlaylist } from "@/lib/collection";
-import { loadAiMode } from "@/lib/settings";
 import { Artwork } from "./Artwork";
 
 interface AiChatProps {
@@ -82,22 +81,23 @@ function buildList(releases: Release[], p: Parsed): Release[] {
 export function AiChat({ releases }: AiChatProps) {
   const player = usePlayer();
   const { current } = usePlayer();
-  const [open, setOpen] = useState(false);
+  // null = closed, "choose" = the left/right picker, "chat" = the describer
+  const [view, setView] = useState<"choose" | "chat" | null>(null);
   const [text, setText] = useState("");
   const [result, setResult] = useState<Release[] | null>(null);
 
-  // The navbar AI button fires "pulsar-ai-activate"; honor the chosen mode.
+  // The navbar AI button fires "pulsar-ai-activate" → show the chooser first.
   useEffect(() => {
-    const activate = () => {
-      if (loadAiMode() === "survey") {
-        window.dispatchEvent(new CustomEvent("pulsar-retake-quiz"));
-      } else {
-        setOpen(true);
-      }
-    };
+    const activate = () => setView("choose");
     window.addEventListener("pulsar-ai-activate", activate);
     return () => window.removeEventListener("pulsar-ai-activate", activate);
   }, []);
+
+  const close = () => setView(null);
+  const chooseSurvey = () => {
+    setView(null);
+    window.dispatchEvent(new CustomEvent("pulsar-retake-quiz"));
+  };
 
   const run = () => {
     if (!text.trim()) return;
@@ -119,119 +119,158 @@ export function AiChat({ releases }: AiChatProps) {
   ];
 
   return (
-    <>
-      <AnimatePresence>
-        {open && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setOpen(false)}
-              className="fixed inset-0 z-[58] bg-void/70 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, y: 30, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.98 }}
-              transition={{ type: "spring", stiffness: 320, damping: 32 }}
-              className="fixed inset-x-3 bottom-3 top-16 z-[58] mx-auto flex max-w-lg flex-col overflow-hidden rounded-2xl border border-star-white/12 bg-[#0a0a14]/97 backdrop-blur-xl md:inset-x-auto md:left-1/2 md:w-[32rem] md:-translate-x-1/2"
-            >
-              <div className="flex items-center justify-between border-b border-star-white/8 p-4">
-                <div className="flex items-center gap-2">
-                  <Sparkles size={18} className="text-neon-violet" />
+    <AnimatePresence>
+      {view && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={close}
+            className="fixed inset-0 z-[58] bg-void/70 backdrop-blur-sm"
+          />
+          <motion.div
+            initial={{ opacity: 0, y: 16, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 520, damping: 40 }}
+            className="fixed left-1/2 top-1/2 z-[58] flex max-h-[80vh] w-[min(92vw,26rem)] -translate-x-1/2 -translate-y-1/2 transform-gpu flex-col overflow-hidden rounded-2xl border border-star-white/12 bg-[#0a0a14]/97 backdrop-blur-xl"
+          >
+            {view === "choose" ? (
+              /* ── left / right choice before entering ── */
+              <div className="p-5">
+                <div className="mb-4 flex items-center justify-between">
                   <h3 className="text-sm font-bold uppercase tracking-wide text-star-white">
-                    Describe a vibe
+                    How do you want to pick?
                   </h3>
+                  <button onClick={close} aria-label="Close" className="text-star-white/50 hover:text-star-white">
+                    <X size={16} />
+                  </button>
                 </div>
-                <button
-                  onClick={() => setOpen(false)}
-                  aria-label="Close"
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-star-white/50 hover:bg-white/10 hover:text-star-white"
-                >
-                  <X size={16} />
-                </button>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={chooseSurvey}
+                    className="flex flex-col items-center gap-2 rounded-xl border border-star-white/12 bg-star-white/[0.03] p-4 text-center transition-colors hover:border-neon-violet/40 hover:bg-neon-violet/[0.06]"
+                  >
+                    <LayoutGrid size={26} className="text-neon-violet" />
+                    <span className="text-[12px] font-bold uppercase tracking-wide text-star-white">
+                      Visual Survey
+                    </span>
+                    <span className="text-[10px] leading-snug text-star-white/40">Tap images ·  no typing</span>
+                  </button>
+                  <button
+                    onClick={() => setView("chat")}
+                    className="flex flex-col items-center gap-2 rounded-xl border border-star-white/12 bg-star-white/[0.03] p-4 text-center transition-colors hover:border-neon-blue/40 hover:bg-neon-blue/[0.06]"
+                  >
+                    <MessagesSquare size={26} className="text-neon-blue" />
+                    <span className="text-[12px] font-bold uppercase tracking-wide text-star-white">
+                      Chat
+                    </span>
+                    <span className="text-[10px] leading-snug text-star-white/40">Describe a mood in words</span>
+                  </button>
+                </div>
               </div>
+            ) : (
+              /* ── compact chat ── */
+              <>
+                <div className="flex items-center justify-between border-b border-star-white/8 p-4">
+                  <button
+                    onClick={() => setView("choose")}
+                    className="flex items-center gap-2 text-star-white/70 hover:text-star-white"
+                    aria-label="Back"
+                  >
+                    <span className="text-lg leading-none">‹</span>
+                    <Sparkles size={16} className="text-neon-violet" />
+                    <h3 className="text-sm font-bold uppercase tracking-wide text-star-white">Describe a vibe</h3>
+                  </button>
+                  <button onClick={close} aria-label="Close" className="text-star-white/50 hover:text-star-white">
+                    <X size={16} />
+                  </button>
+                </div>
 
-              <div className="border-b border-star-white/8 p-4">
-                <textarea
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) run();
-                  }}
-                  placeholder="e.g. dreamy chillwave for a late-night drive…"
-                  rows={2}
-                  className="w-full resize-none rounded-lg border border-star-white/12 bg-star-white/[0.03] p-3 text-sm text-star-white placeholder:text-star-white/35 focus:border-neon-violet/50 focus:outline-none"
-                />
-                {!result && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {suggestions.map((s) => (
+                <div className="p-4">
+                  <textarea
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) run();
+                    }}
+                    placeholder="e.g. dreamy chillwave for a late-night drive…"
+                    rows={2}
+                    autoFocus
+                    className="w-full resize-none rounded-lg border border-star-white/12 bg-star-white/[0.03] p-3 text-sm text-star-white placeholder:text-star-white/35 focus:border-neon-violet/50 focus:outline-none"
+                  />
+                  {!result && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {suggestions.map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => setText(s)}
+                          className="rounded-full border border-star-white/12 px-2.5 py-1 text-[10px] text-star-white/50 transition-colors hover:border-star-white/30 hover:text-star-white"
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      onClick={run}
+                      className="flex-1 rounded-lg bg-star-white py-2.5 text-[11px] font-bold uppercase tracking-widest text-void transition-transform active:scale-[0.98]"
+                    >
+                      Build my list
+                    </button>
+                    {result && result.length > 0 && (
                       <button
-                        key={s}
-                        onClick={() => setText(s)}
-                        className="rounded-full border border-star-white/12 px-2.5 py-1 text-[10px] text-star-white/50 transition-colors hover:border-star-white/30 hover:text-star-white"
+                        onClick={addAll}
+                        className="rounded-lg border border-neon-green/40 bg-neon-green/10 px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-neon-green"
                       >
-                        {s}
+                        + Crate all
                       </button>
-                    ))}
+                    )}
+                  </div>
+                </div>
+
+                {/* results — only when there are any (keeps the card compact) */}
+                {result && (
+                  <div className="max-h-[42vh] flex-1 overflow-y-auto border-t border-star-white/8 p-2">
+                    {result.length === 0 && (
+                      <p className="p-6 text-center text-sm text-star-white/40">
+                        Nothing matched that vibe — try different words or a genre.
+                      </p>
+                    )}
+                    {result.map((r) => {
+                      const isThis = current?.artist === r.artist && current?.title === r.title;
+                      return (
+                        <div key={r.id} className="flex items-center gap-3 rounded-lg p-2 hover:bg-star-white/[0.04]">
+                          <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-md">
+                            <Artwork src={r.artwork_url} artist={r.artist} title={r.title} sizes="44px" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className={`truncate text-[13px] font-bold ${isThis ? "text-neon-blue" : "text-star-white"}`}>
+                              {r.title}
+                            </p>
+                            <p className="truncate text-[11px] text-star-white/50">{r.artist}</p>
+                          </div>
+                          <button
+                            onClick={() => player.play(r)}
+                            aria-label="Play"
+                            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-star-white text-void"
+                          >
+                            <Play size={13} className="ml-0.5" fill="currentColor" />
+                          </button>
+                          <CrateToggle release={r} />
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
-                <div className="mt-3 flex items-center gap-2">
-                  <button
-                    onClick={run}
-                    className="flex-1 rounded-lg bg-star-white py-2.5 text-[11px] font-bold uppercase tracking-widest text-void transition-transform active:scale-[0.98]"
-                  >
-                    Build my list
-                  </button>
-                  {result && result.length > 0 && (
-                    <button
-                      onClick={addAll}
-                      className="rounded-lg border border-neon-green/40 bg-neon-green/10 px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-neon-green"
-                    >
-                      + Crate all
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* results */}
-              <div className="flex-1 overflow-y-auto p-2">
-                {result && result.length === 0 && (
-                  <p className="p-6 text-center text-sm text-star-white/40">
-                    Nothing matched that vibe — try different words or a genre.
-                  </p>
-                )}
-                {(result ?? []).map((r) => {
-                  const isThis = current?.artist === r.artist && current?.title === r.title;
-                  return (
-                    <div key={r.id} className="flex items-center gap-3 rounded-lg p-2 hover:bg-star-white/[0.04]">
-                      <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-md">
-                        <Artwork src={r.artwork_url} artist={r.artist} title={r.title} sizes="44px" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className={`truncate text-[13px] font-bold ${isThis ? "text-neon-blue" : "text-star-white"}`}>
-                          {r.title}
-                        </p>
-                        <p className="truncate text-[11px] text-star-white/50">{r.artist}</p>
-                      </div>
-                      <button
-                        onClick={() => player.play(r)}
-                        aria-label="Play"
-                        className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-star-white text-void"
-                      >
-                        <Play size={13} className="ml-0.5" fill="currentColor" />
-                      </button>
-                      <CrateToggle release={r} />
-                    </div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    </>
+              </>
+            )}
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   );
 }
 

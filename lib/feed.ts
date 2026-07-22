@@ -107,8 +107,13 @@ async function fetchJSON(url: string): Promise<unknown | null> {
   }
 }
 
+// A working release that remembers its Deezer album id (so we can look up the
+// real release date later) and whether it still needs a real date.
+type FeedRelease = Release & { _dz?: number; _noDate?: boolean };
+
 // ── Source 1: Deezer editorial new releases (genuinely new) ──────────
 interface DeezerAlbum {
+  id?: number;
   title?: string;
   cover_xl?: string;
   cover_big?: string;
@@ -117,20 +122,72 @@ interface DeezerAlbum {
   artist?: { name?: string };
 }
 
-function mapDeezer(a: DeezerAlbum, popularity: number | null): Release | null {
+function mapDeezer(a: DeezerAlbum, popularity: number | null): FeedRelease | null {
   const artist = a.artist?.name?.trim();
   const title = a.title?.trim();
   const art = a.cover_xl ?? a.cover_big;
   if (!artist || !title || !art) return null;
   const type: ReleaseType =
     a.record_type === "single" ? "single" : a.record_type === "ep" ? "ep" : "album";
-  const date =
-    a.release_date && /^\d{4}-\d{2}-\d{2}$/.test(a.release_date)
-      ? a.release_date
-      : todayISO();
-  const r = baseRelease(artist, title, type, art, date, null, null);
+  // Deezer's /chart endpoints DON'T include release_date — only /editorial and
+  // /album/{id} do. Mark those so we can back-fill the REAL date afterwards
+  // instead of pretending everything dropped today.
+  const hasRealDate = Boolean(a.release_date && /^\d{4}-\d{2}-\d{2}$/.test(a.release_date));
+  const date = hasRealDate ? a.release_date! : todayISO();
+  const r = baseRelease(artist, title, type, art, date, null, null) as FeedRelease;
   if (popularity != null) r.popularity = popularity;
+  if (a.id) r._dz = a.id;
+  if (!hasRealDate) r._noDate = true;
   return r;
+}
+
+// ── Back-fill true release dates from the Deezer album detail endpoint ──
+interface DeezerAlbumDetail {
+  release_date?: string;
+  genres?: { data?: { name?: string }[] };
+}
+
+/**
+ * For albums whose date we couldn't read from the list endpoint, fetch the
+ * album detail (which carries the REAL release_date) and patch it in. Bounded
+ * by concurrency + a cap; the highest-charting albums are enriched first so
+ * the visible catalogue gets true dates. Anything left undated is flagged so
+ * it never masquerades as a brand-new "latest" drop.
+ */
+async function enrichRealDates(list: FeedRelease[]): Promise<void> {
+  const need = list
+    .filter((r) => r._noDate && r._dz)
+    .sort((a, b) => (b.popularity ?? -1) - (a.popularity ?? -1));
+  const CAP = 1200;
+  const targets = need.slice(0, CAP);
+  const CONC = 24;
+  let idx = 0;
+  let filled = 0;
+
+  const worker = async () => {
+    while (idx < targets.length) {
+      const r = targets[idx++];
+      const detail = (await fetchJSON(
+        `https://api.deezer.com/album/${r._dz}`
+      )) as DeezerAlbumDetail | null;
+      const d = detail?.release_date;
+      if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+        r.release_date = d;
+        r.created_at = d + "T00:00:00Z";
+        r._noDate = false;
+        filled++;
+        const g = detail?.genres?.data?.[0]?.name;
+        if (g && !r.genre) {
+          r.genre = g;
+          r.tags = [g.toLowerCase()];
+          r.mood = moodFor(g);
+        }
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: CONC }, worker));
+  console.log(`[feed] real dates back-filled: ${filled}/${targets.length} (missing ${need.length})`);
 }
 
 async function fromDeezer(): Promise<Release[]> {
@@ -239,21 +296,44 @@ export async function getLiveFeed(): Promise<Release[]> {
     `[feed] deezer: ${deezer.length} · apple: ${apple.length} · genres: ${genres.length}`
   );
 
-  const seen = new Set<string>();
-  const all: Release[] = [];
-  const byKey = new Map<string, Release>();
+  const all: FeedRelease[] = [];
+  const byKey = new Map<string, FeedRelease>();
   // Apple + deezer chart first (best popularity signal), then the genre sweep.
-  for (const r of [...apple, ...deezer, ...genres]) {
+  for (const r of [...apple, ...deezer, ...genres] as FeedRelease[]) {
     const key = `${r.artist.toLowerCase()}::${r.title.toLowerCase()}`;
     const existing = byKey.get(key);
     if (!existing) {
       byKey.set(key, r);
       all.push(r);
-    } else if ((r.popularity ?? -1) > (existing.popularity ?? -1)) {
-      existing.popularity = r.popularity; // keep strongest chart signal
+    } else {
+      if ((r.popularity ?? -1) > (existing.popularity ?? -1)) {
+        existing.popularity = r.popularity; // keep strongest chart signal
+      }
+      // Prefer a copy that actually knows its real (or lookup-able) date.
+      if (existing._noDate && !r._noDate) {
+        existing.release_date = r.release_date;
+        existing.created_at = r.created_at;
+        existing._noDate = false;
+      } else if (existing._noDate && r._dz && !existing._dz) {
+        existing._dz = r._dz; // remember an id we can look the date up with
+      }
     }
   }
-  void seen;
 
-  return all.sort((a, b) => (a.release_date < b.release_date ? 1 : -1));
+  // Back-fill true release dates for the charted albums that arrived undated.
+  await enrichRealDates(all);
+
+  // Sort newest-first by REAL date; albums we still couldn't date are pushed
+  // below the dated ones so they never sit at the top of "Latest".
+  all.sort((a, b) => {
+    if (Boolean(a._noDate) !== Boolean(b._noDate)) return a._noDate ? 1 : -1;
+    return a.release_date < b.release_date ? 1 : -1;
+  });
+
+  // Drop the internal bookkeeping fields before handing back clean Releases.
+  return all.map(({ _dz, _noDate, ...r }) => {
+    void _dz;
+    void _noDate;
+    return r;
+  });
 }

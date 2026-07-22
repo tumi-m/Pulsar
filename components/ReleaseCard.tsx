@@ -75,10 +75,15 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
     >
       <button
         type="button"
-        onClick={() => onOpen(release)}
+        onClick={() => {
+          // Tapping anywhere OUTSIDE the play triangle enters album + visualiser.
+          player.play(release);
+          onOpen(release);
+          onVisualize?.(release);
+        }}
         onFocus={enter}
         onBlur={leave}
-        aria-label={`${release.artist} — ${release.title}. Open listen options`}
+        aria-label={`${release.artist} — ${release.title}. Open album & visualizer`}
         className="block w-full outline-none focus-visible:ring-2 focus-visible:ring-star-white/40"
       >
         <div
@@ -149,10 +154,12 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
       <button
         onClick={(e) => {
           e.stopPropagation();
-          player.play(release);
-          onVisualize?.(release);
+          // The triangle ONLY plays/pauses the preview — it does not enter
+          // album/visualiser mode (that's for taps outside the triangle).
+          if (isCurrent) player.toggle();
+          else player.play(release);
         }}
-        aria-label={isPlayingThis ? "Pause" : "Play & visualize"}
+        aria-label={isPlayingThis ? "Pause" : "Play preview"}
         className={`absolute left-1/2 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full ring-1 ring-white/40 transition-all duration-200 ${
           big ? "h-20 w-20" : "h-14 w-14"
         } ${isCurrent || hovered ? "scale-100 opacity-100" : "scale-90 opacity-0"}`}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, ListMusic, Share2, X, Trash2 } from "lucide-react";
+import { Heart, ListMusic, Share2, X, Trash2, Sparkles, Shuffle } from "lucide-react";
 import type { Release } from "@/lib/types";
 import type { MediaFormat } from "@/lib/format";
 import { getFavorites, getPlaylist, toggleFavorite, removeFromPlaylist } from "@/lib/collection";
@@ -21,11 +21,14 @@ type Panel = "favorites" | "playlist" | null;
  * "crate" panel where the collection is displayed as physical media.
  */
 export function FloatingDock({ format, onOpen }: FloatingDockProps) {
-  const { current } = usePlayer();
+  const { current, shuffle, toggleShuffle } = usePlayer();
   const [panel, setPanel] = useState<Panel>(null);
   const [favs, setFavs] = useState<Release[]>([]);
   const [list, setList] = useState<Release[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+  // When the navbar hides on scroll-down, the Curator (AI) + Shuffle buttons
+  // relocate here, stacking above the three dock buttons.
+  const [navHidden, setNavHidden] = useState(false);
 
   const refresh = () => {
     setFavs(getFavorites());
@@ -39,11 +42,14 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       const which = (e as CustomEvent<"favorites" | "playlist">).detail;
       setPanel(which);
     };
+    const onNavHidden = (e: Event) => setNavHidden((e as CustomEvent<boolean>).detail);
     window.addEventListener("pulsar-collection-change", h);
     window.addEventListener("pulsar-open-crate", openFromSidebar);
+    window.addEventListener("pulsar-nav-hidden", onNavHidden);
     return () => {
       window.removeEventListener("pulsar-collection-change", h);
       window.removeEventListener("pulsar-open-crate", openFromSidebar);
+      window.removeEventListener("pulsar-nav-hidden", onNavHidden);
     };
   }, []);
 
@@ -103,6 +109,50 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
           current ? "bottom-24" : "bottom-5"
         }`}
       >
+        {/* Curator + Shuffle fly in above the three when the navbar hides */}
+        <AnimatePresence>
+          {navHidden && (
+            <>
+              <motion.button
+                key="curator"
+                initial={{ opacity: 0, y: -18, scale: 0.6 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -18, scale: 0.6 }}
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                onClick={() => window.dispatchEvent(new CustomEvent("pulsar-ai-activate"))}
+                aria-label="Curator"
+                className="flex h-14 w-14 items-center justify-center rounded-full"
+                style={{
+                  background: "linear-gradient(120deg, #9b5de5, #ff5fa2 60%, #ffb347)",
+                  boxShadow: "0 6px 18px rgba(155,93,229,0.5), inset 0 1px 0 rgba(255,255,255,0.3)",
+                }}
+              >
+                <Sparkles size={22} className="text-white" />
+              </motion.button>
+              <motion.button
+                key="shuffle"
+                initial={{ opacity: 0, y: -14, scale: 0.6 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -14, scale: 0.6 }}
+                transition={{ type: "spring", stiffness: 500, damping: 30, delay: 0.04 }}
+                onClick={() => toggleShuffle()}
+                aria-label="Shuffle to your top picks"
+                aria-pressed={shuffle}
+                className="flex h-14 w-14 items-center justify-center rounded-full"
+                style={{
+                  background: shuffle
+                    ? "linear-gradient(160deg, #f4d780, #d4af37)"
+                    : "linear-gradient(160deg, #3a3320, #201c10)",
+                  boxShadow: shuffle
+                    ? "0 6px 18px rgba(212,175,55,0.6), inset 0 1px 0 rgba(255,255,255,0.4)"
+                    : "0 6px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12)",
+                }}
+              >
+                <Shuffle size={20} className={shuffle ? "text-[#2a2410]" : "text-[#e8c66a]"} />
+              </motion.button>
+            </>
+          )}
+        </AnimatePresence>
         {dockBtn("share", Share2, "Share Pulsar", null, share, false)}
         {dockBtn(
           "playlist",

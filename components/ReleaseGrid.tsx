@@ -11,6 +11,7 @@ import { FormatPicker } from "./FormatPicker";
 import { FloatingDock } from "./FloatingDock";
 import { Visualizer } from "./Visualizer";
 import { AiChat } from "./AiChat";
+import { usePlayer } from "./player/PlayerProvider";
 import { genreBucket, GENRE_BUCKETS, type GenreBucket } from "@/lib/utils";
 import { loadFormat, saveFormat, type MediaFormat } from "@/lib/format";
 import {
@@ -33,6 +34,7 @@ const SKIP_KEY = "pulsar_quiz_skipped";
 type ViewMode = "latest" | "streamed" | "foryou";
 
 export function ReleaseGrid({ releases }: ReleaseGridProps) {
+  const player = usePlayer();
   const [activeGenre, setActiveGenre] = useState<GenreBucket | null>(null);
   const [activeType, setActiveType] = useState<"all" | "album" | "ep" | "single">("all");
   const [activeLabel, setActiveLabel] = useState<string | null>(null);
@@ -48,6 +50,11 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   const [query, setQuery] = useState("");
 
   const detailOpen = Boolean(selectedRelease);
+
+  // Tell the navbar when album mode is open so its header can go symmetrical.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("pulsar-detail-open", { detail: detailOpen }));
+  }, [detailOpen]);
 
   // bumps whenever the user favorites/crates something → recompute recs
   const [collectionVersion, setCollectionVersion] = useState(0);
@@ -87,6 +94,38 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     () => learnedProfile(profile, getFavorites(), getPlaylist()),
     [profile, collectionVersion]
   );
+
+  // Releases ranked highest-for-you first — the pool shuffle draws from.
+  const rankedForYou = useMemo(() => {
+    if (!recProfile) return releases;
+    return [...releases]
+      .map((r) => ({ r, s: scoreRelease(r, recProfile) }))
+      .sort((a, b) => b.s - a.s)
+      .map(({ r }) => r);
+  }, [releases, recProfile]);
+
+  // Keep a live ref to whether the visualizer is open so a shuffle-advance can
+  // swap its artwork to the new track without stale closures.
+  const visualizingRef = useRef<Release | null>(null);
+  useEffect(() => {
+    visualizingRef.current = visualizing;
+  }, [visualizing]);
+
+  // Register the shuffle picker: on preview end, jump to a random pick from
+  // the user's top-ranked tracks (never the same one twice in a row).
+  useEffect(() => {
+    player.setNextProvider((cur) => {
+      const pool = rankedForYou.slice(0, Math.max(12, Math.min(60, rankedForYou.length)));
+      const choices = pool.filter((r) => r.id !== cur?.id);
+      const list = choices.length ? choices : rankedForYou.filter((r) => r.id !== cur?.id);
+      if (!list.length) return null;
+      const next = list[Math.floor(Math.random() * list.length)];
+      // If the visualizer is open, follow the new track's art.
+      if (visualizingRef.current) setVisualizing(next);
+      return next;
+    });
+    return () => player.setNextProvider(null);
+  }, [player, rankedForYou]);
 
   const labels = useMemo(() => {
     const counts = new Map<string, number>();
@@ -193,8 +232,17 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       >
         {/* ── the menu: search + genre by default, one quiet "Refine" ── */}
         <div className="sticky top-14 z-30 mb-6 bg-void/85 px-6 py-3 backdrop-blur-xl md:px-10">
-          {/* search */}
-          <div className="mb-3 flex items-center gap-2 rounded-full border border-star-white/12 bg-star-white/[0.03] px-4 py-2 focus-within:border-star-white/30">
+          {/* search — 70% wide, centered, translucent liquid glass */}
+          <div
+            className="mx-auto mb-3 flex w-[70%] items-center gap-2 rounded-full border border-white/15 px-4 py-2 transition-colors focus-within:border-white/40"
+            style={{
+              background: "rgba(255,255,255,0.07)",
+              backdropFilter: "blur(14px) saturate(150%)",
+              WebkitBackdropFilter: "blur(14px) saturate(150%)",
+              boxShadow:
+                "inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -2px 6px rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.35)",
+            }}
+          >
             <svg viewBox="0 0 20 20" className="h-4 w-4 flex-shrink-0 text-star-white/40" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="9" cy="9" r="6" />
               <path d="M14 14l4 4" strokeLinecap="round" />

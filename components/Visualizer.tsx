@@ -11,12 +11,13 @@ interface VisualizerProps {
   onClose: () => void;
 }
 
-type Mode = "nebula" | "silhouette" | "aurora" | "crowd";
+type Mode = "nebula" | "silhouette" | "aurora" | "crowd" | "art";
 const MODES: { id: Mode; label: string }[] = [
   { id: "nebula", label: "Nebula" },
   { id: "silhouette", label: "Silhouette" },
   { id: "aurora", label: "Aurora" },
   { id: "crowd", label: "Crowd" },
+  { id: "art", label: "Cover" },
 ];
 
 interface Particle {
@@ -31,6 +32,7 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
   const rafRef = useRef<number>(0);
   const particlesRef = useRef<Particle[]>([]);
   const artTargetsRef = useRef<{ x: number; y: number }[]>([]);
+  const artImgRef = useRef<HTMLImageElement | null>(null);
   const modeRef = useRef<Mode>("nebula");
   const rotRef = useRef(0);
   const [mode, setMode] = useState<Mode>("nebula");
@@ -65,6 +67,7 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
+      artImgRef.current = img; // keep the full image for the "Cover" mode
       const S = 108;
       const off = document.createElement("canvas");
       off.width = S; off.height = S;
@@ -94,6 +97,7 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
 
   useEffect(() => {
     if (!release) return;
+    artImgRef.current = null; // drop the previous cover until the new one loads
     initParticles();
     sampleArt(release.artist, release.title);
   }, [release, initParticles, sampleArt]);
@@ -122,41 +126,68 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
     let prevBass = 0;
     let kick = 0;
 
-    // draw one glowing dancer silhouette
+    // Draw one glowing HOODED RUNNER — an NPC-style figure mid-stride, like
+    // the crowd of running silhouettes in a stylized music video. `run` is a
+    // 0..1 phase driving the stride/arm-swing cycle.
     const person = (
-      x: number, y: number, s: number, hue: number, alpha: number, armsUp: number
+      x: number, y: number, s: number, hue: number, alpha: number, run: number
     ) => {
-      ctx.fillStyle = `hsla(${hue}, 90%, 60%, ${alpha})`;
-      // head
+      const cyc = run * Math.PI * 2;
+      const stride = Math.sin(cyc);          // legs/arms swing
+      const lift = Math.abs(Math.cos(cyc));  // foot lift on the up-phase
+      const body = `hsla(${hue}, 78%, 58%, ${alpha})`;
+      const hood = `hsla(${hue}, 55%, 42%, ${alpha})`;
+
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(0.16); // forward running lean
+      ctx.lineCap = "round";
+      ctx.strokeStyle = body;
+      ctx.fillStyle = body;
+
+      // legs — one drives forward, one trails back
+      ctx.lineWidth = s * 0.2;
       ctx.beginPath();
-      ctx.arc(x, y - s, s * 0.32, 0, Math.PI * 2);
-      ctx.fill();
-      // torso
+      ctx.moveTo(0, s * 0.5);
+      ctx.lineTo(stride * s * 0.5, s * 1.05 - lift * s * 0.12);
+      ctx.moveTo(0, s * 0.5);
+      ctx.lineTo(-stride * s * 0.5, s * 1.05 - (1 - lift) * s * 0.12);
+      ctx.stroke();
+
+      // torso — the hoodie body
       ctx.beginPath();
-      ctx.moveTo(x - s * 0.28, y - s * 0.55);
-      ctx.lineTo(x + s * 0.28, y - s * 0.55);
-      ctx.lineTo(x + s * 0.18, y + s * 0.5);
-      ctx.lineTo(x - s * 0.18, y + s * 0.5);
+      ctx.moveTo(-s * 0.3, -s * 0.5);
+      ctx.lineTo(s * 0.3, -s * 0.5);
+      ctx.lineTo(s * 0.2, s * 0.55);
+      ctx.lineTo(-s * 0.2, s * 0.55);
       ctx.closePath();
       ctx.fill();
-      // arms — raise with the beat
-      const ay = y - s * 0.4 - armsUp * s * 0.7;
+
+      // arms — swing opposite the legs, bent forward
       ctx.lineWidth = s * 0.16;
-      ctx.strokeStyle = `hsla(${hue}, 90%, 65%, ${alpha})`;
-      ctx.lineCap = "round";
       ctx.beginPath();
-      ctx.moveTo(x - s * 0.24, y - s * 0.4);
-      ctx.lineTo(x - s * 0.5, ay);
-      ctx.moveTo(x + s * 0.24, y - s * 0.4);
-      ctx.lineTo(x + s * 0.5, ay);
+      ctx.moveTo(0, -s * 0.34);
+      ctx.lineTo(-stride * s * 0.46, s * 0.12);
+      ctx.moveTo(0, -s * 0.34);
+      ctx.lineTo(stride * s * 0.46, -s * 0.08);
       ctx.stroke();
-      // legs
+
+      // hood — a raised, pointed cowl over the head
+      ctx.fillStyle = hood;
       ctx.beginPath();
-      ctx.moveTo(x - s * 0.1, y + s * 0.5);
-      ctx.lineTo(x - s * 0.22, y + s * 1.05);
-      ctx.moveTo(x + s * 0.1, y + s * 0.5);
-      ctx.lineTo(x + s * 0.22, y + s * 1.05);
-      ctx.stroke();
+      ctx.moveTo(-s * 0.36, -s * 0.48);
+      ctx.quadraticCurveTo(-s * 0.46, -s * 1.18, s * 0.02, -s * 1.24);
+      ctx.quadraticCurveTo(s * 0.46, -s * 1.16, s * 0.34, -s * 0.48);
+      ctx.closePath();
+      ctx.fill();
+
+      // face — shadowed inside the hood
+      ctx.fillStyle = body;
+      ctx.beginPath();
+      ctx.arc(0, -s * 0.82, s * 0.24, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
     };
 
     const draw = () => {
@@ -198,24 +229,65 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
       rotRef.current += 0.0016 + bass * 0.02;
       const rot = rotRef.current;
 
-      if (m === "crowd") {
-        // rows of glowing dancers jumping to the beat (depth = parallax)
+      if (m === "art") {
+        // Just the album / single artwork — softly breathing with the beat.
+        const img = artImgRef.current;
+        ctx.globalCompositeOperation = "source-over";
+        // clear to a near-black so the cover reads cleanly (no additive trails)
+        ctx.fillStyle = "rgba(4,4,10,1)";
+        ctx.fillRect(0, 0, W, H);
+        if (img && img.width) {
+          const pulse = 1 + bass * 0.06 + kick * 0.05;
+          const side = Math.min(W, H) * 0.72 * pulse;
+          const x = cx - side / 2;
+          const y = cy - side / 2;
+          // outer glow that pulses on the low end
+          ctx.save();
+          ctx.shadowColor = `hsla(265, 90%, 60%, ${0.4 + kick * 0.4})`;
+          ctx.shadowBlur = 40 + bass * 80 + kick * 60;
+          ctx.fillStyle = "#000";
+          ctx.fillRect(x, y, side, side);
+          ctx.restore();
+          ctx.drawImage(img, x, y, side, side);
+          // subtle vignette frame
+          ctx.strokeStyle = `hsla(0,0%,100%,${0.12 + treble * 0.2})`;
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(x, y, side, side);
+        } else {
+          ctx.fillStyle = "hsla(0,0%,100%,0.3)";
+          ctx.font = "600 12px ui-monospace, monospace";
+          ctx.textAlign = "center";
+          ctx.fillText("LOADING COVER…", cx, cy);
+        }
+        ctx.globalCompositeOperation = "source-over";
+        rafRef.current = requestAnimationFrame(draw);
+        return;
+      } else if (m === "crowd") {
+        // rows of hooded NPCs RUNNING across the floor (depth = parallax).
+        // The whole crowd drifts sideways so it reads as a running horde; the
+        // beat drives their stride speed and a jump-lift on each kick.
         const rows = 3;
         for (let r = rows - 1; r >= 0; r--) {
-          const rowY = H * (0.58 + r * 0.14);
-          const count = 12 + r * 6;
-          const sizeF = 1 - r * 0.24;
-          const baseHue = 250 + r * 30;
+          const rowY = H * (0.6 + r * 0.13);
+          const count = 11 + r * 5;
+          const sizeF = 1 - r * 0.22;
+          const baseHue = 250 + r * 26;
+          const span = W + 90;
+          // pace: faster rows in front, everyone speeds up on the low end
+          const pace = (16 + r * 8) * (0.7 + bass * 1.6);
+          const strideSpeed = 1.5 + bass * 2.4 + kick * 2.2;
           for (let i = 0; i < count; i++) {
-            const x = ((i + 0.5) / count) * W + Math.sin(i * 3 + r) * 10;
-            const phase = i * 1.3 + r * 2;
-            const jumpAmt = 0.35 + bass * 1.4 + kick * 2.4;
-            const jump = jumpAmt * (26 * sizeF) * Math.abs(Math.sin(time * 4 + phase));
-            const y = rowY - jump;
-            const hue = (baseHue + i * 6 + treble * 60) % 360;
-            const alpha = (0.18 + level * 0.5) * (1 - r * 0.2);
-            const armsUp = Math.min(1, bass * 1.5 + kick * 1.5);
-            person(x, y, 26 * sizeF, hue, alpha, armsUp);
+            const phase = i * 1.7 + r * 3;
+            // horizontal running motion — wraps around the screen
+            const x = (((i / count) * span + time * pace) % span) - 45;
+            const runCycle = ((time * strideSpeed + phase) % 1 + 1) % 1;
+            // running bob + a jump-lift that pops on the beat
+            const bob = Math.abs(Math.sin((time * strideSpeed + phase) * Math.PI)) * (7 * sizeF);
+            const beatLift = (bass * 1.1 + kick * 2.2) * (18 * sizeF);
+            const y = rowY - bob - beatLift;
+            const hue = (baseHue + i * 5 + treble * 50) % 360;
+            const alpha = (0.2 + level * 0.5) * (1 - r * 0.18);
+            person(x, y, 26 * sizeF, hue, alpha, runCycle);
           }
         }
         // floor shimmer
@@ -312,46 +384,75 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
           onDragEnd={(_e, info) => {
             if (info.offset.y > 110 || info.velocity.y > 600) handleClose();
           }}
-          className="fixed inset-x-2 top-16 z-40 h-[56vh] transform-gpu touch-none overflow-hidden rounded-2xl border border-star-white/12 bg-void shadow-2xl md:inset-x-4"
+          className="fixed inset-x-3 top-16 z-40 h-[48vh] transform-gpu touch-none overflow-hidden rounded-[3px] border-2 border-[#42424e] bg-void md:inset-x-[20%]"
+          style={{
+            boxShadow:
+              "inset 2px 2px 0 rgba(255,255,255,0.22), inset -2px -2px 0 rgba(0,0,0,0.7), 0 22px 60px rgba(0,0,0,0.6)",
+          }}
         >
-          <div className="absolute left-1/2 top-2 z-10 h-1 w-10 -translate-x-1/2 rounded-full bg-star-white/25" />
           <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 
-          {/* top bar */}
-          <div className="absolute inset-x-0 top-0 flex items-start justify-between p-4 md:p-6">
-            <div className="min-w-0">
-              <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-star-white/40">
-                Now Visualizing
-              </p>
-              <h2 className="mt-1 truncate text-lg font-bold uppercase tracking-tight text-star-white md:text-2xl">
+          {/* NeXT-style scored title bar */}
+          <div
+            className="absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 border-b-2 border-[#08080c] px-2.5 py-2"
+            style={{
+              backgroundColor: "#22222c",
+              backgroundImage:
+                "repeating-linear-gradient(0deg, rgba(255,255,255,0.10) 0 1px, transparent 1px 3px)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.6)",
+            }}
+          >
+            <div className="min-w-0 flex items-center gap-2 rounded-[2px] bg-[#1a1a22]/80 px-2 py-1">
+              <span className="text-[9px] font-bold uppercase tracking-[0.24em] text-star-white/45">
+                Visualize
+              </span>
+              <span className="text-star-white/25">·</span>
+              <span className="truncate font-mono text-[11px] font-bold uppercase tracking-tight text-star-white">
                 {release.title}
-              </h2>
-              <p className="truncate text-sm text-star-white/60">{release.artist}</p>
+              </span>
+              <span className="hidden truncate font-mono text-[11px] text-star-white/55 sm:inline">
+                — {release.artist}
+              </span>
               {!hasAudio && (
-                <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-neon-amber/70">
-                  No preview · idle visual
-                </p>
+                <span className="flex-shrink-0 font-mono text-[9px] font-bold uppercase tracking-widest text-neon-amber/70">
+                  idle
+                </span>
               )}
             </div>
             <button
               onClick={handleClose}
               aria-label="Close visualizer"
-              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-star-white/20 bg-void/50 text-star-white/70 backdrop-blur transition-colors hover:border-white/60 hover:text-star-white"
+              className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-[2px] border border-[#5a5a66] bg-[#2c2c36] text-star-white/80 transition-colors hover:bg-[#3a3a46] hover:text-star-white"
+              style={{ boxShadow: "inset 1px 1px 0 rgba(255,255,255,0.22), inset -1px -1px 0 rgba(0,0,0,0.6)" }}
             >
-              <X size={16} />
+              <X size={13} strokeWidth={2.5} />
             </button>
           </div>
 
           {/* bottom controls */}
           <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 p-4 md:p-6">
-            <div className="scrollbar-none flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full bg-[#141420]/70 p-1 backdrop-blur">
+            <div
+              className="scrollbar-none flex max-w-full items-center gap-0.5 overflow-x-auto rounded-[3px] border border-[#4a4a56] p-1"
+              style={{
+                backgroundColor: "#20202a",
+                boxShadow: "inset 1px 1px 0 rgba(255,255,255,0.18), inset -1px -1px 0 rgba(0,0,0,0.6)",
+              }}
+            >
               {MODES.map((mo) => (
                 <button
                   key={mo.id}
                   onClick={() => setMode(mo.id)}
-                  className={`flex-shrink-0 rounded-full px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
-                    mode === mo.id ? "bg-star-white text-void" : "text-star-white/55 hover:text-star-white"
+                  className={`flex-shrink-0 rounded-[2px] px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] transition-colors ${
+                    mode === mo.id ? "text-void" : "text-star-white/60 hover:text-star-white"
                   }`}
+                  style={
+                    mode === mo.id
+                      ? {
+                          background: "linear-gradient(160deg, #f0f0f4, #c8c8d0)",
+                          boxShadow: "inset 1px 1px 0 rgba(255,255,255,0.6), inset -1px -1px 0 rgba(0,0,0,0.35)",
+                        }
+                      : undefined
+                  }
                 >
                   {mo.label}
                 </button>
@@ -361,8 +462,11 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
               onClick={() => player.toggle()}
               disabled={!hasAudio}
               aria-label={playing ? "Pause" : "Play"}
-              className="flex h-14 w-14 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95 disabled:opacity-40"
-              style={{ background: "linear-gradient(160deg, #f0f0f4, #c4c4cc)" }}
+              className="flex h-14 w-14 items-center justify-center rounded-[4px] transition-transform active:translate-y-px disabled:opacity-40"
+              style={{
+                background: "linear-gradient(160deg, #f0f0f4, #c4c4cc)",
+                boxShadow: "inset 2px 2px 0 rgba(255,255,255,0.7), inset -2px -2px 0 rgba(0,0,0,0.35), 0 6px 16px rgba(0,0,0,0.5)",
+              }}
             >
               {playing ? (
                 <Pause size={22} className="text-void" fill="currentColor" />
@@ -370,7 +474,7 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
                 <Play size={22} className="ml-0.5 text-void" fill="currentColor" />
               )}
             </button>
-            <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-star-white/30">
+            <p className="font-mono text-[9px] font-bold uppercase tracking-[0.22em] text-star-white/30">
               Swipe down to close · keep browsing below
             </p>
           </div>
