@@ -51,6 +51,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const audio = new Audio();
     audio.crossOrigin = "anonymous";
     audio.preload = "auto";
+    // Safari (esp. iOS): must play inline, not fullscreen.
+    audio.setAttribute("playsinline", "");
+    audio.setAttribute("webkit-playsinline", "");
     audioRef.current = audio;
 
     const onTime = () => {

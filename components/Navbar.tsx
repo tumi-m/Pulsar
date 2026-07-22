@@ -26,18 +26,14 @@ export function Navbar() {
     >
       <div className="mx-auto flex h-full max-w-screen-2xl items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5">
-          <CalabiYau size={20} />
-          <span className="text-sm font-bold uppercase tracking-[0.28em] text-star-white">
+          <CalabiYau size={22} />
+          <span className="text-sm font-bold uppercase tracking-[0.3em] text-star-white">
             PULSAR
           </span>
         </Link>
 
-        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-star-white/35">
-          {new Date().toLocaleDateString("en-US", {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-          })}
+        <span className="hidden font-mono text-[9px] uppercase tracking-[0.24em] text-star-white/30 sm:block">
+          Music discovery service
         </span>
       </div>
     </motion.nav>

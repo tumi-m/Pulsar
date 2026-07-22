@@ -31,6 +31,7 @@ type ViewMode = "latest" | "streamed" | "foryou";
 
 export function ReleaseGrid({ releases }: ReleaseGridProps) {
   const [activeGenre, setActiveGenre] = useState<GenreBucket | null>(null);
+  const [activeType, setActiveType] = useState<"all" | "album" | "ep" | "single">("all");
   const [activeLabel, setActiveLabel] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>("latest");
   const [selectedRelease, setSelectedRelease] = useState<Release | null>(null);
@@ -84,6 +85,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
         .sort((a, b) => b.s - a.s)
         .map(({ r }) => r);
     }
+    if (activeType !== "all") list = list.filter((r) => r.type === activeType);
     if (activeGenre) list = list.filter((r) => genreBucket(r.genre) === activeGenre);
     if (activeLabel) list = list.filter((r) => r.label === activeLabel);
     const q = query.trim().toLowerCase();
@@ -97,7 +99,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       );
     }
     return list;
-  }, [releases, activeGenre, activeLabel, view, profile, query]);
+  }, [releases, activeGenre, activeType, activeLabel, view, profile, query]);
 
   const shown = filtered.slice(0, visible);
   const sizes = useMemo(() => tileSizes(shown, profile), [shown, profile]);
@@ -179,6 +181,51 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 ✕
               </button>
             )}
+          </div>
+
+          {/* Albums / EPs / Tracks — beveled segmented control (like CD picker) */}
+          <div className="mb-3 flex justify-center">
+            <div
+              className="flex items-center gap-0.5 rounded-lg p-1"
+              style={{
+                background: "linear-gradient(160deg, #26262e, #14141a)",
+                boxShadow:
+                  "inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -2px 4px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4)",
+              }}
+            >
+              {(
+                [
+                  ["all", "All"],
+                  ["album", "Albums"],
+                  ["ep", "EPs"],
+                  ["single", "Tracks"],
+                ] as const
+              ).map(([t, label]) => (
+                <button
+                  key={t}
+                  onClick={() => {
+                    setActiveType(t);
+                    resetPage();
+                  }}
+                  className={`relative rounded-md px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors ${
+                    activeType === t ? "text-void" : "text-star-white/55 hover:text-star-white"
+                  }`}
+                >
+                  {activeType === t && (
+                    <motion.span
+                      layoutId="type-active"
+                      className="absolute inset-0 rounded-md"
+                      style={{
+                        background: "linear-gradient(160deg, #f0f0f4, #c8c8d0)",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.6)",
+                      }}
+                      transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                    />
+                  )}
+                  <span className="relative">{label}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
@@ -307,7 +354,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
             <p className="font-mono text-sm tracking-widest text-star-white/30">NOTHING HERE YET</p>
           </div>
         ) : (
-          <div className={`grid grid-flow-dense gap-2.5 px-3 md:gap-3 md:px-5 ${gridCols}`}>
+          <div className={`grid grid-flow-dense gap-4 px-3 md:gap-5 md:px-5 ${gridCols}`}>
             {shown.map((release, i) => (
               <ReleaseCard
                 key={release.id}

@@ -80,7 +80,7 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
         aria-label={`${release.artist} — ${release.title}. Open listen options`}
         className="block w-full outline-none focus-visible:ring-2 focus-visible:ring-star-white/40"
       >
-        <div className={`relative w-full ${size === 1 ? "aspect-[2/1]" : "aspect-square"}`}>
+        <div className={`relative w-full overflow-hidden rounded-2xl ring-1 ring-star-white/[0.06] ${size === 1 ? "aspect-[2/1]" : "aspect-square"}`}>
           {/* default: plain album cover */}
           <Artwork
             src={release.artwork_url}
@@ -170,22 +170,22 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
             setFav(toggleFavorite(release));
           }}
           aria-label={fav ? "Remove from favorites" : "Add to favorites"}
-          className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-void/70 backdrop-blur-sm transition-colors hover:border-white/60"
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-void/70 backdrop-blur-sm transition-colors hover:border-white/60"
         >
-          <Heart size={12} className={fav ? "fill-neon-pink text-neon-pink" : "text-star-white/80"} />
+          <Heart size={16} className={fav ? "fill-neon-pink text-neon-pink" : "text-star-white/80"} />
         </button>
         <button
           onClick={(e) => {
             e.stopPropagation();
             setInList(togglePlaylist(release));
           }}
-          aria-label={inList ? "Remove from playlist" : "Add to playlist"}
-          className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-void/70 backdrop-blur-sm transition-colors hover:border-white/60"
+          aria-label={inList ? "Remove from crate" : "Add to crate"}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-void/70 backdrop-blur-sm transition-colors hover:border-white/60"
         >
           {inList ? (
-            <Check size={12} className="text-neon-green" />
+            <Check size={16} className="text-neon-green" />
           ) : (
-            <Plus size={12} className="text-star-white/80" />
+            <Plus size={16} className="text-star-white/80" />
           )}
         </button>
       </div>

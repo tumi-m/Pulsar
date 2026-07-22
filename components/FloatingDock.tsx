@@ -69,7 +69,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       key={key}
       onClick={onClick}
       aria-label={label}
-      className="group relative flex h-12 w-12 items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95"
+      className="group relative flex h-14 w-14 items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95"
       style={{
         background: active
           ? "linear-gradient(160deg, #f0f0f4, #c8c8d0)"
@@ -78,7 +78,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
           "0 6px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -2px 4px rgba(0,0,0,0.4)",
       }}
     >
-      <Icon size={18} className={active ? "text-void" : "text-star-white/85"} />
+      <Icon size={22} className={active ? "text-void" : "text-star-white/85"} />
       {count != null && count > 0 && (
         <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon-pink px-1 text-[9px] font-bold text-void">
           {count}
@@ -99,7 +99,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
         {dockBtn(
           "playlist",
           ListMusic,
-          "Your playlist",
+          "Your crate",
           list.length,
           () => setPanel(panel === "playlist" ? null : "playlist"),
           panel === "playlist"
@@ -149,10 +149,10 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-star-white/40">
-                    {panel === "favorites" ? "The Crate" : "Your Mixtape"}
+                    {panel === "favorites" ? "Favorites" : "The Crate"}
                   </p>
                   <h3 className="text-lg font-bold uppercase tracking-tight text-star-white">
-                    {panel === "favorites" ? "Favorites" : "Playlist"} · {items.length}
+                    {panel === "favorites" ? "Loved" : "Your Crate"} · {items.length}
                   </h3>
                 </div>
                 <button
@@ -167,7 +167,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               {items.length === 0 ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
                   <p className="text-sm font-bold uppercase tracking-widest text-star-white/40">
-                    Empty {panel === "favorites" ? "crate" : "mixtape"}
+                    Empty {panel === "favorites" ? "loved" : "crate"}
                   </p>
                   <p className="text-xs text-star-white/35">
                     Hover any album and tap the {panel === "favorites" ? "♥ heart" : "＋ plus"} to

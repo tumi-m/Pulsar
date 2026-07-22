@@ -352,13 +352,21 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
         <motion.div
           initial={{ opacity: 0, y: -24 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -24 }}
+          exit={{ opacity: 0, y: 60 }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          className="fixed inset-x-2 top-16 z-40 h-[65vh] overflow-hidden rounded-2xl border border-star-white/12 bg-void shadow-2xl md:inset-x-4"
+          drag="y"
+          dragConstraints={{ top: 0, bottom: 0 }}
+          dragElastic={{ top: 0.05, bottom: 0.6 }}
+          onDragEnd={(_e, info) => {
+            if (info.offset.y > 110 || info.velocity.y > 600) handleClose();
+          }}
+          className="fixed inset-x-2 top-16 z-40 h-[62vh] touch-none overflow-hidden rounded-2xl border border-star-white/12 bg-void shadow-2xl md:inset-x-4"
         >
+          {/* swipe-down handle */}
+          <div className="absolute left-1/2 top-2 z-10 h-1 w-10 -translate-x-1/2 rounded-full bg-star-white/25" />
           <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <audio ref={audioRef} onEnded={() => setPlaying(false)} />
+          <audio ref={audioRef} playsInline onEnded={() => setPlaying(false)} />
 
           {/* top bar */}
           <div className="absolute inset-x-0 top-0 flex items-start justify-between p-5 md:p-8">
