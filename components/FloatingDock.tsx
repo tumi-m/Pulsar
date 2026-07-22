@@ -7,6 +7,7 @@ import type { Release } from "@/lib/types";
 import type { MediaFormat } from "@/lib/format";
 import { getFavorites, getPlaylist, toggleFavorite, removeFromPlaylist } from "@/lib/collection";
 import { PhysicalMedia } from "./PhysicalMedia";
+import { usePlayer } from "./player/PlayerProvider";
 
 interface FloatingDockProps {
   format: MediaFormat;
@@ -20,6 +21,7 @@ type Panel = "favorites" | "playlist" | null;
  * "crate" panel where the collection is displayed as physical media.
  */
 export function FloatingDock({ format, onOpen }: FloatingDockProps) {
+  const { current } = usePlayer();
   const [panel, setPanel] = useState<Panel>(null);
   const [favs, setFavs] = useState<Release[]>([]);
   const [list, setList] = useState<Release[]>([]);
@@ -88,7 +90,11 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   return (
     <>
       {/* the dock */}
-      <div className="fixed bottom-5 right-5 z-40 flex flex-col gap-2.5">
+      <div
+        className={`fixed right-5 z-40 flex flex-col gap-2.5 transition-[bottom] duration-300 ${
+          current ? "bottom-24" : "bottom-5"
+        }`}
+      >
         {dockBtn("share", Share2, "Share Pulsar", null, share, false)}
         {dockBtn(
           "playlist",

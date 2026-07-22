@@ -3,6 +3,8 @@ import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { ParticleField } from "@/components/ParticleField";
 import { FloatingObjects } from "@/components/FloatingObjects";
+import { PlayerProvider } from "@/components/player/PlayerProvider";
+import { NowPlayingBar } from "@/components/player/NowPlayingBar";
 
 export const metadata: Metadata = {
   title: "PULSAR — Daily Music Discovery",
@@ -48,13 +50,18 @@ export default function RootLayout({
         {/* Immersive drifting physical-media silhouettes */}
         <FloatingObjects />
 
-        {/* Navigation */}
-        <Navbar />
+        <PlayerProvider>
+          {/* Navigation */}
+          <Navbar />
 
-        {/* Page content */}
-        <main className="relative z-10">
-          {children}
-        </main>
+          {/* Page content */}
+          <main className="relative z-10">
+            {children}
+          </main>
+
+          {/* Persistent now-playing transport */}
+          <NowPlayingBar />
+        </PlayerProvider>
       </body>
     </html>
   );

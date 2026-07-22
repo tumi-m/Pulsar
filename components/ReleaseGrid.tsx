@@ -40,6 +40,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   const [showQuiz, setShowQuiz] = useState(false);
   const [format, setFormat] = useState<MediaFormat>("vinyl");
   const [showRefine, setShowRefine] = useState(false);
+  const [query, setQuery] = useState("");
 
   const detailOpen = Boolean(selectedRelease);
 
@@ -85,8 +86,18 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     }
     if (activeGenre) list = list.filter((r) => genreBucket(r.genre) === activeGenre);
     if (activeLabel) list = list.filter((r) => r.label === activeLabel);
+    const q = query.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (r) =>
+          r.artist.toLowerCase().includes(q) ||
+          r.title.toLowerCase().includes(q) ||
+          (r.genre ?? "").toLowerCase().includes(q) ||
+          (r.label ?? "").toLowerCase().includes(q)
+      );
+    }
     return list;
-  }, [releases, activeGenre, activeLabel, view, profile]);
+  }, [releases, activeGenre, activeLabel, view, profile, query]);
 
   const shown = filtered.slice(0, visible);
   const sizes = useMemo(() => tileSizes(shown, profile), [shown, profile]);
@@ -126,8 +137,34 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
           detailOpen ? "lg:pr-[50vw]" : ""
         }`}
       >
-        {/* ── the menu: genre by default, one quiet "Refine" control ── */}
+        {/* ── the menu: search + genre by default, one quiet "Refine" ── */}
         <div className="sticky top-14 z-30 mb-6 bg-void/85 px-6 py-3 backdrop-blur-xl md:px-10">
+          {/* search */}
+          <div className="mb-3 flex items-center gap-2 rounded-full border border-star-white/12 bg-star-white/[0.03] px-4 py-2 focus-within:border-star-white/30">
+            <svg viewBox="0 0 20 20" className="h-4 w-4 flex-shrink-0 text-star-white/40" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="9" cy="9" r="6" />
+              <path d="M14 14l4 4" strokeLinecap="round" />
+            </svg>
+            <input
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                resetPage();
+              }}
+              placeholder="Search artists, albums, genres…"
+              className="w-full bg-transparent text-sm text-star-white placeholder:text-star-white/35 focus:outline-none"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                aria-label="Clear search"
+                className="flex-shrink-0 text-star-white/40 hover:text-star-white"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
           <div className="flex items-center gap-4">
             <div className="min-w-0 flex-1">
               <GenreFilter

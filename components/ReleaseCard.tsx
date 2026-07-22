@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Heart, Plus, Check } from "lucide-react";
+import { Heart, Plus, Check, Play, Pause } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { isToday, isYesterday } from "@/lib/utils";
 import type { MediaFormat } from "@/lib/format";
 import { PhysicalMedia } from "./PhysicalMedia";
 import { isFavorite, toggleFavorite, inPlaylist, togglePlaylist } from "@/lib/collection";
+import { usePlayer } from "./player/PlayerProvider";
 
 interface ReleaseCardProps {
   release: Release;
@@ -19,6 +20,9 @@ interface ReleaseCardProps {
 }
 
 export function ReleaseCard({ release, index, size = 0, forYou = false, format, onOpen }: ReleaseCardProps) {
+  const player = usePlayer();
+  const isCurrent = player.current?.id === release.id;
+  const isPlayingThis = isCurrent && player.playing;
   const [hovered, setHovered] = useState(false);
   // `armed` gates the physical-media animation: it only turns on after the
   // cursor has rested on the tile for 3 seconds, so the grid stays calm.
@@ -110,6 +114,25 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
             )}
           </div>
         </div>
+      </button>
+
+      {/* persistent play button, bottom-left (Spotify-style quick preview) */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          player.play(release);
+        }}
+        aria-label={isPlayingThis ? "Pause preview" : "Play preview"}
+        className={`absolute bottom-1.5 left-1.5 z-20 flex h-9 w-9 items-center justify-center rounded-full shadow-lg transition-all duration-200 ${
+          isCurrent || hovered ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
+        }`}
+        style={{ background: "linear-gradient(160deg, #f0f0f4, #c4c4cc)" }}
+      >
+        {isPlayingThis ? (
+          <Pause size={15} className="text-void" fill="currentColor" />
+        ) : (
+          <Play size={15} className="ml-0.5 text-void" fill="currentColor" />
+        )}
       </button>
 
       {/* quick actions — appear on hover, top-right */}
