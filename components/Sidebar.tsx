@@ -133,7 +133,6 @@ export function Sidebar() {
                     <span className="text-[12px] font-bold uppercase tracking-wide text-star-white">
                       {f.label}
                     </span>
-                    <span className="text-[10px] text-star-white/35">{f.blurb}</span>
                   </button>
                 ))}
               </div>
