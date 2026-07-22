@@ -384,37 +384,37 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
           onDragEnd={(_e, info) => {
             if (info.offset.y > 110 || info.velocity.y > 600) handleClose();
           }}
-          className="fixed inset-x-3 top-16 z-40 h-[48vh] transform-gpu touch-none overflow-hidden rounded-[3px] border-2 border-[#42424e] bg-void md:inset-x-[20%]"
+          className="fixed inset-x-6 top-16 z-40 h-[30vh] transform-gpu touch-none overflow-hidden rounded-2xl border border-white/15 bg-[#0a0a14]/55 backdrop-blur-2xl md:inset-x-[28%]"
           style={{
             boxShadow:
-              "inset 2px 2px 0 rgba(255,255,255,0.22), inset -2px -2px 0 rgba(0,0,0,0.7), 0 22px 60px rgba(0,0,0,0.6)",
+              "inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 10px rgba(0,0,0,0.4), 0 24px 60px rgba(0,0,0,0.6)",
           }}
         >
           <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 
-          {/* NeXT-style scored title bar */}
+          {/* translucent liquid-glass title bar */}
           <div
-            className="absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 border-b-2 border-[#08080c] px-2.5 py-2"
+            className="absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2"
             style={{
-              backgroundColor: "#22222c",
-              backgroundImage:
-                "repeating-linear-gradient(0deg, rgba(255,255,255,0.10) 0 1px, transparent 1px 3px)",
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.6)",
+              background: "rgba(255,255,255,0.08)",
+              backdropFilter: "blur(12px) saturate(150%)",
+              WebkitBackdropFilter: "blur(12px) saturate(150%)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35)",
             }}
           >
-            <div className="min-w-0 flex items-center gap-2 rounded-[2px] bg-[#1a1a22]/80 px-2 py-1">
+            <div className="flex min-w-0 items-center gap-2">
               <span className="text-[9px] font-bold uppercase tracking-[0.24em] text-star-white/45">
                 Visualize
               </span>
               <span className="text-star-white/25">·</span>
-              <span className="truncate font-mono text-[11px] font-bold uppercase tracking-tight text-star-white">
+              <span className="truncate text-[12px] font-bold uppercase tracking-tight text-star-white">
                 {release.title}
               </span>
-              <span className="hidden truncate font-mono text-[11px] text-star-white/55 sm:inline">
+              <span className="hidden truncate text-[11px] text-star-white/55 sm:inline">
                 — {release.artist}
               </span>
               {!hasAudio && (
-                <span className="flex-shrink-0 font-mono text-[9px] font-bold uppercase tracking-widest text-neon-amber/70">
+                <span className="flex-shrink-0 text-[9px] font-bold uppercase tracking-widest text-neon-amber/70">
                   idle
                 </span>
               )}
@@ -422,37 +422,35 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
             <button
               onClick={handleClose}
               aria-label="Close visualizer"
-              className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-[2px] border border-[#5a5a66] bg-[#2c2c36] text-star-white/80 transition-colors hover:bg-[#3a3a46] hover:text-star-white"
-              style={{ boxShadow: "inset 1px 1px 0 rgba(255,255,255,0.22), inset -1px -1px 0 rgba(0,0,0,0.6)" }}
+              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/25 text-star-white/80 transition-colors hover:border-white/60 hover:text-star-white"
+              style={{
+                background: "rgba(255,255,255,0.12)",
+                backdropFilter: "blur(8px)",
+                WebkitBackdropFilter: "blur(8px)",
+              }}
             >
               <X size={13} strokeWidth={2.5} />
             </button>
           </div>
 
           {/* bottom controls */}
-          <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 p-4 md:p-6">
+          <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2.5 p-3 md:p-4">
             <div
-              className="scrollbar-none flex max-w-full items-center gap-0.5 overflow-x-auto rounded-[3px] border border-[#4a4a56] p-1"
+              className="scrollbar-none flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-white/15 p-1"
               style={{
-                backgroundColor: "#20202a",
-                boxShadow: "inset 1px 1px 0 rgba(255,255,255,0.18), inset -1px -1px 0 rgba(0,0,0,0.6)",
+                background: "rgba(255,255,255,0.1)",
+                backdropFilter: "blur(12px) saturate(150%)",
+                WebkitBackdropFilter: "blur(12px) saturate(150%)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 6px 18px rgba(0,0,0,0.4)",
               }}
             >
               {MODES.map((mo) => (
                 <button
                   key={mo.id}
                   onClick={() => setMode(mo.id)}
-                  className={`flex-shrink-0 rounded-[2px] px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] transition-colors ${
-                    mode === mo.id ? "text-void" : "text-star-white/60 hover:text-star-white"
+                  className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors ${
+                    mode === mo.id ? "bg-white/85 text-void" : "text-star-white/60 hover:text-star-white"
                   }`}
-                  style={
-                    mode === mo.id
-                      ? {
-                          background: "linear-gradient(160deg, #f0f0f4, #c8c8d0)",
-                          boxShadow: "inset 1px 1px 0 rgba(255,255,255,0.6), inset -1px -1px 0 rgba(0,0,0,0.35)",
-                        }
-                      : undefined
-                  }
                 >
                   {mo.label}
                 </button>
@@ -462,19 +460,21 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
               onClick={() => player.toggle()}
               disabled={!hasAudio}
               aria-label={playing ? "Pause" : "Play"}
-              className="flex h-14 w-14 items-center justify-center rounded-[4px] transition-transform active:translate-y-px disabled:opacity-40"
+              className="flex h-12 w-12 items-center justify-center rounded-full ring-1 ring-white/40 transition-transform hover:scale-105 active:scale-95 disabled:opacity-40"
               style={{
-                background: "linear-gradient(160deg, #f0f0f4, #c4c4cc)",
-                boxShadow: "inset 2px 2px 0 rgba(255,255,255,0.7), inset -2px -2px 0 rgba(0,0,0,0.35), 0 6px 16px rgba(0,0,0,0.5)",
+                background: "rgba(255,255,255,0.14)",
+                backdropFilter: "blur(10px) saturate(140%)",
+                WebkitBackdropFilter: "blur(10px) saturate(140%)",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -2px 6px rgba(0,0,0,0.25)",
               }}
             >
               {playing ? (
-                <Pause size={22} className="text-void" fill="currentColor" />
+                <Pause size={20} className="text-white drop-shadow" fill="currentColor" />
               ) : (
-                <Play size={22} className="ml-0.5 text-void" fill="currentColor" />
+                <Play size={20} className="ml-0.5 text-white drop-shadow" fill="currentColor" />
               )}
             </button>
-            <p className="font-mono text-[9px] font-bold uppercase tracking-[0.22em] text-star-white/30">
+            <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-star-white/30">
               Swipe down to close · keep browsing below
             </p>
           </div>

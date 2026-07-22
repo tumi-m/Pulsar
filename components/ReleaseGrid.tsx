@@ -48,6 +48,8 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   const [showRefine, setShowRefine] = useState(false);
   const [showGenres, setShowGenres] = useState(false);
   const [query, setQuery] = useState("");
+  // Search bar shrinks + centers when the user scrolls down (nav hides).
+  const [searchCompact, setSearchCompact] = useState(false);
 
   const detailOpen = Boolean(selectedRelease);
 
@@ -77,15 +79,18 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       setView("latest");
       setShowQuiz(true);
     };
+    const onNavHidden = (e: Event) => setSearchCompact((e as CustomEvent<boolean>).detail);
     window.addEventListener("pulsar-collection-change", onChange);
     window.addEventListener("pulsar-format-change", onFormat);
     window.addEventListener("pulsar-type-change", onType);
     window.addEventListener("pulsar-retake-quiz", onRetake);
+    window.addEventListener("pulsar-nav-hidden", onNavHidden);
     return () => {
       window.removeEventListener("pulsar-collection-change", onChange);
       window.removeEventListener("pulsar-format-change", onFormat);
       window.removeEventListener("pulsar-type-change", onType);
       window.removeEventListener("pulsar-retake-quiz", onRetake);
+      window.removeEventListener("pulsar-nav-hidden", onNavHidden);
     };
   }, []);
 
@@ -232,9 +237,11 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       >
         {/* ── the menu: search + genre by default, one quiet "Refine" ── */}
         <div className="sticky top-14 z-30 mb-6 bg-void/85 px-6 py-3 backdrop-blur-xl md:px-10">
-          {/* search — 70% wide, centered, translucent liquid glass */}
+          {/* search — centered translucent liquid glass; shrinks on scroll-down */}
           <div
-            className="mx-auto mb-3 flex w-[70%] items-center gap-2 rounded-full border border-white/15 px-4 py-2 transition-colors focus-within:border-white/40"
+            className={`mx-auto mb-3 flex items-center gap-2 rounded-full border border-white/15 focus-within:border-white/40 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              searchCompact ? "w-[46%] px-3 py-1.5" : "w-[70%] px-4 py-2"
+            }`}
             style={{
               background: "rgba(255,255,255,0.07)",
               backdropFilter: "blur(14px) saturate(150%)",

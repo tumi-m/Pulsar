@@ -107,25 +107,25 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
             onDragEnd={(_e, info) => {
               if (info.offset.y > 120 || info.velocity.y > 700) onClose();
             }}
-            className="fixed inset-x-0 bottom-0 z-40 flex h-[72vh] transform-gpu touch-pan-y flex-col rounded-t-[4px] border-2 border-b-0 border-[#42424e] bg-[#08080f]/97 backdrop-blur-xl lg:inset-x-auto lg:right-0 lg:top-14 lg:bottom-0 lg:h-auto lg:w-1/2 lg:rounded-none lg:border-2 lg:border-r-0"
-            style={{ boxShadow: "inset 2px 2px 0 rgba(255,255,255,0.16), inset -2px 0 0 rgba(0,0,0,0.6)" }}
+            className="fixed inset-x-0 bottom-0 z-40 flex h-[72vh] transform-gpu touch-pan-y flex-col rounded-t-2xl border border-b-0 border-white/15 bg-[#0a0a14]/70 backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-14 lg:bottom-0 lg:h-auto lg:w-1/2 lg:rounded-none lg:border-l lg:border-r-0 lg:border-t-0"
+            style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35), 0 -20px 60px rgba(0,0,0,0.5)" }}
             role="dialog"
             aria-modal="false"
             aria-label={`${release.title} by ${release.artist}`}
           >
             {/* mobile grab handle */}
             <div className="mx-auto mt-2 h-1 w-10 flex-shrink-0 rounded-full bg-star-white/25 lg:hidden" />
-            {/* NeXT-style scored title bar */}
+            {/* translucent liquid-glass title bar */}
             <div
-              className="flex items-center justify-between gap-3 border-b-2 border-[#08080c] px-2.5 py-2"
+              className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2"
               style={{
-                backgroundColor: "#22222c",
-                backgroundImage:
-                  "repeating-linear-gradient(0deg, rgba(255,255,255,0.10) 0 1px, transparent 1px 3px)",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.6)",
+                background: "rgba(255,255,255,0.08)",
+                backdropFilter: "blur(12px) saturate(150%)",
+                WebkitBackdropFilter: "blur(12px) saturate(150%)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35)",
               }}
             >
-              <span className="flex items-center gap-2 rounded-[2px] bg-[#1a1a22]/80 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-star-white/80">
+              <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-star-white/80">
                 Album
                 <span className="text-star-white/25">·</span>
                 <span className="max-w-[46vw] truncate normal-case tracking-tight text-star-white lg:max-w-[16vw]">
@@ -135,8 +135,12 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
               <button
                 onClick={onClose}
                 aria-label="Close"
-                className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-[2px] border border-[#5a5a66] bg-[#2c2c36] text-star-white/80 transition-colors hover:bg-[#3a3a46] hover:text-star-white"
-                style={{ boxShadow: "inset 1px 1px 0 rgba(255,255,255,0.22), inset -1px -1px 0 rgba(0,0,0,0.6)" }}
+                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/25 text-star-white/80 transition-colors hover:border-white/60 hover:text-star-white"
+                style={{
+                  background: "rgba(255,255,255,0.12)",
+                  backdropFilter: "blur(8px)",
+                  WebkitBackdropFilter: "blur(8px)",
+                }}
               >
                 <X size={13} strokeWidth={2.5} />
               </button>
