@@ -7,6 +7,7 @@ import type { Release } from "@/lib/types";
 import { isToday, isYesterday } from "@/lib/utils";
 import type { MediaFormat } from "@/lib/format";
 import { PhysicalMedia } from "./PhysicalMedia";
+import { Artwork } from "./Artwork";
 import { isFavorite, toggleFavorite, inPlaylist, togglePlaylist } from "@/lib/collection";
 import { usePlayer } from "./player/PlayerProvider";
 
@@ -76,14 +77,31 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
         className="block w-full outline-none focus-visible:ring-2 focus-visible:ring-star-white/40"
       >
         <div className={`relative w-full ${size === 1 ? "aspect-[2/1]" : "aspect-square"}`}>
-          <PhysicalMedia
+          {/* default: plain album cover */}
+          <Artwork
             src={release.artwork_url}
             artist={release.artist}
             title={release.title}
-            format={format}
-            hovered={armed}
-            big={big}
+            className={`object-cover transition-opacity duration-300 ${armed ? "opacity-0" : "opacity-100"}`}
           />
+          {/* physical object appears only after a 3-second dwell */}
+          {armed && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
+              className="absolute inset-0"
+            >
+              <PhysicalMedia
+                src={release.artwork_url}
+                artist={release.artist}
+                title={release.title}
+                format={format}
+                hovered={armed}
+                big={big}
+              />
+            </motion.div>
+          )}
 
           {/* fresh-drop dot */}
           {isFresh && !armed && (

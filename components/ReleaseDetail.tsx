@@ -2,11 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, Link as LinkIcon, AudioLines } from "lucide-react";
+import { X, Check, Link as LinkIcon, AudioLines, Play, Pause } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { Artwork } from "./Artwork";
 import { PLATFORMS } from "./platforms";
+import { usePlayer } from "./player/PlayerProvider";
+
+interface Track {
+  number: number;
+  title: string;
+  durationMs: number;
+  previewUrl: string | null;
+}
 
 interface ReleaseDetailProps {
   release: Release | null;
@@ -14,19 +22,51 @@ interface ReleaseDetailProps {
   onVisualize?: (release: Release) => void;
 }
 
+const fmtDur = (ms: number) => {
+  if (!ms) return "";
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
+
 /**
- * Half-page detail — a right-side sheet. On large screens it occupies the
- * right half of the viewport while the grid reflows into the left half
- * (see ReleaseGrid). On small screens it becomes a full-height overlay.
+ * Half-page detail — a right-side sheet. For an album (or EP) it fetches
+ * and shows the whole tracklist; each track plays its own 30s preview.
  */
 export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailProps) {
+  const player = usePlayer();
   const [copied, setCopied] = useState<string | null>(null);
+  const [tracks, setTracks] = useState<Track[] | null>(null);
+  const [tracksLoading, setTracksLoading] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  // Fetch the whole album's tracklist when an album/EP is selected.
+  useEffect(() => {
+    setTracks(null);
+    if (!release || (release.type !== "album" && release.type !== "ep")) return;
+    let cancelled = false;
+    setTracksLoading(true);
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/album?artist=${encodeURIComponent(release.artist)}&title=${encodeURIComponent(release.title)}`
+        );
+        const data = await res.json();
+        if (!cancelled) setTracks(Array.isArray(data.tracks) ? data.tracks : []);
+      } catch {
+        if (!cancelled) setTracks([]);
+      } finally {
+        if (!cancelled) setTracksLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [release]);
 
   const available = release ? PLATFORMS.filter((p) => Boolean(release[p.key])) : [];
 
@@ -125,6 +165,73 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
                       →
                     </span>
                   </button>
+                </div>
+              )}
+
+              {/* whole-album tracklist (albums / EPs) */}
+              {(release.type === "album" || release.type === "ep") && (
+                <div className="border-b border-star-white/5 p-3">
+                  <p className="flex items-center justify-between px-2 pb-2 pt-1 text-[10px] font-mono uppercase tracking-[0.22em] text-star-white/35">
+                    <span>Tracklist</span>
+                    {tracks && tracks.length > 0 && <span>{tracks.length} tracks</span>}
+                  </p>
+                  {tracksLoading && (
+                    <p className="px-2 py-3 text-[11px] text-star-white/30">Loading tracks…</p>
+                  )}
+                  {!tracksLoading && tracks && tracks.length === 0 && (
+                    <p className="px-2 py-3 text-[11px] text-star-white/30">
+                      Tracklist unavailable for this release.
+                    </p>
+                  )}
+                  <div className="space-y-0.5">
+                    {(tracks ?? []).map((t) => {
+                      const trackDisplay: Release = { ...release, title: t.title };
+                      const isThis =
+                        player.current?.artist === release.artist && player.current?.title === t.title;
+                      const playingThis = isThis && player.playing;
+                      return (
+                        <div
+                          key={`${t.number}-${t.title}`}
+                          className="group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-star-white/[0.05]"
+                        >
+                          <button
+                            onClick={() => {
+                              if (isThis) player.toggle();
+                              else if (t.previewUrl) player.playDirect(trackDisplay, t.previewUrl);
+                            }}
+                            disabled={!t.previewUrl}
+                            aria-label={playingThis ? "Pause" : "Play track"}
+                            className="flex h-6 w-6 flex-shrink-0 items-center justify-center text-star-white/45 transition-colors group-hover:text-star-white disabled:opacity-30"
+                          >
+                            <span className="group-hover:hidden">
+                              {playingThis ? (
+                                <Pause size={12} className="text-neon-blue" fill="currentColor" />
+                              ) : (
+                                <span className="text-[11px] font-mono">{t.number || "•"}</span>
+                              )}
+                            </span>
+                            <span className="hidden group-hover:inline">
+                              {playingThis ? (
+                                <Pause size={12} fill="currentColor" />
+                              ) : (
+                                <Play size={12} fill="currentColor" />
+                              )}
+                            </span>
+                          </button>
+                          <span
+                            className={`flex-1 truncate text-[13px] ${
+                              isThis ? "text-neon-blue" : "text-star-white/85"
+                            }`}
+                          >
+                            {t.title}
+                          </span>
+                          <span className="flex-shrink-0 font-mono text-[10px] text-star-white/30">
+                            {fmtDur(t.durationMs)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 

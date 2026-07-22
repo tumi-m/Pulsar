@@ -24,6 +24,7 @@ interface PlayerCtx {
   progress: number; // 0..1
   hasAudio: boolean;
   play: (release: Release) => void;
+  playDirect: (display: Release, previewUrl: string) => void;
   toggle: () => void;
   stop: () => void;
   seek: (fraction: number) => void;
@@ -118,6 +119,21 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     [current, hasAudio]
   );
 
+  // Play a specific, already-resolved preview URL (e.g. an album track).
+  const playDirect = useCallback((display: Release, previewUrl: string) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const reqId = ++reqIdRef.current;
+    void reqId;
+    setCurrent(display);
+    setLoading(false);
+    setHasAudio(true);
+    setProgress(0);
+    audio.src = previewUrl;
+    audio.load();
+    audio.play().catch(() => {});
+  }, []);
+
   const toggle = useCallback(() => {
     const audio = audioRef.current;
     if (!audio || !hasAudio) return;
@@ -145,7 +161,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <Ctx.Provider value={{ current, playing, loading, progress, hasAudio, play, toggle, stop, seek }}>
+    <Ctx.Provider value={{ current, playing, loading, progress, hasAudio, play, playDirect, toggle, stop, seek }}>
       {children}
     </Ctx.Provider>
   );
