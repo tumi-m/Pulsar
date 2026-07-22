@@ -12,6 +12,11 @@ const buildTimeStub: unknown = new Proxy(resolved, {
   },
 });
 
+// Sanitize the project URL: trim whitespace/newlines and strip any trailing
+// slash. A trailing slash produces "//rest/v1/…" which Supabase rejects with
+// "Invalid path specified in request URL" — the cause of failed inserts.
+const cleanUrl = () => (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim().replace(/\/+$/, "");
+
 // Lazy client — reads env vars at call time so agent/env.ts config() has already run
 let _supabase: ReturnType<typeof createClient> | null = null;
 
@@ -21,21 +26,16 @@ export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
       return () => buildTimeStub;
     }
     if (!_supabase) {
-      _supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      );
+      _supabase = createClient(cleanUrl(), (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").trim());
     }
     return (_supabase as unknown as Record<string | symbol, unknown>)[prop];
   },
 });
 
 export const supabaseAdmin = () =>
-  createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  createClient(cleanUrl(), (process.env.SUPABASE_SERVICE_ROLE_KEY ?? "").trim(), {
+    auth: { persistSession: false },
+  });
 
 export async function getReleases(opts?: {
   limit?: number;

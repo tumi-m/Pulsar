@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 
 interface ArtworkProps {
@@ -10,6 +10,8 @@ interface ArtworkProps {
   sizes?: string;
   priority?: boolean;
   className?: string;
+  /** Fired when no artwork could be resolved (stored URL + proxy both failed). */
+  onUnavailable?: () => void;
 }
 
 /**
@@ -26,14 +28,20 @@ export function Artwork({
   sizes = "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw",
   priority = false,
   className = "object-cover",
+  onUnavailable,
 }: ArtworkProps) {
   // 0 = original url, 1 = iTunes proxy, 2 = letter tile
   const [stage, setStage] = useState(0);
 
   const proxied = `/api/artwork?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`;
   const isProxySrc = src.startsWith("/api/");
+  const exhausted = stage >= 2 || (stage === 1 && isProxySrc);
 
-  if (stage >= 2 || (stage === 1 && isProxySrc)) {
+  useEffect(() => {
+    if (exhausted) onUnavailable?.();
+  }, [exhausted, onUnavailable]);
+
+  if (exhausted) {
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-nebula via-cosmos to-void">
         <span className="text-4xl font-bold text-dust/60 select-none">

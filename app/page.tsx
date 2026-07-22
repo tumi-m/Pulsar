@@ -58,7 +58,9 @@ export default async function HomePage() {
 
   // Priority: Supabase releases → live feed → built-in catalog.
   // The site always shows a large, fresh grid — with or without config.
-  const gridReleases = mergeReleases(dbReleases, liveFeed, CATALOG);
+  const gridReleases = mergeReleases(dbReleases, liveFeed, CATALOG).filter(
+    (r) => r.artwork_url && r.artwork_url.trim().length > 0
+  );
 
   // "New today" counts genuine last-24h drops from DB + live feed.
   const today = new Date().toISOString().split("T")[0];

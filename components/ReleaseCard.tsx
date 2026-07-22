@@ -30,6 +30,7 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
   const [armed, setArmed] = useState(false);
   const [fav, setFav] = useState(false);
   const [inList, setInList] = useState(false);
+  const [artHidden, setArtHidden] = useState(false); // hide if no art resolves
   const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -54,6 +55,9 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
 
   const isFresh = isToday(release.release_date) || isYesterday(release.release_date);
   const big = size === 2;
+
+  // No artwork could be resolved → don't show this release at all.
+  if (artHidden) return null;
 
   return (
     <motion.div
@@ -83,6 +87,7 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
             artist={release.artist}
             title={release.title}
             className={`object-cover transition-opacity duration-300 ${armed ? "opacity-0" : "opacity-100"}`}
+            onUnavailable={() => setArtHidden(true)}
           />
           {/* physical object appears only after a 3-second dwell */}
           {armed && (

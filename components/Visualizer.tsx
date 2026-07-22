@@ -190,20 +190,24 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
 
     const resize = () => {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
-      canvas.width = window.innerWidth * dpr;
-      canvas.height = window.innerHeight * dpr;
+      const w = canvas.clientWidth || window.innerWidth;
+      const h = canvas.clientHeight || window.innerHeight;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
     resize();
     window.addEventListener("resize", resize);
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas);
 
     const freq = new Uint8Array(1024);
     let prevBass = 0;
     let kick = 0; // transient beat impulse, decays each frame
 
     const draw = () => {
-      const W = window.innerWidth;
-      const H = window.innerHeight;
+      const W = canvas.clientWidth || window.innerWidth;
+      const H = canvas.clientHeight || window.innerHeight;
       const cx = W / 2;
       const cy = H / 2;
 
@@ -326,18 +330,12 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
     return () => {
       cancelAnimationFrame(rafRef.current);
       window.removeEventListener("resize", resize);
+      ro.disconnect();
     };
   }, [playing]);
 
-  // ── cleanup on close ────────────────────────────────────────────
-  useEffect(() => {
-    if (release) {
-      document.body.style.overflow = "hidden";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [release]);
+  // Non-modal — the page stays scrollable/clickable so the user can keep
+  // browsing albums while the visualizer plays. (No scroll lock.)
 
   const handleClose = useCallback(() => {
     const audio = audioRef.current;
@@ -352,11 +350,11 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
     <AnimatePresence>
       {release && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.4 }}
-          className="fixed inset-0 z-[70] bg-void"
+          initial={{ opacity: 0, y: -24 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -24 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          className="fixed inset-x-2 top-16 z-40 h-[65vh] overflow-hidden rounded-2xl border border-star-white/12 bg-void shadow-2xl md:inset-x-4"
         >
           <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
