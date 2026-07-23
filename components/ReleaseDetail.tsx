@@ -39,6 +39,7 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
   const [tracks, setTracks] = useState<Track[] | null>(null);
   const [tracksLoading, setTracksLoading] = useState(false);
   const [tracksOpen, setTracksOpen] = useState(true);
+  const [origDate, setOrigDate] = useState<string | null>(null);
   const [visualMode, setVisualMode] = useState<VisualMode>("nebula");
 
   const cycleVisual = (dir: 1 | -1) =>
@@ -53,9 +54,10 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // Fetch the whole album's tracklist when an album/EP is selected.
+  // Fetch the whole album's tracklist + original release date when selected.
   useEffect(() => {
     setTracks(null);
+    setOrigDate(null);
     if (!release || (release.type !== "album" && release.type !== "ep")) return;
     let cancelled = false;
     setTracksLoading(true);
@@ -65,7 +67,9 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
           `/api/album?artist=${encodeURIComponent(release.artist)}&title=${encodeURIComponent(release.title)}`
         );
         const data = await res.json();
-        if (!cancelled) setTracks(Array.isArray(data.tracks) ? data.tracks : []);
+        if (cancelled) return;
+        setTracks(Array.isArray(data.tracks) ? data.tracks : []);
+        if (typeof data.releaseDate === "string") setOrigDate(data.releaseDate);
       } catch {
         if (!cancelled) setTracks([]);
       } finally {
@@ -165,7 +169,7 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
                 </h2>
                 <p className="mt-0.5 text-sm text-star-white/55">{release.artist}</p>
                 <p className="mt-2 text-[10px] font-mono uppercase tracking-[0.18em] text-star-white/35">
-                  {release.type} · {formatDate(release.release_date)}
+                  {release.type} · {formatDate(origDate ?? release.release_date)}
                   {release.genre ? ` · ${release.genre}` : ""}
                 </p>
                 {/* DSP platform logos next to the artist / release date */}

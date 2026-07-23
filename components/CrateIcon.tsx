@@ -20,22 +20,22 @@ export function CrateIcon({
       className={className}
       aria-hidden="true"
     >
-      <rect
-        x="3"
-        y="5.5"
-        width="18"
-        height="13"
-        rx="1.6"
+      {/* basket body — a woven trapezoid crate (wider at the top) */}
+      <path
+        d="M5 8 L6.6 19.4 A1.1 1.1 0 0 0 7.7 20.3 H16.3 A1.1 1.1 0 0 0 17.4 19.4 L19 8 Z"
         fill="currentColor"
         fillOpacity={filled ? 0.22 : 0}
         stroke="currentColor"
-        strokeWidth="1.7"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
       />
-      {/* cross-brace slats */}
+      {/* top rim */}
+      <path d="M3.4 8 H20.6" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+      {/* woven slats — verticals + a horizontal band */}
       <path
-        d="M3 5.5l18 13M21 5.5L3 18.5M3 12h18"
+        d="M9.3 8.6 L10 20 M12 8.6 V20 M14.7 8.6 L14 20 M5.9 13.8 H18.1"
         stroke="currentColor"
-        strokeWidth="1.35"
+        strokeWidth="1.1"
         strokeLinecap="round"
       />
     </svg>
