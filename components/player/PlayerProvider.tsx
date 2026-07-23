@@ -33,6 +33,10 @@ interface PlayerCtx {
   /** ReleaseGrid registers a picker that returns the next taste-ranked
    *  release to play when a preview ends in shuffle mode. */
   setNextProvider: (fn: ((current: Release | null) => Release | null) | null) => void;
+  /** Build the analyser graph (desktop only) — called from the visualiser's
+   *  open gesture so audio reactivity is available without touching mobile
+   *  playback reliability. */
+  ensureGraph: () => AnalyserNode | null;
   /** Shared Web Audio analyser (created on the first gesture-driven play).
    *  The visualizer reads this so it reliably tracks the already-playing
    *  audio — critical on iOS/Safari where autoplay is blocked. */
@@ -74,6 +78,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const ensureGraph = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return null;
+    // Never build the Web Audio graph on touch/mobile: routing the <audio>
+    // element through an AudioContext (which mobile keeps suspending) makes
+    // playback unreliable. Mobile visuals use the time-based fallback instead.
+    const isTouch =
+      typeof window !== "undefined" &&
+      ((window.matchMedia && window.matchMedia("(pointer: coarse)").matches) ||
+        "ontouchstart" in window);
+    if (isTouch) return null;
     if (!ctxRef.current) {
       try {
         const AC =
@@ -176,7 +188,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     async (release: Release) => {
       const audio = audioRef.current;
       if (!audio) return;
-      ensureGraph(); // synchronous, inside the tap gesture (iOS unlock)
+      // NOTE: we deliberately do NOT route through Web Audio here. Playback is
+      // the plain <audio> element so it's reliable on mobile Chrome/Safari (a
+      // suspended AudioContext would otherwise play silently). The analyser
+      // graph is built lazily, on desktop, only when the visualiser opens.
+      if (ctxRef.current?.state === "suspended") ctxRef.current.resume().catch(() => {});
 
       // Same track → just toggle
       if (current?.id === release.id && hasAudio) {
@@ -203,14 +219,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         audio.src = data.previewUrl;
         audio.load();
         setHasAudio(true);
-        // Resume the context (it may have re-suspended) so the routed audio
-        // isn't silent, then play. Retry once — the first mobile play can race
-        // the unlock.
-        if (ctxRef.current?.state === "suspended") await ctxRef.current.resume().catch(() => {});
+        // Play; retry once — the first mobile play can race the unlock.
         try {
           await audio.play();
         } catch {
-          await new Promise((r) => setTimeout(r, 120));
+          await new Promise((r) => setTimeout(r, 140));
           await audio.play().catch(() => {});
         }
       } catch {
@@ -230,7 +243,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     (display: Release, previewUrl: string) => {
       const audio = audioRef.current;
       if (!audio) return;
-      ensureGraph();
       const reqId = ++reqIdRef.current;
       void reqId;
       setCurrent(display);
@@ -239,9 +251,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setProgress(0);
       audio.src = previewUrl;
       audio.load();
-      audio.play().catch(() => {});
+      audio.play().catch(async () => {
+        await new Promise((r) => setTimeout(r, 140));
+        audio.play().catch(() => {});
+      });
     },
-    [ensureGraph]
+    []
   );
 
   // Keep a stable ref to play() so the audio "ended" handler can advance.
@@ -252,10 +267,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const toggle = useCallback(() => {
     const audio = audioRef.current;
     if (!audio || !hasAudio) return;
-    ensureGraph();
+    if (ctxRef.current?.state === "suspended") ctxRef.current.resume().catch(() => {});
     if (audio.paused) audio.play().catch(() => {});
     else audio.pause();
-  }, [hasAudio, ensureGraph]);
+  }, [hasAudio]);
 
   // Shuffle: when ON, previews stop looping so "ended" can advance to the
   // next taste-ranked track; when OFF, previews loop as before.
@@ -299,7 +314,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     <Ctx.Provider
       value={{
         current, playing, loading, progress, hasAudio, shuffle,
-        play, playDirect, toggle, toggleShuffle, stop, seek, setNextProvider, getAnalyser,
+        play, playDirect, toggle, toggleShuffle, stop, seek, setNextProvider, ensureGraph, getAnalyser,
       }}
     >
       {children}

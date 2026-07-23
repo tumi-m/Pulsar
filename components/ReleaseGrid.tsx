@@ -293,7 +293,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
             letterhead. Proportions follow the Fibonacci sequence / golden
             ratio: 13px inner gap, 21px x-pad, 13px y-pad, 34px bottom margin,
             and a search field at 61.8% (1/φ) width for symmetry. ── */}
-        <div className="mx-auto mb-[34px] flex flex-col items-center gap-[13px] px-[21px] py-[13px] md:px-10">
+        <div className="mx-auto mb-[13px] flex flex-col items-center gap-[8px] px-[21px] py-[8px] md:px-10">
           {/* search row — the menu (sidebar) button is pinned to the left edge
               while the search bar stays perfectly centered (symmetrical) */}
           <div className="relative flex w-full items-center justify-center">
