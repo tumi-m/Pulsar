@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, Link as LinkIcon, Play, Pause, ChevronLeft, ChevronRight, Maximize2, AudioLines } from "lucide-react";
+import { X, Check, Link as LinkIcon, Play, Pause, ChevronLeft, ChevronRight, Maximize2, AudioLines, Share2 } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { Artwork } from "./Artwork";
@@ -93,6 +93,22 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
       setTimeout(() => setCopied(null), 1600);
     } catch {
       /* clipboard unavailable */
+    }
+  }
+
+  async function shareRelease() {
+    if (!release) return;
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    const data = { title: `${release.title} — ${release.artist}`, text: "Found on PULSAR", url };
+    try {
+      if (navigator.share) await navigator.share(data);
+      else {
+        await navigator.clipboard.writeText(url);
+        setCopied("share");
+        setTimeout(() => setCopied(null), 1600);
+      }
+    } catch {
+      /* cancelled */
     }
   }
 
@@ -393,9 +409,23 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
               )}
 
               <div className="p-3">
-                <p className="px-2 pb-2 pt-1 text-[10px] font-mono uppercase tracking-[0.22em] text-star-white/35">
-                  Listen on your service
-                </p>
+                <div className="flex items-center justify-between px-2 pb-2 pt-1">
+                  <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-star-white/35">
+                    Listen on your service
+                  </p>
+                  <button
+                    onClick={shareRelease}
+                    aria-label="Share"
+                    className="flex items-center gap-1.5 rounded-full border border-white/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-star-white/75 transition-colors hover:border-white/50 hover:text-star-white"
+                  >
+                    {copied === "share" ? (
+                      <Check size={12} className="text-neon-green" />
+                    ) : (
+                      <Share2 size={12} />
+                    )}
+                    Share
+                  </button>
+                </div>
                 <div className="space-y-1">
                   {available.map((p, i) => (
                     <motion.div
