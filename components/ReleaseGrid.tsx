@@ -298,23 +298,27 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               : "top-14 bg-void/20 px-6 py-3 backdrop-blur-xl"
           }`}
         >
-          {/* search row — the menu (sidebar) button sits in the bar when compact */}
-          <div className={`flex items-center justify-center gap-3 ${searchCompact ? "" : "mb-3"}`}>
-            {searchCompact && (
-              <button
-                onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
-                aria-label="Open menu"
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/[0.05] text-star-white/80 backdrop-blur transition-colors hover:bg-white/10 hover:text-star-white"
-              >
-                <span className="flex flex-col gap-[3px]">
-                  <span className="h-[2px] w-4 rounded-full bg-current" />
-                  <span className="h-[2px] w-4 rounded-full bg-current" />
-                  <span className="h-[2px] w-4 rounded-full bg-current" />
-                </span>
-              </button>
-            )}
-          {/* search — small, centered, rounded liquid glass with a rainbow
-              outer line; shrinks further on scroll-down */}
+          {/* search row — the menu (sidebar) button always sits in the block,
+              in its own liquid-glass pill next to the search bar */}
+          <div className={`flex items-center justify-center gap-2.5 ${searchCompact ? "" : "mb-3"}`}>
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
+              aria-label="Open menu"
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-white/30 text-star-white/85 transition-transform hover:scale-105 active:scale-95"
+              style={{
+                background: "rgba(255,255,255,0.1)",
+                backdropFilter: "blur(18px) saturate(180%)",
+                WebkitBackdropFilter: "blur(18px) saturate(180%)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -2px 5px rgba(0,0,0,0.3), 0 6px 16px rgba(0,0,0,0.4)",
+              }}
+            >
+              <span className="flex flex-col gap-[3px]">
+                <span className="h-[2px] w-4 rounded-full bg-current" />
+                <span className="h-[2px] w-4 rounded-full bg-current" />
+                <span className="h-[2px] w-4 rounded-full bg-current" />
+              </span>
+            </button>
+          {/* search — rounded liquid glass with a rainbow outer line */}
           <div
             className={`search-rainbow rounded-full p-[1.5px] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
               searchCompact ? "w-[52%]" : "w-[48%]"
@@ -325,13 +329,13 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 searchCompact ? "px-3 py-1.5" : "px-4 py-2"
               }`}
               style={{
-                background: "rgba(10,10,20,0.55)",
-                backdropFilter: "blur(16px) saturate(160%)",
-                WebkitBackdropFilter: "blur(16px) saturate(160%)",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.28)",
+                background: "rgba(255,255,255,0.1)",
+                backdropFilter: "blur(20px) saturate(180%)",
+                WebkitBackdropFilter: "blur(20px) saturate(180%)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -3px 8px rgba(0,0,0,0.3)",
               }}
             >
-              <svg viewBox="0 0 20 20" className="h-4 w-4 flex-shrink-0 text-star-white/40" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg viewBox="0 0 20 20" className="h-4 w-4 flex-shrink-0 text-star-white/70" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="9" cy="9" r="6" />
                 <path d="M14 14l4 4" strokeLinecap="round" />
               </svg>

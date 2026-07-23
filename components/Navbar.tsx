@@ -54,19 +54,8 @@ export function Navbar() {
           detailOpen ? "lg:pr-[50vw]" : ""
         }`}
       >
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
-            aria-label="Open menu"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 text-star-white/75 transition-colors hover:bg-star-white/10 hover:text-star-white"
-          >
-            <span className="flex flex-col gap-[4px]">
-              <span className="h-[2px] w-5 rounded-full bg-current" />
-              <span className="h-[2px] w-5 rounded-full bg-current" />
-              <span className="h-[2px] w-5 rounded-full bg-current" />
-            </span>
-          </button>
-        </div>
+        {/* left spacer — the menu button now lives in the search block */}
+        <div className="h-11 w-11" aria-hidden />
 
         <div className="flex items-center gap-2">
         <button
