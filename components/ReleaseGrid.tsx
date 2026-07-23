@@ -11,6 +11,7 @@ import { FormatPicker } from "./FormatPicker";
 import { FloatingDock } from "./FloatingDock";
 import { Visualizer } from "./Visualizer";
 import { AiChat } from "./AiChat";
+import { usePlayer } from "./player/PlayerProvider";
 import { genreBucket, GENRE_BUCKETS, type GenreBucket } from "@/lib/utils";
 import { loadFormat, saveFormat, type MediaFormat } from "@/lib/format";
 import {
@@ -33,6 +34,7 @@ const SKIP_KEY = "pulsar_quiz_skipped";
 type ViewMode = "latest" | "streamed" | "foryou";
 
 export function ReleaseGrid({ releases }: ReleaseGridProps) {
+  const player = usePlayer();
   const [activeGenre, setActiveGenre] = useState<GenreBucket | null>(null);
   const [activeType, setActiveType] = useState<"all" | "album" | "ep" | "single">("all");
   const [activeLabel, setActiveLabel] = useState<string | null>(null);
@@ -46,8 +48,20 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   const [showRefine, setShowRefine] = useState(false);
   const [showGenres, setShowGenres] = useState(false);
   const [query, setQuery] = useState("");
+  // Search bar shrinks + centers when the user scrolls down (nav hides).
+  const [searchCompact, setSearchCompact] = useState(false);
 
   const detailOpen = Boolean(selectedRelease);
+
+  // Tell the navbar when album mode is open so its header can go symmetrical.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("pulsar-detail-open", { detail: detailOpen }));
+  }, [detailOpen]);
+
+  // Tell the navbar / visualizer whether we're in visualiser mode.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("pulsar-visualizing", { detail: Boolean(visualizing) }));
+  }, [visualizing]);
 
   // bumps whenever the user favorites/crates something → recompute recs
   const [collectionVersion, setCollectionVersion] = useState(0);
@@ -70,15 +84,25 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       setView("latest");
       setShowQuiz(true);
     };
+    const onNavHidden = (e: Event) => setSearchCompact((e as CustomEvent<boolean>).detail);
+    const onSearch = (e: Event) => {
+      setQuery((e as CustomEvent<string>).detail);
+      setVisible(PAGE);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    window.addEventListener("pulsar-search", onSearch);
     window.addEventListener("pulsar-collection-change", onChange);
     window.addEventListener("pulsar-format-change", onFormat);
     window.addEventListener("pulsar-type-change", onType);
     window.addEventListener("pulsar-retake-quiz", onRetake);
+    window.addEventListener("pulsar-nav-hidden", onNavHidden);
     return () => {
       window.removeEventListener("pulsar-collection-change", onChange);
       window.removeEventListener("pulsar-format-change", onFormat);
       window.removeEventListener("pulsar-type-change", onType);
       window.removeEventListener("pulsar-retake-quiz", onRetake);
+      window.removeEventListener("pulsar-nav-hidden", onNavHidden);
+      window.removeEventListener("pulsar-search", onSearch);
     };
   }, []);
 
@@ -87,6 +111,49 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     () => learnedProfile(profile, getFavorites(), getPlaylist()),
     [profile, collectionVersion]
   );
+
+  // Releases ranked highest-for-you first — the pool shuffle draws from.
+  const rankedForYou = useMemo(() => {
+    if (!recProfile) return releases;
+    return [...releases]
+      .map((r) => ({ r, s: scoreRelease(r, recProfile) }))
+      .sort((a, b) => b.s - a.s)
+      .map(({ r }) => r);
+  }, [releases, recProfile]);
+
+  // Keep a live ref to whether the visualizer is open so a shuffle-advance can
+  // swap its artwork to the new track without stale closures.
+  const visualizingRef = useRef<Release | null>(null);
+  useEffect(() => {
+    visualizingRef.current = visualizing;
+  }, [visualizing]);
+
+  // Tracks already played this shuffle cycle — so shuffle never repeats a song
+  // until the whole pool has been heard.
+  const playedRef = useRef<Set<string>>(new Set());
+
+  // Register the shuffle picker: on preview end, advance to the next taste-
+  // ranked track that hasn't played yet (no repeats until the pool is dry).
+  useEffect(() => {
+    player.setNextProvider((cur) => {
+      if (cur) playedRef.current.add(cur.id);
+      const pool = rankedForYou.slice(0, Math.max(20, Math.min(120, rankedForYou.length)));
+      let fresh = pool.filter((r) => r.id !== cur?.id && !playedRef.current.has(r.id));
+      if (!fresh.length) {
+        // Whole pool heard — start a new cycle (still skip the current track).
+        playedRef.current.clear();
+        if (cur) playedRef.current.add(cur.id);
+        fresh = pool.filter((r) => r.id !== cur?.id);
+      }
+      if (!fresh.length) return null;
+      const next = fresh[Math.floor(Math.random() * fresh.length)];
+      playedRef.current.add(next.id);
+      // If the visualizer is open, follow the new track's art.
+      if (visualizingRef.current) setVisualizing(next);
+      return next;
+    });
+    return () => player.setNextProvider(null);
+  }, [player, rankedForYou]);
 
   const labels = useMemo(() => {
     const counts = new Map<string, number>();
@@ -138,7 +205,13 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   }, [releases, activeGenre, activeType, activeLabel, view, recProfile, query]);
 
   const shown = filtered.slice(0, visible);
-  const sizes = useMemo(() => tileSizes(shown, recProfile), [shown, recProfile]);
+  const searching = query.trim().length > 0;
+  // In search mode, keep every tile the same size so results pack tightly with
+  // no empty gaps; otherwise use the taste-driven dynamic sizing.
+  const sizes = useMemo(
+    () => (searching ? shown.map(() => 0) : tileSizes(shown, recProfile)),
+    [shown, recProfile, searching]
+  );
   const hasMore = visible < filtered.length;
 
   const resetPage = () => setVisible(PAGE);
@@ -193,30 +266,47 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       >
         {/* ── the menu: search + genre by default, one quiet "Refine" ── */}
         <div className="sticky top-14 z-30 mb-6 bg-void/85 px-6 py-3 backdrop-blur-xl md:px-10">
-          {/* search */}
-          <div className="mb-3 flex items-center gap-2 rounded-full border border-star-white/12 bg-star-white/[0.03] px-4 py-2 focus-within:border-star-white/30">
-            <svg viewBox="0 0 20 20" className="h-4 w-4 flex-shrink-0 text-star-white/40" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="9" cy="9" r="6" />
-              <path d="M14 14l4 4" strokeLinecap="round" />
-            </svg>
-            <input
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                resetPage();
+          {/* search — small, centered, rounded liquid glass with a rainbow
+              outer line; shrinks further on scroll-down */}
+          <div
+            className={`search-rainbow mx-auto mb-3 rounded-full p-[1.5px] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              searchCompact ? "w-[34%]" : "w-[48%]"
+            }`}
+          >
+            <div
+              className={`flex items-center gap-2 rounded-full transition-all duration-300 ${
+                searchCompact ? "px-3 py-1.5" : "px-4 py-2"
+              }`}
+              style={{
+                background: "rgba(10,10,20,0.55)",
+                backdropFilter: "blur(16px) saturate(160%)",
+                WebkitBackdropFilter: "blur(16px) saturate(160%)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.28)",
               }}
-              placeholder="Search artists, albums, genres…"
-              className="w-full bg-transparent text-sm text-star-white placeholder:text-star-white/35 focus:outline-none"
-            />
-            {query && (
-              <button
-                onClick={() => setQuery("")}
-                aria-label="Clear search"
-                className="flex-shrink-0 text-star-white/40 hover:text-star-white"
-              >
-                ✕
-              </button>
-            )}
+            >
+              <svg viewBox="0 0 20 20" className="h-4 w-4 flex-shrink-0 text-star-white/40" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="9" cy="9" r="6" />
+                <path d="M14 14l4 4" strokeLinecap="round" />
+              </svg>
+              <input
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  resetPage();
+                }}
+                placeholder="Search artists, albums, genres…"
+                className="w-full bg-transparent text-sm text-star-white placeholder:text-star-white/35 focus:outline-none"
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery("")}
+                  aria-label="Clear search"
+                  className="flex-shrink-0 text-star-white/40 hover:text-star-white"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
 
 

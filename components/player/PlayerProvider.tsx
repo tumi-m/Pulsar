@@ -23,11 +23,16 @@ interface PlayerCtx {
   loading: boolean;
   progress: number; // 0..1
   hasAudio: boolean;
+  shuffle: boolean;
   play: (release: Release) => void;
   playDirect: (display: Release, previewUrl: string) => void;
   toggle: () => void;
+  toggleShuffle: () => void;
   stop: () => void;
   seek: (fraction: number) => void;
+  /** ReleaseGrid registers a picker that returns the next taste-ranked
+   *  release to play when a preview ends in shuffle mode. */
+  setNextProvider: (fn: ((current: Release | null) => Release | null) | null) => void;
   /** Shared Web Audio analyser (created on the first gesture-driven play).
    *  The visualizer reads this so it reliably tracks the already-playing
    *  audio — critical on iOS/Safari where autoplay is blocked. */
@@ -49,10 +54,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [hasAudio, setHasAudio] = useState(false);
+  const [shuffle, setShuffle] = useState(false);
   const reqIdRef = useRef(0);
   const ctxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const shuffleRef = useRef(false);
+  const currentRef = useRef<Release | null>(null);
+  const nextProviderRef = useRef<((current: Release | null) => Release | null) | null>(null);
+  const playRef = useRef<((release: Release) => void) | null>(null);
+
+  useEffect(() => {
+    currentRef.current = current;
+  }, [current]);
 
   // Build the Web Audio graph once, on a user gesture. iOS requires the
   // AudioContext be created/resumed inside a gesture, so this is called
@@ -89,7 +103,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const audio = new Audio();
     audio.crossOrigin = "anonymous";
     audio.preload = "auto";
-    audio.loop = true; // 30s previews loop so the visuals never stop
+    audio.loop = true; // previews loop by default so the visuals never stop
     // Safari (esp. iOS): must play inline, not fullscreen.
     audio.setAttribute("playsinline", "");
     audio.setAttribute("webkit-playsinline", "");
@@ -101,6 +115,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const onEnd = () => {
       setPlaying(false);
       setProgress(0);
+      // Shuffle mode: jump to the next release ranked higher for the user.
+      if (shuffleRef.current && nextProviderRef.current) {
+        const next = nextProviderRef.current(currentRef.current);
+        if (next) playRef.current?.(next);
+      }
     };
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
@@ -181,6 +200,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     [ensureGraph]
   );
 
+  // Keep a stable ref to play() so the audio "ended" handler can advance.
+  useEffect(() => {
+    playRef.current = play;
+  }, [play]);
+
   const toggle = useCallback(() => {
     const audio = audioRef.current;
     if (!audio || !hasAudio) return;
@@ -188,6 +212,25 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (audio.paused) audio.play().catch(() => {});
     else audio.pause();
   }, [hasAudio, ensureGraph]);
+
+  // Shuffle: when ON, previews stop looping so "ended" can advance to the
+  // next taste-ranked track; when OFF, previews loop as before.
+  const toggleShuffle = useCallback(() => {
+    setShuffle((on) => {
+      const next = !on;
+      shuffleRef.current = next;
+      const audio = audioRef.current;
+      if (audio) audio.loop = !next;
+      return next;
+    });
+  }, []);
+
+  const setNextProvider = useCallback(
+    (fn: ((current: Release | null) => Release | null) | null) => {
+      nextProviderRef.current = fn;
+    },
+    []
+  );
 
   const stop = useCallback(() => {
     const audio = audioRef.current;
@@ -210,7 +253,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <Ctx.Provider
-      value={{ current, playing, loading, progress, hasAudio, play, playDirect, toggle, stop, seek, getAnalyser }}
+      value={{
+        current, playing, loading, progress, hasAudio, shuffle,
+        play, playDirect, toggle, toggleShuffle, stop, seek, setNextProvider, getAnalyser,
+      }}
     >
       {children}
     </Ctx.Provider>

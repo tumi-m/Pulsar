@@ -74,7 +74,8 @@ export function Sidebar() {
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
             transition={{ type: "spring", stiffness: 520, damping: 42 }}
-            className="fixed inset-y-0 left-0 z-[55] flex w-[86%] max-w-xs transform-gpu flex-col overflow-y-auto border-r border-star-white/10 bg-[#08080f]/95 backdrop-blur-xl"
+            className="fixed inset-y-0 left-0 z-[55] flex w-[86%] max-w-xs transform-gpu flex-col overflow-y-auto border-r border-white/15 bg-[#0a0a14]/60 backdrop-blur-2xl"
+            style={{ boxShadow: "inset -1px 0 0 rgba(255,255,255,0.14), 20px 0 60px rgba(0,0,0,0.5)" }}
           >
             <div className="flex items-center justify-between px-5 py-5">
               <span className="text-sm font-bold uppercase tracking-[0.3em] text-star-white">Pulsar</span>
@@ -133,7 +134,6 @@ export function Sidebar() {
                     <span className="text-[12px] font-bold uppercase tracking-wide text-star-white">
                       {f.label}
                     </span>
-                    <span className="text-[10px] text-star-white/35">{f.blurb}</span>
                   </button>
                 ))}
               </div>

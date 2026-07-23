@@ -223,20 +223,41 @@ export function learnedProfile(
  * ~1 in 7 wide).
  */
 export function tileSizes(releases: Release[], profile: TasteProfile | null): number[] {
+  const n = releases.length;
+  const sizes = new Array(n).fill(0);
+  if (n === 0) return sizes;
+
+  // Stable pseudo-random from the index → a varied but non-jittery layout that
+  // never collapses into a uniform grid of same-size tiles.
+  const rnd = (i: number) => {
+    const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453;
+    return x - Math.floor(x);
+  };
+
   if (!profile) {
-    // No profile yet: neutral rhythm — a large tile every 11.
-    return releases.map((_, i) => (i % 11 === 0 ? 2 : 0));
+    // No taste yet — still mix big & wide tiles in a lively, irregular rhythm.
+    for (let i = 0; i < n; i++) {
+      const r = rnd(i);
+      if (r > 0.9) sizes[i] = 2; // ~10% large squares
+      else if (r > 0.72) sizes[i] = 1; // ~18% wide tiles
+    }
+    return sizes;
   }
+
   const scored = releases.map((r, i) => ({ i, s: scoreRelease(r, profile) }));
   const ranked = [...scored].sort((a, b) => b.s - a.s);
-  const bigCount = Math.max(4, Math.floor(releases.length / 9));
-  const wideCount = Math.max(6, Math.floor(releases.length / 7));
-  const sizes = new Array(releases.length).fill(0);
+  const bigCount = Math.max(4, Math.floor(n / 9));
+  const wideCount = Math.max(6, Math.floor(n / 7));
   ranked.slice(0, bigCount).forEach(({ i, s }) => {
     if (s > 0) sizes[i] = 2;
   });
   ranked.slice(bigCount, bigCount + wideCount).forEach(({ i, s }) => {
     if (s > 0) sizes[i] = 1;
   });
+  // Sprinkle extra wide tiles across the rest so the grid keeps a dynamic,
+  // mixed rhythm instead of a flat wall of equal squares.
+  for (let i = 0; i < n; i++) {
+    if (sizes[i] === 0 && rnd(i) > 0.88) sizes[i] = 1;
+  }
   return sizes;
 }
