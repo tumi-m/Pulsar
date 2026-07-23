@@ -42,8 +42,8 @@ export function FormatPicker({ active, onChange }: FormatPickerProps) {
                   layoutId="format-active"
                   className="absolute inset-0 rounded-md"
                   style={{
-                    background: "linear-gradient(160deg, #f0f0f4, #c8c8d0)",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.6)",
+                    background: "linear-gradient(160deg, #8cc6ff, #3f9bff)",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.5)",
                   }}
                   transition={{ type: "spring", stiffness: 400, damping: 32 }}
                 />
