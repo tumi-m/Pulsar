@@ -353,6 +353,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                     <button
                       onClick={() => {
                         player.play(release);
+                        player.ensureGraph(); // desktop: build analyser in-gesture
                         setShowVisual(true);
                       }}
                       className="group flex w-full items-center gap-3 rounded-full px-3 py-3 transition-colors hover:bg-neon-violet/10"

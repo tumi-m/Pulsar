@@ -17,7 +17,7 @@ import type { Release } from "@/lib/types";
  * full 3D visualizer.
  */
 export function NowPlayingBar() {
-  const { current, playing, loading, progress, hasAudio, toggle, stop, seek } = usePlayer();
+  const { current, playing, loading, progress, hasAudio, toggle, stop, seek, ensureGraph } = usePlayer();
   const [expanded, setExpanded] = useState<Release | null>(null);
   const [inCrate, setInCrate] = useState(false);
 
@@ -29,7 +29,8 @@ export function NowPlayingBar() {
   }, [current]);
 
   function openVisualizer() {
-    // The visualizer now reads the SHARED player audio — keep it playing.
+    // Build the analyser in-gesture (desktop only); mobile uses idle visuals.
+    ensureGraph();
     if (current) setExpanded(current);
   }
 

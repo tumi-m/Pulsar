@@ -276,11 +276,11 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               className="fixed inset-0 z-40 bg-void/80 backdrop-blur-md"
             />
             <motion.div
-              initial={{ opacity: 0, x: 40 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 40 }}
-              transition={{ type: "spring", stiffness: 320, damping: 34 }}
-              className="crate-weave fixed bottom-0 right-0 top-0 z-40 flex w-full max-w-md flex-col border-l border-[#5a3d24]/60"
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", stiffness: 340, damping: 36 }}
+              className="crate-weave fixed inset-x-0 bottom-0 z-40 flex h-[55vh] flex-col rounded-t-2xl border-t-2 border-[#5a3d24]/70 lg:inset-x-auto lg:right-0 lg:top-0 lg:h-full lg:w-1/2 lg:rounded-none lg:border-l-2 lg:border-t-0"
             >
               <div className="border-b border-white/10 px-5 py-4">
                 <div className="flex items-center justify-between">
