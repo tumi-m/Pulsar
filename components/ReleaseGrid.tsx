@@ -128,15 +128,26 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     visualizingRef.current = visualizing;
   }, [visualizing]);
 
-  // Register the shuffle picker: on preview end, jump to a random pick from
-  // the user's top-ranked tracks (never the same one twice in a row).
+  // Tracks already played this shuffle cycle — so shuffle never repeats a song
+  // until the whole pool has been heard.
+  const playedRef = useRef<Set<string>>(new Set());
+
+  // Register the shuffle picker: on preview end, advance to the next taste-
+  // ranked track that hasn't played yet (no repeats until the pool is dry).
   useEffect(() => {
     player.setNextProvider((cur) => {
-      const pool = rankedForYou.slice(0, Math.max(12, Math.min(60, rankedForYou.length)));
-      const choices = pool.filter((r) => r.id !== cur?.id);
-      const list = choices.length ? choices : rankedForYou.filter((r) => r.id !== cur?.id);
-      if (!list.length) return null;
-      const next = list[Math.floor(Math.random() * list.length)];
+      if (cur) playedRef.current.add(cur.id);
+      const pool = rankedForYou.slice(0, Math.max(20, Math.min(120, rankedForYou.length)));
+      let fresh = pool.filter((r) => r.id !== cur?.id && !playedRef.current.has(r.id));
+      if (!fresh.length) {
+        // Whole pool heard — start a new cycle (still skip the current track).
+        playedRef.current.clear();
+        if (cur) playedRef.current.add(cur.id);
+        fresh = pool.filter((r) => r.id !== cur?.id);
+      }
+      if (!fresh.length) return null;
+      const next = fresh[Math.floor(Math.random() * fresh.length)];
+      playedRef.current.add(next.id);
       // If the visualizer is open, follow the new track's art.
       if (visualizingRef.current) setVisualizing(next);
       return next;

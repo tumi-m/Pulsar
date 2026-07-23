@@ -234,6 +234,47 @@ async function fromDeezerGenres(): Promise<Release[]> {
   return out;
 }
 
+// ── Source 1c: African & South African music (Deezer artist search) ──
+// A broad, keyless sweep of prominent African/SA artists so the catalogue
+// carries hundreds of Afrobeats / Amapiano / SA-house / kwaito releases.
+const AFRICA_ARTISTS = [
+  // Afrobeats / Nigeria & West Africa
+  "Burna Boy", "Wizkid", "Davido", "Tems", "Rema", "Asake", "Ayra Starr",
+  "Fireboy DML", "Omah Lay", "Tiwa Savage", "Yemi Alade", "Mr Eazi",
+  "Wande Coal", "Olamide", "Adekunle Gold", "Simi", "CKay", "Joeboy",
+  "Ruger", "Kizz Daniel", "Patoranking", "Flavour", "Mr Eazi",
+  // Amapiano / South Africa
+  "Kabza De Small", "DJ Maphorisa", "Focalistic", "Uncle Waffles",
+  "Musa Keys", "Tyler ICU", "Daliwonga", "Young Stunna", "Kelvin Momo",
+  "Mellow & Sleazy", "Nkosazana Daughter", "Sha Sha", "Zakes Bantwini",
+  "Master KG", "Nomcebo Zikode", "Makhadzi", "DBN Gogo",
+  // SA house / hip-hop / soul
+  "Black Coffee", "Sun-El Musician", "Nasty C", "Cassper Nyovest", "AKA",
+  "Emtee", "Kwesta", "Sjava", "Zonke", "Msaki", "Amanda Black", "Zahara",
+  "Mafikizolo", "Sho Madjozi", "Tyla", "Elaine", "Lloyiso",
+  // Legends & pan-African
+  "Fela Kuti", "Miriam Makeba", "Hugh Masekela", "Brenda Fassie",
+  "Lucky Dube", "Ladysmith Black Mambazo", "Angelique Kidjo",
+  "Youssou N'Dour", "Salif Keita", "Diamond Platnumz", "Sauti Sol",
+];
+
+async function fromAfrica(): Promise<Release[]> {
+  const out: Release[] = [];
+  await Promise.all(
+    AFRICA_ARTISTS.map(async (name) => {
+      const q = encodeURIComponent(`artist:"${name}"`);
+      const data = (await fetchJSON(
+        `https://api.deezer.com/search/album?q=${q}&limit=10&order=RANKING`
+      )) as { data?: DeezerAlbum[] } | null;
+      for (const a of data?.data ?? []) {
+        const r = mapDeezer(a, null);
+        if (r) out.push(r);
+      }
+    })
+  );
+  return out;
+}
+
 // ── Source 2: Apple most-played albums + songs (current, popular) ────
 interface AppleFeedResult {
   artistName?: string;
@@ -287,19 +328,21 @@ async function fromApple(): Promise<Release[]> {
  * Never throws — on total failure it returns an empty array.
  */
 export async function getLiveFeed(): Promise<Release[]> {
-  const [deezer, apple, genres] = await Promise.all([
+  const [deezer, apple, genres, africa] = await Promise.all([
     fromDeezer(),
     fromApple(),
     fromDeezerGenres(),
+    fromAfrica(),
   ]);
   console.log(
-    `[feed] deezer: ${deezer.length} · apple: ${apple.length} · genres: ${genres.length}`
+    `[feed] deezer: ${deezer.length} · apple: ${apple.length} · genres: ${genres.length} · africa: ${africa.length}`
   );
 
   const all: FeedRelease[] = [];
   const byKey = new Map<string, FeedRelease>();
-  // Apple + deezer chart first (best popularity signal), then the genre sweep.
-  for (const r of [...apple, ...deezer, ...genres] as FeedRelease[]) {
+  // Apple + deezer chart first (best popularity signal), then the genre sweep
+  // and the African / South African sweep.
+  for (const r of [...apple, ...deezer, ...genres, ...africa] as FeedRelease[]) {
     const key = `${r.artist.toLowerCase()}::${r.title.toLowerCase()}`;
     const existing = byKey.get(key);
     if (!existing) {
