@@ -379,7 +379,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               aria-expanded={showGenres}
               className={`flex flex-shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.1em] transition-colors sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.16em] ${
                 activeGenre
-                  ? "border-star-white/40 bg-star-white/[0.06] text-star-white"
+                  ? "border-[#4aa3ff]/60 bg-[#4aa3ff]/15 text-[#a9d5ff]" // filter active → reminder
                   : "border-star-white/15 text-star-white/60 hover:border-star-white/40 hover:text-star-white"
               }`}
             >
@@ -390,13 +390,15 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               onClick={() => setShowRefine((v) => !v)}
               aria-expanded={showRefine}
               className={`flex flex-shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.1em] transition-colors sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.2em] ${
-                showRefine || refineActive
-                  ? "border-star-white/40 bg-star-white/[0.06] text-star-white"
-                  : "border-star-white/15 text-star-white/50 hover:border-star-white/40 hover:text-star-white"
+                refineActive
+                  ? "border-[#4aa3ff]/60 bg-[#4aa3ff]/15 text-[#a9d5ff]" // filter active → reminder
+                  : showRefine
+                    ? "border-star-white/40 bg-star-white/[0.06] text-star-white"
+                    : "border-star-white/15 text-star-white/50 hover:border-star-white/40 hover:text-star-white"
               }`}
             >
               Refine
-              {refineActive && <span className="h-1 w-1 rounded-full bg-neon-violet" />}
+              {refineActive && <span className="h-1 w-1 rounded-full bg-[#4aa3ff]" />}
               <span className={`transition-transform ${showRefine ? "rotate-180" : ""}`}>⌄</span>
             </button>
           </div>
