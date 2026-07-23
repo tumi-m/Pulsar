@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Heart, Plus, Play, Pause, Share2 } from "lucide-react";
+import { Heart, Play, Pause, Share2 } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";
 import { isToday, isYesterday } from "@/lib/utils";
@@ -223,9 +223,9 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
             }
           }}
           aria-label="Share"
-          className={`flex flex-1 items-center justify-center transition-colors hover:bg-white/10 ${big ? "h-12" : "h-10"}`}
+          className={`flex flex-1 items-center justify-center transition-colors hover:bg-neon-blue/15 ${big ? "h-12" : "h-10"}`}
         >
-          <Share2 size={big ? 20 : 17} className="text-white drop-shadow" />
+          <Share2 size={big ? 20 : 17} className="text-neon-blue drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]" />
         </button>
         <span className="my-2 w-px bg-white/25" />
         <button
@@ -234,9 +234,9 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
             setFav(toggleFavorite(release));
           }}
           aria-label={fav ? "Remove from favorites" : "Add to favorites"}
-          className={`flex flex-1 items-center justify-center transition-colors hover:bg-white/10 ${big ? "h-12" : "h-10"}`}
+          className={`flex flex-1 items-center justify-center transition-colors hover:bg-neon-pink/15 ${big ? "h-12" : "h-10"}`}
         >
-          <Heart size={big ? 22 : 19} className={fav ? "fill-neon-pink text-neon-pink" : "text-white drop-shadow"} />
+          <Heart size={big ? 22 : 19} className={`drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] ${fav ? "fill-neon-pink text-neon-pink" : "text-neon-pink"}`} />
         </button>
         <span className="my-2 w-px bg-white/25" />
         <button
@@ -245,13 +245,9 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
             window.dispatchEvent(new CustomEvent("pulsar-crate-picker", { detail: release }));
           }}
           aria-label="Add to a crate"
-          className={`flex flex-1 items-center justify-center transition-colors hover:bg-white/10 ${big ? "h-12" : "h-10"}`}
+          className={`flex flex-1 items-center justify-center transition-colors hover:bg-[#c08a4e]/20 ${big ? "h-12" : "h-10"}`}
         >
-          {inList ? (
-            <CrateIcon size={big ? 22 : 19} filled className="text-[#c08a4e] drop-shadow" />
-          ) : (
-            <Plus size={big ? 22 : 19} className="text-white drop-shadow" />
-          )}
+          <CrateIcon size={big ? 22 : 19} filled={inList} className="text-[#e0a45c] drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]" />
         </button>
       </div>
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Play, Pause, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, Play, Pause, ChevronLeft, ChevronRight, Move } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { usePlayer } from "./player/PlayerProvider";
 import { VisualCanvas, VISUAL_MODES, type VisualMode } from "./VisualCanvas";
@@ -15,22 +15,35 @@ interface VisualizerProps {
 export function Visualizer({ release, onClose }: VisualizerProps) {
   const player = usePlayer();
   const [mode, setMode] = useState<VisualMode>("nebula");
-  const [dock, setDock] = useState<"full" | "mini">("full");
   const [detailOpen, setDetailOpen] = useState(false);
+  // Free-floating panel the user can drag & resize.
+  const [size, setSize] = useState({ w: 560, h: 340 });
+  const resizeStart = useRef({ x: 0, y: 0, w: 0, h: 0 });
 
-  useEffect(() => {
-    if (release) setDock("full");
-  }, [release]);
-
-  useEffect(() => {
-    const onMenu = () => setDock((d) => (d === "mini" ? "full" : "mini"));
-    const onDetail = (e: Event) => setDetailOpen((e as CustomEvent<boolean>).detail);
-    window.addEventListener("pulsar-toggle-sidebar", onMenu);
-    window.addEventListener("pulsar-detail-open", onDetail);
-    return () => {
-      window.removeEventListener("pulsar-toggle-sidebar", onMenu);
-      window.removeEventListener("pulsar-detail-open", onDetail);
+  const onResizeDown = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    resizeStart.current = { x: e.clientX, y: e.clientY, w: size.w, h: size.h };
+    const move = (ev: PointerEvent) => {
+      const maxW = Math.min(window.innerWidth - 24, 1100);
+      const maxH = Math.min(window.innerHeight - 120, 800);
+      setSize({
+        w: Math.max(240, Math.min(maxW, resizeStart.current.w + (ev.clientX - resizeStart.current.x))),
+        h: Math.max(170, Math.min(maxH, resizeStart.current.h + (ev.clientY - resizeStart.current.y))),
+      });
     };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
+  useEffect(() => {
+    const onDetail = (e: Event) => setDetailOpen((e as CustomEvent<boolean>).detail);
+    window.addEventListener("pulsar-detail-open", onDetail);
+    return () => window.removeEventListener("pulsar-detail-open", onDetail);
   }, []);
 
   const cycleMode = (dir: 1 | -1) =>
@@ -40,34 +53,28 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
       return VISUAL_MODES[next].id;
     });
 
-  // Full centered, or the 20%-right "mini" when the main menu is opened.
-  const dockClass =
-    dock === "mini"
-      ? "right-3 top-16 h-[24vh] w-[42%] md:w-[20%]"
-      : "inset-x-6 top-16 h-[34vh] md:inset-x-[24%]";
-
   const playing = player.playing;
   const hasAudio = player.hasAudio;
   const handleClose = useCallback(() => onClose(), [onClose]);
 
   // The album detail renders its own inline visual; the floating panel is only
-  // for the standalone / expanded experience.
+  // for the standalone / expanded experience — draggable & resizable.
   return (
     <AnimatePresence>
       {release && !detailOpen && (
         <motion.div
-          initial={{ opacity: 0, y: -24 }}
+          drag
+          dragMomentum={false}
+          dragElastic={0.04}
+          initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 60 }}
-          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          drag="y"
-          dragConstraints={{ top: 0, bottom: 0 }}
-          dragElastic={{ top: 0.05, bottom: 0.6 }}
-          onDragEnd={(_e, info) => {
-            if (info.offset.y > 110 || info.velocity.y > 600) handleClose();
-          }}
-          className={`fixed z-40 transform-gpu touch-none overflow-hidden rounded-2xl border border-white/15 bg-[#0a0a14]/55 backdrop-blur-2xl transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${dockClass}`}
+          exit={{ opacity: 0, y: 30 }}
+          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          className="fixed left-1/2 top-16 z-40 transform-gpu overflow-hidden rounded-2xl border border-white/15 bg-[#0a0a14]/55 backdrop-blur-2xl"
           style={{
+            width: `min(${size.w}px, 92vw)`,
+            height: size.h,
+            marginLeft: `min(${-size.w / 2}px, -46vw)`,
             boxShadow:
               "inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 10px rgba(0,0,0,0.4), 0 24px 60px rgba(0,0,0,0.6)",
           }}
@@ -76,7 +83,7 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
 
           {/* title bar */}
           <div
-            className="absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2"
+            className="absolute inset-x-0 top-0 z-10 flex cursor-move items-center justify-between gap-3 border-b border-white/10 px-3 py-2"
             style={{
               background: "rgba(255,255,255,0.08)",
               backdropFilter: "blur(12px) saturate(150%)",
@@ -85,6 +92,7 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
             }}
           >
             <div className="flex min-w-0 items-center gap-2">
+              <Move size={12} className="flex-shrink-0 text-star-white/40" />
               <span className="text-[9px] font-bold uppercase tracking-[0.24em] text-star-white/45">
                 Visualize
               </span>
@@ -108,43 +116,39 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
 
           {/* bottom controls — mode switcher with prev/next arrows + play */}
           <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col items-center gap-2.5 p-3 md:p-4">
-            {dock !== "mini" && (
-              <div
-                className="flex max-w-full items-center gap-1 rounded-full border border-white/15 p-1"
-                style={{
-                  background: "rgba(255,255,255,0.1)",
-                  backdropFilter: "blur(12px) saturate(150%)",
-                  WebkitBackdropFilter: "blur(12px) saturate(150%)",
-                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 6px 18px rgba(0,0,0,0.4)",
-                }}
+            <div
+              className="flex max-w-full items-center gap-1 rounded-full border border-white/15 p-1"
+              style={{
+                background: "rgba(255,255,255,0.1)",
+                backdropFilter: "blur(12px) saturate(150%)",
+                WebkitBackdropFilter: "blur(12px) saturate(150%)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 6px 18px rgba(0,0,0,0.4)",
+              }}
+            >
+              <button
+                onClick={() => cycleMode(-1)}
+                aria-label="Previous visualisation"
+                className="flex h-6 w-6 items-center justify-center rounded-full text-star-white/70 hover:bg-white/10 hover:text-star-white"
               >
-                <button
-                  onClick={() => cycleMode(-1)}
-                  aria-label="Previous visualisation"
-                  className="flex h-6 w-6 items-center justify-center rounded-full text-star-white/70 hover:bg-white/10 hover:text-star-white"
-                >
-                  <ChevronLeft size={15} />
-                </button>
-                <span className="min-w-[68px] text-center text-[11px] font-bold uppercase tracking-[0.14em] text-star-white">
-                  {VISUAL_MODES.find((m) => m.id === mode)?.label}
-                </span>
-                <button
-                  onClick={() => cycleMode(1)}
-                  aria-label="Next visualisation"
-                  className="flex h-6 w-6 items-center justify-center rounded-full text-star-white/70 hover:bg-white/10 hover:text-star-white"
-                >
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-            )}
+                <ChevronLeft size={15} />
+              </button>
+              <span className="min-w-[68px] text-center text-[11px] font-bold uppercase tracking-[0.14em] text-star-white">
+                {VISUAL_MODES.find((m) => m.id === mode)?.label}
+              </span>
+              <button
+                onClick={() => cycleMode(1)}
+                aria-label="Next visualisation"
+                className="flex h-6 w-6 items-center justify-center rounded-full text-star-white/70 hover:bg-white/10 hover:text-star-white"
+              >
+                <ChevronRight size={15} />
+              </button>
+            </div>
             {mode !== "video" && (
               <button
                 onClick={() => player.toggle()}
                 disabled={!hasAudio}
                 aria-label={playing ? "Pause" : "Play"}
-                className={`flex items-center justify-center rounded-full ring-1 ring-white/40 transition-transform hover:scale-105 active:scale-95 disabled:opacity-40 ${
-                  dock === "mini" ? "h-9 w-9" : "h-12 w-12"
-                }`}
+                className="flex h-12 w-12 items-center justify-center rounded-full ring-1 ring-white/40 transition-transform hover:scale-105 active:scale-95 disabled:opacity-40"
                 style={{
                   background: "rgba(255,255,255,0.14)",
                   backdropFilter: "blur(10px) saturate(140%)",
@@ -153,12 +157,24 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
                 }}
               >
                 {playing ? (
-                  <Pause size={dock === "mini" ? 15 : 20} className="text-white drop-shadow" fill="currentColor" />
+                  <Pause size={20} className="text-white drop-shadow" fill="currentColor" />
                 ) : (
-                  <Play size={dock === "mini" ? 15 : 20} className="ml-0.5 text-white drop-shadow" fill="currentColor" />
+                  <Play size={20} className="ml-0.5 text-white drop-shadow" fill="currentColor" />
                 )}
               </button>
             )}
+          </div>
+
+          {/* resize handle (bottom-right corner) */}
+          <div
+            onPointerDown={onResizeDown}
+            className="absolute bottom-0 right-0 z-20 flex h-6 w-6 cursor-se-resize items-end justify-end p-1 text-white/45 hover:text-white/80"
+            aria-label="Resize"
+            title="Drag to resize"
+          >
+            <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+              <path d="M11 4L4 11M11 8l-3 3" />
+            </svg>
           </div>
         </motion.div>
       )}
