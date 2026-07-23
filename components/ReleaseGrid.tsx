@@ -413,7 +413,15 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 transition={{ duration: 0.22 }}
                 className="overflow-hidden"
               >
-                <div className="pt-3">
+                <div
+                  className="mx-auto mb-1 max-w-[92vw] rounded-2xl border border-white/12 p-2.5"
+                  style={{
+                    background: "rgba(12,12,20,0.96)",
+                    backdropFilter: "blur(24px) saturate(160%)",
+                    WebkitBackdropFilter: "blur(24px) saturate(160%)",
+                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12), 0 18px 44px rgba(0,0,0,0.6)",
+                  }}
+                >
                   <GenreFilter
                     active={activeGenre}
                     onChange={(g) => {
@@ -438,7 +446,15 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 transition={{ duration: 0.25 }}
                 className="overflow-hidden"
               >
-                <div className="flex flex-col gap-3 pt-4">
+                <div
+                  className="mx-auto mb-1 flex max-w-[92vw] flex-col gap-3 rounded-2xl border border-white/12 p-3"
+                  style={{
+                    background: "rgba(12,12,20,0.96)",
+                    backdropFilter: "blur(24px) saturate(160%)",
+                    WebkitBackdropFilter: "blur(24px) saturate(160%)",
+                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.12), 0 18px 44px rgba(0,0,0,0.6)",
+                  }}
+                >
                   {/* view + format — macOS-style segmented controls (sky blue) */}
                   <div className="flex flex-wrap items-center gap-3">
                     <div
@@ -513,7 +529,9 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                           resetPage();
                         }}
                         className={`flex-shrink-0 rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
-                          activeLabel === null ? "bg-[#4aa3ff] text-void" : "text-[#a9d5ff] hover:text-white"
+                          activeLabel === null
+                            ? "bg-[#4aa3ff] text-void shadow-[0_1px_3px_rgba(0,0,0,0.5)]"
+                            : "bg-white/[0.06] text-[#a9d5ff] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-white/[0.1] hover:text-white"
                         }`}
                       >
                         All
@@ -525,10 +543,10 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                             setActiveLabel(activeLabel === l ? null : l);
                             resetPage();
                           }}
-                          className={`flex-shrink-0 whitespace-nowrap rounded-md border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                          className={`flex-shrink-0 whitespace-nowrap rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
                             activeLabel === l
-                              ? "border-transparent bg-[#4aa3ff] text-void"
-                              : "border-[#4aa3ff]/25 text-[#a9d5ff] hover:border-[#4aa3ff]/60 hover:text-white"
+                              ? "bg-[#4aa3ff] text-void shadow-[0_1px_3px_rgba(0,0,0,0.5)]"
+                              : "bg-white/[0.06] text-[#a9d5ff] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-white/[0.1] hover:text-white"
                           }`}
                         >
                           {l}
