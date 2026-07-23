@@ -67,9 +67,6 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
     (r) => r.artwork_url && r.artwork_url.trim().length > 0
   );
 
-  // Platform links for the currently-playing song (only those with a URL).
-  const currentLinks = current ? PLATFORMS.filter((p) => Boolean(current[p.key])) : [];
-
   async function shareRelease(r: Release) {
     const url = typeof window !== "undefined" ? window.location.href : "";
     try {
@@ -218,40 +215,6 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                 <Shuffle size={20} className={shuffle ? "text-[#2a2410]" : "text-[#e8c66a]"} />
               </motion.button>
             </>
-          )}
-        </AnimatePresence>
-
-        {/* platform links for the current song — Spotify/Apple/Tidal/SC/YT */}
-        <AnimatePresence>
-          {currentLinks.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.9 }}
-              transition={{ type: "spring", stiffness: 480, damping: 32 }}
-              className="flex flex-col items-center gap-1.5 rounded-full border border-white/15 p-1.5"
-              style={{
-                background: "rgba(255,255,255,0.1)",
-                backdropFilter: "blur(12px) saturate(150%)",
-                WebkitBackdropFilter: "blur(12px) saturate(150%)",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 8px 22px rgba(0,0,0,0.45)",
-              }}
-            >
-              {currentLinks.map((p) => (
-                <a
-                  key={p.key}
-                  href={current![p.key]!}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={p.hint}
-                  title={p.label}
-                  className="flex h-9 w-9 items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95"
-                  style={{ backgroundColor: `${p.color}26`, color: p.color }}
-                >
-                  <p.Icon />
-                </a>
-              ))}
-            </motion.div>
           )}
         </AnimatePresence>
 
