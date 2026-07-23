@@ -134,3 +134,14 @@ body {
   animation: rainbowPan 8s linear infinite;
   box-shadow: 0 8px 26px rgba(0, 0, 0, 0.4);
 }
+
+/* ─── Woven brown crate (the Crate page theme) ── */
+.crate-weave {
+  background-color: #2a1c10;
+  background-image:
+    repeating-linear-gradient( 45deg, rgba(120, 78, 40, 0.55) 0 10px, rgba(70, 44, 22, 0.55) 10px 20px),
+    repeating-linear-gradient(-45deg, rgba(120, 78, 40, 0.30) 0 10px, rgba(45, 28, 14, 0.30) 10px 20px),
+    linear-gradient(180deg, rgba(20, 12, 6, 0.35), rgba(10, 6, 3, 0.6));
+  background-blend-mode: overlay, overlay, normal;
+  box-shadow: inset 0 1px 0 rgba(255, 210, 150, 0.12), -20px 0 60px rgba(0, 0, 0, 0.5);
+}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, ListMusic, X, Trash2, Sparkles, Shuffle } from "lucide-react";
+import { Heart, ListMusic, X, Trash2, Sparkles, Shuffle, Play, Share2 } from "lucide-react";
 import type { Release } from "@/lib/types";
 import type { MediaFormat } from "@/lib/format";
 import { getFavorites, getPlaylist, toggleFavorite, removeFromPlaylist } from "@/lib/collection";
@@ -22,7 +22,7 @@ type Panel = "favorites" | "playlist" | null;
  * "crate" panel where the collection is displayed as physical media.
  */
 export function FloatingDock({ format, onOpen }: FloatingDockProps) {
-  const { current, shuffle, toggleShuffle } = usePlayer();
+  const { current, shuffle, toggleShuffle, play } = usePlayer();
   const [panel, setPanel] = useState<Panel>(null);
   const [favs, setFavs] = useState<Release[]>([]);
   const [list, setList] = useState<Release[]>([]);
@@ -53,10 +53,23 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
     };
   }, []);
 
-  const items = panel === "favorites" ? favs : list;
+  // Crate/favorites only show entries that actually have artwork.
+  const items = (panel === "favorites" ? favs : list).filter(
+    (r) => r.artwork_url && r.artwork_url.trim().length > 0
+  );
 
   // Platform links for the currently-playing song (only those with a URL).
   const currentLinks = current ? PLATFORMS.filter((p) => Boolean(current[p.key])) : [];
+
+  async function shareRelease(r: Release) {
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    try {
+      if (navigator.share) await navigator.share({ title: `${r.title} — ${r.artist}`, text: "Found on PULSAR", url });
+      else await navigator.clipboard.writeText(url);
+    } catch {
+      /* cancelled */
+    }
+  }
 
   const dockBtn = (
     key: string,
@@ -209,7 +222,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 40 }}
               transition={{ type: "spring", stiffness: 320, damping: 34 }}
-              className="fixed bottom-0 right-0 top-0 z-40 flex w-full max-w-md flex-col border-l border-white/10 bg-[#0b0b12]/95"
+              className="crate-weave fixed bottom-0 right-0 top-0 z-40 flex w-full max-w-md flex-col border-l border-[#5a3d24]/60"
             >
               <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
                 <div>
@@ -250,7 +263,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                         }}
                         className="block w-full"
                       >
-                        <div className="relative aspect-square w-full">
+                        <div className="relative aspect-square w-full overflow-hidden rounded-lg">
                           <PhysicalMedia
                             src={r.artwork_url}
                             artist={r.artist}
@@ -264,16 +277,59 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                         </p>
                         <p className="truncate text-[9px] text-star-white/50">{r.artist}</p>
                       </button>
+
+                      {/* liquid-glass play triangle — like the home tiles */}
                       <button
-                        onClick={() => {
-                          if (panel === "favorites") toggleFavorite(r);
-                          else removeFromPlaylist(r.id);
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          play(r);
                         }}
-                        aria-label="Remove"
-                        className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-void/70 text-star-white/60 opacity-0 backdrop-blur transition-opacity hover:text-neon-pink group-hover:opacity-100"
+                        aria-label="Play"
+                        className="absolute left-1/2 top-[calc(50%-11px)] flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full opacity-0 ring-1 ring-white/40 transition-opacity group-hover:opacity-100"
+                        style={{
+                          background: "rgba(255,255,255,0.14)",
+                          backdropFilter: "blur(10px) saturate(140%)",
+                          WebkitBackdropFilter: "blur(10px) saturate(140%)",
+                          boxShadow: "0 8px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.5)",
+                        }}
                       >
-                        <Trash2 size={11} />
+                        <Play size={15} className="ml-0.5 text-white drop-shadow" fill="currentColor" />
                       </button>
+
+                      {/* home-style actions: heart · share · remove */}
+                      <div className="absolute right-1 top-1 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(r);
+                          }}
+                          aria-label="Favorite"
+                          className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-void/70 text-star-white/70 backdrop-blur hover:text-neon-pink"
+                        >
+                          <Heart size={11} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            shareRelease(r);
+                          }}
+                          aria-label="Share"
+                          className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-void/70 text-star-white/70 backdrop-blur hover:text-star-white"
+                        >
+                          <Share2 size={11} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (panel === "favorites") toggleFavorite(r);
+                            else removeFromPlaylist(r.id);
+                          }}
+                          aria-label="Remove"
+                          className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-void/70 text-star-white/60 backdrop-blur hover:text-neon-pink"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
