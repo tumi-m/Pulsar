@@ -11,13 +11,14 @@ interface VisualizerProps {
   onClose: () => void;
 }
 
-type Mode = "nebula" | "silhouette" | "aurora" | "crowd" | "art";
+type Mode = "nebula" | "silhouette" | "aurora" | "crowd" | "art" | "video";
 const MODES: { id: Mode; label: string }[] = [
   { id: "nebula", label: "Nebula" },
   { id: "silhouette", label: "Silhouette" },
   { id: "aurora", label: "Aurora" },
   { id: "crowd", label: "Crowd" },
   { id: "art", label: "Cover" },
+  { id: "video", label: "Video" },
 ];
 
 interface Particle {
@@ -40,6 +41,9 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
   // opened mid-visualise); detailOpen shrinks it to sit beside the tracklist.
   const [dock, setDock] = useState<"full" | "mini">("full");
   const [detailOpen, setDetailOpen] = useState(false);
+  // "Video" mode — the free YouTube music video, resolved on demand.
+  const [videoId, setVideoId] = useState<string | null>(null);
+  const [videoState, setVideoState] = useState<"idle" | "loading" | "none">("idle");
 
   useEffect(() => {
     modeRef.current = mode;
@@ -48,7 +52,40 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
   // Reset to the full centered panel whenever a new release is visualised.
   useEffect(() => {
     if (release) setDock("full");
+    setVideoId(null);
+    setVideoState("idle");
   }, [release]);
+
+  // Fetch the YouTube video id the first time "Video" mode is opened for a
+  // release, and pause the 30s preview so its audio doesn't clash.
+  useEffect(() => {
+    if (mode !== "video" || !release) return;
+    if (player.playing) player.toggle();
+    if (videoId || videoState === "loading" || videoState === "none") return;
+    let cancelled = false;
+    setVideoState("loading");
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/ytvideo?artist=${encodeURIComponent(release.artist)}&title=${encodeURIComponent(release.title)}`
+        );
+        const data = await res.json();
+        if (cancelled) return;
+        if (data.videoId) {
+          setVideoId(data.videoId);
+          setVideoState("idle");
+        } else {
+          setVideoState("none");
+        }
+      } catch {
+        if (!cancelled) setVideoState("none");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, release]);
 
   // Clicking the main menu while visualising docks the panel to 20% right;
   // opening album mode shrinks it to fit beside the tracklist.
@@ -422,6 +459,32 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
         >
           <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 
+          {/* Video mode — the free YouTube music video */}
+          {mode === "video" && (
+            <div className="absolute inset-0 top-[42px] z-[6] bg-black">
+              {videoId ? (
+                <iframe
+                  key={videoId}
+                  className="h-full w-full"
+                  src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`}
+                  title={`${release.title} — music video`}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  referrerPolicy="strict-origin-when-cross-origin"
+                />
+              ) : (
+                <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-center">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-star-white/45">
+                    {videoState === "none" ? "No music video found" : "Finding music video…"}
+                  </p>
+                  {videoState === "loading" && (
+                    <span className="h-1.5 w-1.5 animate-ping rounded-full bg-neon-violet" />
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* translucent liquid-glass title bar */}
           <div
             className="absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2"
@@ -464,7 +527,7 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
           </div>
 
           {/* bottom controls */}
-          <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2.5 p-3 md:p-4">
+          <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col items-center gap-2.5 p-3 md:p-4">
             {dock !== "mini" && (
               <div
                 className="scrollbar-none flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-white/15 p-1"
@@ -488,26 +551,28 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
                 ))}
               </div>
             )}
-            <button
-              onClick={() => player.toggle()}
-              disabled={!hasAudio}
-              aria-label={playing ? "Pause" : "Play"}
-              className={`flex items-center justify-center rounded-full ring-1 ring-white/40 transition-transform hover:scale-105 active:scale-95 disabled:opacity-40 ${
-                dock === "mini" ? "h-9 w-9" : "h-12 w-12"
-              }`}
-              style={{
-                background: "rgba(255,255,255,0.14)",
-                backdropFilter: "blur(10px) saturate(140%)",
-                WebkitBackdropFilter: "blur(10px) saturate(140%)",
-                boxShadow: "0 8px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -2px 6px rgba(0,0,0,0.25)",
-              }}
-            >
-              {playing ? (
-                <Pause size={dock === "mini" ? 15 : 20} className="text-white drop-shadow" fill="currentColor" />
-              ) : (
-                <Play size={dock === "mini" ? 15 : 20} className="ml-0.5 text-white drop-shadow" fill="currentColor" />
-              )}
-            </button>
+            {mode !== "video" && (
+              <button
+                onClick={() => player.toggle()}
+                disabled={!hasAudio}
+                aria-label={playing ? "Pause" : "Play"}
+                className={`flex items-center justify-center rounded-full ring-1 ring-white/40 transition-transform hover:scale-105 active:scale-95 disabled:opacity-40 ${
+                  dock === "mini" ? "h-9 w-9" : "h-12 w-12"
+                }`}
+                style={{
+                  background: "rgba(255,255,255,0.14)",
+                  backdropFilter: "blur(10px) saturate(140%)",
+                  WebkitBackdropFilter: "blur(10px) saturate(140%)",
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -2px 6px rgba(0,0,0,0.25)",
+                }}
+              >
+                {playing ? (
+                  <Pause size={dock === "mini" ? 15 : 20} className="text-white drop-shadow" fill="currentColor" />
+                ) : (
+                  <Play size={dock === "mini" ? 15 : 20} className="ml-0.5 text-white drop-shadow" fill="currentColor" />
+                )}
+              </button>
+            )}
             {dock !== "mini" && (
               <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-star-white/30">
                 Swipe down to close · keep browsing below

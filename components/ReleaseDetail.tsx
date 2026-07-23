@@ -214,9 +214,6 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
                       <span className="block text-sm font-bold uppercase tracking-wide text-star-white">
                         Visualise
                       </span>
-                      <span className="block text-[11px] text-star-white/45">
-                        30-second preview · live 3D visuals
-                      </span>
                     </span>
                     <span className="text-star-white/30 transition-all group-hover:translate-x-0.5 group-hover:text-star-white/70">
                       →
@@ -340,10 +337,7 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
                         >
                           <p.Icon />
                         </span>
-                        <span className="flex-1">
-                          <span className="block text-sm font-medium text-star-white">{p.label}</span>
-                          <span className="block text-[11px] text-star-white/40">{p.hint}</span>
-                        </span>
+                        <span className="flex-1 text-sm font-medium text-star-white">{p.label}</span>
                         <svg
                           viewBox="0 0 16 16"
                           className="h-3.5 w-3.5 text-star-white/25 transition-all group-hover:translate-x-0.5 group-hover:text-star-white/70"

@@ -174,22 +174,25 @@ export function AiChat({ releases }: AiChatProps) {
             ) : (
               /* ── compact chat ── */
               <>
-                <div className="flex items-center justify-between border-b border-star-white/8 p-4">
-                  <button
-                    onClick={() => setView("choose")}
-                    className="flex items-center gap-2 text-star-white/70 hover:text-star-white"
-                    aria-label="Back"
-                  >
-                    <span className="text-lg leading-none">‹</span>
-                    <Sparkles size={16} className="text-neon-violet" />
-                    <h3 className="text-sm font-bold uppercase tracking-wide text-star-white">Describe a vibe</h3>
-                  </button>
+                <div className="flex items-center justify-between gap-3 border-b border-star-white/8 p-3">
+                  {/* one-tap switch between Chat and Visual Survey */}
+                  <div className="flex items-center gap-1 rounded-full border border-star-white/12 bg-star-white/[0.03] p-0.5">
+                    <span className="flex items-center gap-1.5 rounded-full bg-star-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-void">
+                      <Sparkles size={12} /> Chat
+                    </span>
+                    <button
+                      onClick={chooseSurvey}
+                      className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-star-white/60 transition-colors hover:text-star-white"
+                    >
+                      <LayoutGrid size={12} /> Visual Survey
+                    </button>
+                  </div>
                   <button onClick={close} aria-label="Close" className="text-star-white/50 hover:text-star-white">
                     <X size={16} />
                   </button>
                 </div>
 
-                <div className="p-4">
+                <div className="p-3.5">
                   <textarea
                     value={text}
                     onChange={(e) => setText(e.target.value)}
