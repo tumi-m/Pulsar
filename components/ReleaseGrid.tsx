@@ -302,13 +302,13 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               : "top-14 bg-void/20 px-6 py-3 backdrop-blur-xl"
           }`}
         >
-          {/* search row — the menu (sidebar) button always sits in the block,
-              in its own liquid-glass pill next to the search bar */}
-          <div className={`flex items-center justify-center gap-2.5 ${searchCompact ? "" : "mb-3"}`}>
+          {/* search row — the menu (sidebar) button is pinned to the left edge
+              while the search bar stays perfectly centered (symmetrical) */}
+          <div className={`relative flex items-center justify-center ${searchCompact ? "" : "mb-3"}`}>
             <button
               onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
               aria-label="Open menu"
-              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-white/30 text-star-white/85 transition-transform hover:scale-105 active:scale-95"
+              className="absolute left-0 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-white/30 text-star-white/85 transition-transform hover:scale-105 active:scale-95"
               style={{
                 background: "rgba(255,255,255,0.1)",
                 backdropFilter: "blur(18px) saturate(180%)",
