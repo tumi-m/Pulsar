@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Play, Pause } from "lucide-react";
+import { X, Play, Pause, Maximize2 } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { usePlayer } from "./player/PlayerProvider";
 
@@ -101,11 +101,13 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
   }, []);
 
   // The panel's size/position class for the current layout state.
+  // In tracklist mode the visualiser sits on the RIGHT, tucked into the empty
+  // space beside the tracklist; the expand icon promotes it to full.
   const dockClass =
     dock === "mini"
       ? "right-3 top-16 h-[24vh] w-[42%] md:w-[20%]"
       : detailOpen
-        ? "inset-x-3 top-16 h-[32vh] md:inset-x-auto md:left-4 md:w-[46%]"
+        ? "inset-x-3 top-16 h-[34vh] md:inset-x-auto md:right-4 md:w-[44%]"
         : "inset-x-6 top-16 h-[30vh] md:inset-x-[28%]";
 
   const playing = player.playing;
@@ -512,18 +514,36 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
                 </span>
               )}
             </div>
-            <button
-              onClick={handleClose}
-              aria-label="Close visualizer"
-              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/25 text-star-white/80 transition-colors hover:border-white/60 hover:text-star-white"
-              style={{
-                background: "rgba(255,255,255,0.12)",
-                backdropFilter: "blur(8px)",
-                WebkitBackdropFilter: "blur(8px)",
-              }}
-            >
-              <X size={13} strokeWidth={2.5} />
-            </button>
+            <div className="flex flex-shrink-0 items-center gap-1.5">
+              {/* expand → leaves tracklist mode, promotes the visualiser to full */}
+              {detailOpen && (
+                <button
+                  onClick={() => window.dispatchEvent(new CustomEvent("pulsar-close-detail"))}
+                  aria-label="Expand visualiser"
+                  title="Expand"
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-white/25 text-star-white/80 transition-colors hover:border-white/60 hover:text-star-white"
+                  style={{
+                    background: "rgba(255,255,255,0.12)",
+                    backdropFilter: "blur(8px)",
+                    WebkitBackdropFilter: "blur(8px)",
+                  }}
+                >
+                  <Maximize2 size={12} strokeWidth={2.5} />
+                </button>
+              )}
+              <button
+                onClick={handleClose}
+                aria-label="Close visualizer"
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-white/25 text-star-white/80 transition-colors hover:border-white/60 hover:text-star-white"
+                style={{
+                  background: "rgba(255,255,255,0.12)",
+                  backdropFilter: "blur(8px)",
+                  WebkitBackdropFilter: "blur(8px)",
+                }}
+              >
+                <X size={13} strokeWidth={2.5} />
+              </button>
+            </div>
           </div>
 
           {/* bottom controls */}

@@ -134,8 +134,8 @@ export function AiChat({ releases }: AiChatProps) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.97 }}
             transition={{ type: "spring", stiffness: 520, damping: 40 }}
-            className="fixed left-1/2 top-1/2 z-[58] flex max-h-[80vh] w-[min(92vw,26rem)] -translate-x-1/2 -translate-y-1/2 transform-gpu flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#0a0a14]/65 backdrop-blur-2xl"
-            style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35), 0 24px 70px rgba(0,0,0,0.6)" }}
+            className="fixed left-1/2 top-1/2 z-[58] flex max-h-[80vh] w-[min(92vw,26rem)] -translate-x-1/2 -translate-y-1/2 transform-gpu flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#0a0a14]/45 backdrop-blur-2xl"
+            style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4), 0 24px 70px rgba(0,0,0,0.6)" }}
           >
             {view === "choose" ? (
               /* ── left / right choice before entering ── */

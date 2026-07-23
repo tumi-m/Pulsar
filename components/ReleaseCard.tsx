@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Heart, Plus, Check, Play, Pause, Disc3 } from "lucide-react";
+import { Heart, Plus, Check, Play, Pause, Share2 } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { isToday, isYesterday } from "@/lib/utils";
 import type { MediaFormat } from "@/lib/format";
@@ -30,10 +30,13 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
   // `armed` gates the physical-media animation: it only turns on after the
   // cursor has rested on the tile for 3 seconds, so the grid stays calm.
   const [armed, setArmed] = useState(false);
+  // DSP links reveal faster (1.5s) than the physical-media animation (3s).
+  const [showDsp, setShowDsp] = useState(false);
   const [fav, setFav] = useState(false);
   const [inList, setInList] = useState(false);
   const [artHidden, setArtHidden] = useState(false); // hide if no art resolves
   const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dspTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setFav(isFavorite(release.id));
@@ -42,17 +45,22 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
 
   useEffect(() => () => {
     if (armTimer.current) clearTimeout(armTimer.current);
+    if (dspTimer.current) clearTimeout(dspTimer.current);
   }, []);
 
   const enter = () => {
     setHovered(true);
     if (armTimer.current) clearTimeout(armTimer.current);
-    armTimer.current = setTimeout(() => setArmed(true), 3000);
+    if (dspTimer.current) clearTimeout(dspTimer.current);
+    dspTimer.current = setTimeout(() => setShowDsp(true), 1500); // DSP links: 1.5s
+    armTimer.current = setTimeout(() => setArmed(true), 3000); // physical media: 3s
   };
   const leave = () => {
     setHovered(false);
     setArmed(false);
+    setShowDsp(false);
     if (armTimer.current) clearTimeout(armTimer.current);
+    if (dspTimer.current) clearTimeout(dspTimer.current);
   };
 
   const isFresh = isToday(release.release_date) || isYesterday(release.release_date);
@@ -182,7 +190,7 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
       </button>
 
       {/* quick actions — a full-width liquid-glass bar (matches the play
-          triangle): Favorite · Crate · Share, spanning the tile's width */}
+          triangle): Share · Favorite · Crate, spanning the tile's width */}
       <div
         className={`absolute inset-x-2 top-2 z-20 flex items-stretch overflow-hidden rounded-full ring-1 ring-white/40 transition-all duration-200 ${
           hovered ? "translate-y-0 opacity-100" : "-translate-y-1.5 opacity-0"
@@ -195,6 +203,24 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
             "0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -2px 6px rgba(0,0,0,0.25)",
         }}
       >
+        <button
+          onClick={async (e) => {
+            e.stopPropagation();
+            const url = typeof window !== "undefined" ? window.location.href : "";
+            const data = { title: `${release.title} — ${release.artist}`, text: "Found on PULSAR", url };
+            try {
+              if (navigator.share) await navigator.share(data);
+              else await navigator.clipboard.writeText(url);
+            } catch {
+              /* cancelled */
+            }
+          }}
+          aria-label="Share"
+          className={`flex flex-1 items-center justify-center transition-colors hover:bg-white/10 ${big ? "h-12" : "h-10"}`}
+        >
+          <Share2 size={big ? 20 : 17} className="text-white drop-shadow" />
+        </button>
+        <span className="my-2 w-px bg-white/25" />
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -220,26 +246,14 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
             <Plus size={big ? 22 : 19} className="text-white drop-shadow" />
           )}
         </button>
-        <span className="my-2 w-px bg-white/25" />
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            // "More by" → surface more music from this artist via search.
-            window.dispatchEvent(new CustomEvent("pulsar-search", { detail: release.artist }));
-          }}
-          aria-label={`More by ${release.artist}`}
-          className={`flex flex-1 items-center justify-center transition-colors hover:bg-white/10 ${big ? "h-12" : "h-10"}`}
-        >
-          <Disc3 size={big ? 22 : 19} className="text-white drop-shadow" />
-        </button>
       </div>
 
-      {/* after a 3-second dwell: full-colour DSP logos across the bottom,
+      {/* after a 1.5-second dwell: full-colour DSP logos across the bottom,
           each linking straight to this release on that service */}
       {dsps.length > 0 && (
         <div
           className={`pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-center justify-around gap-1 rounded-b-2xl px-2 py-2 transition-all duration-300 ${
-            armed ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
+            showDsp ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
           }`}
           style={{
             background: "linear-gradient(0deg, rgba(4,4,10,0.92), rgba(4,4,10,0.55) 70%, transparent)",
@@ -257,7 +271,7 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
               aria-label={p.hint}
               title={p.label}
               className={`flex items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95 ${
-                armed ? "pointer-events-auto" : ""
+                showDsp ? "pointer-events-auto" : ""
               } ${big ? "h-9 w-9" : "h-7 w-7"}`}
               style={{ backgroundColor: `${p.color}2e`, color: p.color }}
             >

@@ -58,7 +58,7 @@ export function Navbar() {
           transition={{ duration: 0.25 }}
           onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
           aria-label="Open menu"
-          className="fixed left-5 top-3 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-star-white/15 bg-void/70 text-star-white/80 backdrop-blur-xl transition-colors hover:bg-star-white/10 hover:text-star-white md:left-10"
+          className="fixed left-4 top-2.5 z-50 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-void/70 text-star-white/80 backdrop-blur-xl transition-colors hover:bg-star-white/10 hover:text-star-white md:left-9"
         >
           <span className="flex flex-col gap-[3px]">
             <span className="h-[1.5px] w-4 rounded-full bg-current" />
@@ -87,12 +87,12 @@ export function Navbar() {
           <button
             onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
             aria-label="Open menu"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-star-white/70 transition-colors hover:bg-star-white/10 hover:text-star-white"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 text-star-white/75 transition-colors hover:bg-star-white/10 hover:text-star-white"
           >
-            <span className="flex flex-col gap-[3px]">
-              <span className="h-[1.5px] w-4 rounded-full bg-current" />
-              <span className="h-[1.5px] w-4 rounded-full bg-current" />
-              <span className="h-[1.5px] w-4 rounded-full bg-current" />
+            <span className="flex flex-col gap-[4px]">
+              <span className="h-[2px] w-5 rounded-full bg-current" />
+              <span className="h-[2px] w-5 rounded-full bg-current" />
+              <span className="h-[2px] w-5 rounded-full bg-current" />
             </span>
           </button>
           <Link
