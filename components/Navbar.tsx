@@ -13,14 +13,21 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [visualizing, setVisualizing] = useState(false);
   const prevY = useRef(0);
 
   // Album mode (detail sheet) opens on the right half; confine the header to
-  // the left half so the logo sits symmetrically over the grid below.
+  // the left half so the logo sits symmetrically over the grid below. In
+  // visualiser mode the logo centers (matching the reference layout).
   useEffect(() => {
     const onDetail = (e: Event) => setDetailOpen((e as CustomEvent<boolean>).detail);
+    const onVis = (e: Event) => setVisualizing((e as CustomEvent<boolean>).detail);
     window.addEventListener("pulsar-detail-open", onDetail);
-    return () => window.removeEventListener("pulsar-detail-open", onDetail);
+    window.addEventListener("pulsar-visualizing", onVis);
+    return () => {
+      window.removeEventListener("pulsar-detail-open", onDetail);
+      window.removeEventListener("pulsar-visualizing", onVis);
+    };
   }, []);
 
   const setHiddenBroadcast = (h: boolean) => {
@@ -88,7 +95,12 @@ export function Navbar() {
               <span className="h-[1.5px] w-4 rounded-full bg-current" />
             </span>
           </button>
-          <Link href="/" className="flex items-center gap-2.5">
+          <Link
+            href="/"
+            className={`flex items-center gap-2.5 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              visualizing ? "absolute left-1/2 -translate-x-1/2" : ""
+            }`}
+          >
             <CalabiYau size={22} />
             <span className="text-sm font-bold uppercase tracking-[0.3em] text-star-white">
               PULSAR

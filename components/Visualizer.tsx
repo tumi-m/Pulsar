@@ -36,10 +36,40 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
   const modeRef = useRef<Mode>("nebula");
   const rotRef = useRef(0);
   const [mode, setMode] = useState<Mode>("nebula");
+  // Layout states: "mini" docks to 20% on the right (when the main menu is
+  // opened mid-visualise); detailOpen shrinks it to sit beside the tracklist.
+  const [dock, setDock] = useState<"full" | "mini">("full");
+  const [detailOpen, setDetailOpen] = useState(false);
 
   useEffect(() => {
     modeRef.current = mode;
   }, [mode]);
+
+  // Reset to the full centered panel whenever a new release is visualised.
+  useEffect(() => {
+    if (release) setDock("full");
+  }, [release]);
+
+  // Clicking the main menu while visualising docks the panel to 20% right;
+  // opening album mode shrinks it to fit beside the tracklist.
+  useEffect(() => {
+    const onMenu = () => setDock((d) => (d === "mini" ? "full" : "mini"));
+    const onDetail = (e: Event) => setDetailOpen((e as CustomEvent<boolean>).detail);
+    window.addEventListener("pulsar-toggle-sidebar", onMenu);
+    window.addEventListener("pulsar-detail-open", onDetail);
+    return () => {
+      window.removeEventListener("pulsar-toggle-sidebar", onMenu);
+      window.removeEventListener("pulsar-detail-open", onDetail);
+    };
+  }, []);
+
+  // The panel's size/position class for the current layout state.
+  const dockClass =
+    dock === "mini"
+      ? "right-3 top-16 h-[24vh] w-[42%] md:w-[20%]"
+      : detailOpen
+        ? "inset-x-3 top-16 h-[32vh] md:inset-x-auto md:left-4 md:w-[46%]"
+        : "inset-x-6 top-16 h-[30vh] md:inset-x-[28%]";
 
   const playing = player.playing;
 
@@ -384,7 +414,7 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
           onDragEnd={(_e, info) => {
             if (info.offset.y > 110 || info.velocity.y > 600) handleClose();
           }}
-          className="fixed inset-x-6 top-16 z-40 h-[30vh] transform-gpu touch-none overflow-hidden rounded-2xl border border-white/15 bg-[#0a0a14]/55 backdrop-blur-2xl md:inset-x-[28%]"
+          className={`fixed z-40 transform-gpu touch-none overflow-hidden rounded-2xl border border-white/15 bg-[#0a0a14]/55 backdrop-blur-2xl transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${dockClass}`}
           style={{
             boxShadow:
               "inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 10px rgba(0,0,0,0.4), 0 24px 60px rgba(0,0,0,0.6)",
@@ -435,32 +465,36 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
 
           {/* bottom controls */}
           <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2.5 p-3 md:p-4">
-            <div
-              className="scrollbar-none flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-white/15 p-1"
-              style={{
-                background: "rgba(255,255,255,0.1)",
-                backdropFilter: "blur(12px) saturate(150%)",
-                WebkitBackdropFilter: "blur(12px) saturate(150%)",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 6px 18px rgba(0,0,0,0.4)",
-              }}
-            >
-              {MODES.map((mo) => (
-                <button
-                  key={mo.id}
-                  onClick={() => setMode(mo.id)}
-                  className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors ${
-                    mode === mo.id ? "bg-white/85 text-void" : "text-star-white/60 hover:text-star-white"
-                  }`}
-                >
-                  {mo.label}
-                </button>
-              ))}
-            </div>
+            {dock !== "mini" && (
+              <div
+                className="scrollbar-none flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-white/15 p-1"
+                style={{
+                  background: "rgba(255,255,255,0.1)",
+                  backdropFilter: "blur(12px) saturate(150%)",
+                  WebkitBackdropFilter: "blur(12px) saturate(150%)",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 6px 18px rgba(0,0,0,0.4)",
+                }}
+              >
+                {MODES.map((mo) => (
+                  <button
+                    key={mo.id}
+                    onClick={() => setMode(mo.id)}
+                    className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors ${
+                      mode === mo.id ? "bg-white/85 text-void" : "text-star-white/60 hover:text-star-white"
+                    }`}
+                  >
+                    {mo.label}
+                  </button>
+                ))}
+              </div>
+            )}
             <button
               onClick={() => player.toggle()}
               disabled={!hasAudio}
               aria-label={playing ? "Pause" : "Play"}
-              className="flex h-12 w-12 items-center justify-center rounded-full ring-1 ring-white/40 transition-transform hover:scale-105 active:scale-95 disabled:opacity-40"
+              className={`flex items-center justify-center rounded-full ring-1 ring-white/40 transition-transform hover:scale-105 active:scale-95 disabled:opacity-40 ${
+                dock === "mini" ? "h-9 w-9" : "h-12 w-12"
+              }`}
               style={{
                 background: "rgba(255,255,255,0.14)",
                 backdropFilter: "blur(10px) saturate(140%)",
@@ -469,14 +503,16 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
               }}
             >
               {playing ? (
-                <Pause size={20} className="text-white drop-shadow" fill="currentColor" />
+                <Pause size={dock === "mini" ? 15 : 20} className="text-white drop-shadow" fill="currentColor" />
               ) : (
-                <Play size={20} className="ml-0.5 text-white drop-shadow" fill="currentColor" />
+                <Play size={dock === "mini" ? 15 : 20} className="ml-0.5 text-white drop-shadow" fill="currentColor" />
               )}
             </button>
-            <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-star-white/30">
-              Swipe down to close · keep browsing below
-            </p>
+            {dock !== "mini" && (
+              <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-star-white/30">
+                Swipe down to close · keep browsing below
+              </p>
+            )}
           </div>
         </motion.div>
       )}

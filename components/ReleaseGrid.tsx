@@ -58,6 +58,11 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     window.dispatchEvent(new CustomEvent("pulsar-detail-open", { detail: detailOpen }));
   }, [detailOpen]);
 
+  // Tell the navbar / visualizer whether we're in visualiser mode.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("pulsar-visualizing", { detail: Boolean(visualizing) }));
+  }, [visualizing]);
+
   // bumps whenever the user favorites/crates something → recompute recs
   const [collectionVersion, setCollectionVersion] = useState(0);
 
