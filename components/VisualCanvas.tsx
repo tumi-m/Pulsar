@@ -88,7 +88,12 @@ export function VisualCanvas({
   }, [mode, release]);
 
   const initParticles = useCallback(() => {
-    const COUNT = Math.min(1200, Math.floor((window.innerWidth * window.innerHeight) / 1100));
+    const touch =
+      typeof window !== "undefined" &&
+      ((window.matchMedia && window.matchMedia("(pointer: coarse)").matches) || "ontouchstart" in window);
+    // Density scales with screen area but is capped much lower on phones.
+    const cap = touch ? 520 : 1400;
+    const COUNT = Math.min(cap, Math.floor((window.innerWidth * window.innerHeight) / (touch ? 2600 : 1000)));
     const ps: Particle[] = [];
     for (let i = 0; i < COUNT; i++) {
       const t = i / COUNT;
@@ -151,17 +156,45 @@ export function VisualCanvas({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Adaptive resolution: cap DPR hard on touch devices — rendering fewer
+    // physical pixels is the single biggest perf win on phones.
+    const isTouch =
+      typeof window !== "undefined" &&
+      ((window.matchMedia && window.matchMedia("(pointer: coarse)").matches) || "ontouchstart" in window);
+    const maxDpr = isTouch ? 1.25 : 2;
     const resize = () => {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const dpr = Math.min(maxDpr, window.devicePixelRatio || 1);
       const w = canvas.clientWidth || window.innerWidth;
       const h = canvas.clientHeight || window.innerHeight;
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
+      canvas.width = Math.max(1, Math.round(w * dpr));
+      canvas.height = Math.max(1, Math.round(h * dpr));
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
+    // Pre-built radial gradients (rebuilt only on resize) — creating a gradient
+    // every frame is a major cost; we modulate opacity via globalAlpha instead.
+    let glowGrad: CanvasGradient | null = null;
+    let artGlowGrad: CanvasGradient | null = null;
+    const buildGradients = () => {
+      const w = canvas.clientWidth || window.innerWidth;
+      const h = canvas.clientHeight || window.innerHeight;
+      const cx0 = w / 2;
+      const cy0 = h / 2;
+      const r = Math.min(w, h);
+      glowGrad = ctx.createRadialGradient(cx0, cy0, 0, cx0, cy0, r * 0.55);
+      glowGrad.addColorStop(0, "hsla(265, 92%, 66%, 1)");
+      glowGrad.addColorStop(1, "hsla(265, 92%, 66%, 0)");
+      artGlowGrad = ctx.createRadialGradient(cx0, cy0, r * 0.2, cx0, cy0, r * 0.62);
+      artGlowGrad.addColorStop(0, "hsla(275, 90%, 62%, 0.9)");
+      artGlowGrad.addColorStop(1, "hsla(275, 90%, 62%, 0)");
+    };
     resize();
-    window.addEventListener("resize", resize);
-    const ro = new ResizeObserver(resize);
+    buildGradients();
+    const onResize = () => {
+      resize();
+      buildGradients();
+    };
+    window.addEventListener("resize", onResize);
+    const ro = new ResizeObserver(onResize);
     ro.observe(canvas);
 
     const freq = new Uint8Array(1024);
@@ -264,6 +297,15 @@ export function VisualCanvas({
         ctx.fillStyle = "rgba(4,4,10,1)";
         ctx.fillRect(0, 0, W, H);
         if (img && img.width) {
+          // Cheap glow halo via the cached gradient (no per-frame shadowBlur).
+          if (artGlowGrad) {
+            ctx.globalCompositeOperation = "lighter";
+            ctx.globalAlpha = 0.25 + bass * 0.4 + kick * 0.5;
+            ctx.fillStyle = artGlowGrad;
+            ctx.fillRect(0, 0, W, H);
+            ctx.globalAlpha = 1;
+            ctx.globalCompositeOperation = "source-over";
+          }
           // React hard to the music: punch on the kick, sway + bob to the beat,
           // and a slight tilt so the cover really dances.
           const pulse = 1 + bass * 0.22 + kick * 0.3;
@@ -274,11 +316,6 @@ export function VisualCanvas({
           ctx.save();
           ctx.translate(cx + sway, cy + bob);
           ctx.rotate(tilt);
-          ctx.shadowColor = `hsla(${265 + treble * 80}, 90%, 60%, ${0.4 + kick * 0.5})`;
-          ctx.shadowBlur = 40 + bass * 140 + kick * 120;
-          ctx.fillStyle = "#000";
-          ctx.fillRect(-side / 2, -side / 2, side, side);
-          ctx.shadowBlur = 0;
           ctx.drawImage(img, -side / 2, -side / 2, side, side);
           ctx.strokeStyle = `hsla(0,0%,100%,${0.15 + treble * 0.3 + kick * 0.3})`;
           ctx.lineWidth = 1.5 + kick * 2;
@@ -371,11 +408,13 @@ export function VisualCanvas({
         }
       }
 
-      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(W, H) * (0.2 + bass * 0.3 + kick * 0.25));
-      glow.addColorStop(0, `hsla(265, 90%, 65%, ${0.06 + level * 0.14 + kick * 0.15})`);
-      glow.addColorStop(1, "transparent");
-      ctx.fillStyle = glow;
-      ctx.fillRect(0, 0, W, H);
+      // Ambient centre glow — cached gradient, modulated by loudness/beat.
+      if (glowGrad) {
+        ctx.globalAlpha = 0.06 + level * 0.16 + kick * 0.18;
+        ctx.fillStyle = glowGrad;
+        ctx.fillRect(0, 0, W, H);
+        ctx.globalAlpha = 1;
+      }
 
       ctx.globalCompositeOperation = "source-over";
       rafRef.current = requestAnimationFrame(draw);
@@ -384,7 +423,7 @@ export function VisualCanvas({
 
     return () => {
       cancelAnimationFrame(rafRef.current);
-      window.removeEventListener("resize", resize);
+      window.removeEventListener("resize", onResize);
       ro.disconnect();
     };
   }, [playing, player]);
