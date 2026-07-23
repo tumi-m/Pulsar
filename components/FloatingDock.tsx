@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, ListMusic, X, Trash2, Sparkles, Shuffle, Play, Share2 } from "lucide-react";
+import { Heart, ListMusic, X, Trash2, Sparkles, Shuffle, Play, Share2, Upload } from "lucide-react";
 import type { Release } from "@/lib/types";
 import type { MediaFormat } from "@/lib/format";
 import { getFavorites, getPlaylist, toggleFavorite, removeFromPlaylist } from "@/lib/collection";
@@ -29,6 +29,14 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   // When the navbar hides on scroll-down, the Selector + Shuffle buttons
   // relocate here, stacking above the dock buttons.
   const [navHidden, setNavHidden] = useState(false);
+  // Crate → playlist export sheet.
+  const [exporting, setExporting] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const flash = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2600);
+  };
 
   const refresh = () => {
     setFavs(getFavorites());
@@ -70,6 +78,64 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       /* cancelled */
     }
   }
+
+  // ── Crate export → a playlist on the DSP of choice ──────────────
+  const crateName = () => `PULSAR Crate ${new Date().toISOString().slice(0, 10)}`;
+  const asLines = () => items.map((r) => `${r.artist} — ${r.title}`).join("\n");
+
+  const download = (filename: string, text: string, type = "text/plain") => {
+    const blob = new Blob([text], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadCsv = () => {
+    const rows = [
+      "Title,Artist,Album",
+      ...items.map((r) => {
+        const esc = (s: string) => `"${(s ?? "").replace(/"/g, '""')}"`;
+        return [esc(r.title), esc(r.artist), esc(r.title)].join(",");
+      }),
+    ].join("\n");
+    download(`${crateName()}.csv`, rows, "text/csv");
+  };
+
+  const copyList = async () => {
+    try {
+      await navigator.clipboard.writeText(asLines());
+      flash("Crate copied to clipboard");
+    } catch {
+      download(`${crateName()}.txt`, asLines());
+      flash("Crate downloaded as text");
+    }
+  };
+
+  // Where each DSP lets you build/import a playlist.
+  const DSP_HOME: Record<string, string> = {
+    spotify: "https://open.spotify.com/collection/playlists",
+    apple_music: "https://music.apple.com/library/playlists",
+    tidal: "https://tidal.com/my-collection/playlists",
+    soundcloud: "https://soundcloud.com/you/library",
+    youtube_music: "https://music.youtube.com/library/playlists",
+  };
+
+  const exportTo = async (key: string, label: string) => {
+    // Keyless flow: copy the tracklist + drop a CSV, then open the service's
+    // playlist area so the list can be pasted / imported into a new playlist.
+    downloadCsv();
+    try {
+      await navigator.clipboard.writeText(asLines());
+    } catch {
+      /* clipboard blocked — the CSV still downloaded */
+    }
+    window.open(DSP_HOME[key] ?? "https://pulsar.app", "_blank", "noopener,noreferrer");
+    setExporting(false);
+    flash(`Crate copied + CSV ready for ${label}`);
+  };
 
   const dockBtn = (
     key: string,
@@ -233,14 +299,91 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                     {panel === "favorites" ? "Loved" : "Your Crate"} · {items.length}
                   </h3>
                 </div>
-                <button
-                  onClick={() => setPanel(null)}
-                  aria-label="Close"
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-star-white/50 hover:bg-white/10 hover:text-star-white"
-                >
-                  <X size={16} />
-                </button>
+                <div className="flex items-center gap-2">
+                  {items.length > 0 && (
+                    <button
+                      onClick={() => setExporting(true)}
+                      className="flex items-center gap-1.5 rounded-full border border-neon-green/40 bg-neon-green/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-neon-green transition-colors hover:bg-neon-green/20"
+                    >
+                      <Upload size={13} />
+                      Export
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setPanel(null)}
+                    aria-label="Close"
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-star-white/50 hover:bg-white/10 hover:text-star-white"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
               </div>
+
+              {/* export → playlist sheet */}
+              <AnimatePresence>
+                {exporting && (
+                  <>
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      onClick={() => setExporting(false)}
+                      className="absolute inset-0 z-10 bg-void/70 backdrop-blur-sm"
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 16 }}
+                      transition={{ type: "spring", stiffness: 460, damping: 34 }}
+                      className="absolute inset-x-4 top-20 z-20 rounded-2xl border border-white/15 bg-[#0d0d16]/95 p-4 backdrop-blur-2xl"
+                      style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 24px 60px rgba(0,0,0,0.6)" }}
+                    >
+                      <p className="text-sm font-bold uppercase tracking-wide text-star-white">
+                        Export {items.length} to a playlist
+                      </p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-star-white/45">
+                        Pick a service — Pulsar copies the tracklist &amp; downloads a CSV, then opens
+                        your playlists so you can paste or import it into a new playlist.
+                      </p>
+                      <div className="mt-3 grid grid-cols-1 gap-1.5">
+                        {PLATFORMS.map((p) => (
+                          <button
+                            key={p.key}
+                            onClick={() => exportTo(p.key, p.label)}
+                            className="flex items-center gap-3 rounded-xl border border-white/10 px-3 py-2.5 text-left transition-colors hover:bg-white/[0.06]"
+                          >
+                            <span
+                              className="flex h-8 w-8 items-center justify-center rounded-lg"
+                              style={{ backgroundColor: `${p.color}26`, color: p.color }}
+                            >
+                              <p.Icon />
+                            </span>
+                            <span className="flex-1 text-sm font-medium text-star-white">{p.label}</span>
+                            <span className="text-star-white/30">→</span>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={copyList}
+                          className="flex-1 rounded-lg border border-white/15 py-2 text-[10px] font-bold uppercase tracking-widest text-star-white/70 hover:text-star-white"
+                        >
+                          Copy list
+                        </button>
+                        <button
+                          onClick={() => {
+                            downloadCsv();
+                            flash("CSV downloaded");
+                          }}
+                          className="flex-1 rounded-lg border border-white/15 py-2 text-[10px] font-bold uppercase tracking-widest text-star-white/70 hover:text-star-white"
+                        >
+                          Download CSV
+                        </button>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
 
               {items.length === 0 ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
@@ -336,6 +479,20 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               )}
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* export toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-full border border-neon-green/40 bg-void/90 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-neon-green backdrop-blur"
+          >
+            {toast}
+          </motion.div>
         )}
       </AnimatePresence>
     </>

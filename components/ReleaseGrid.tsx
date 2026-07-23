@@ -205,7 +205,13 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   }, [releases, activeGenre, activeType, activeLabel, view, recProfile, query]);
 
   const shown = filtered.slice(0, visible);
-  const sizes = useMemo(() => tileSizes(shown, recProfile), [shown, recProfile]);
+  const searching = query.trim().length > 0;
+  // In search mode, keep every tile the same size so results pack tightly with
+  // no empty gaps; otherwise use the taste-driven dynamic sizing.
+  const sizes = useMemo(
+    () => (searching ? shown.map(() => 0) : tileSizes(shown, recProfile)),
+    [shown, recProfile, searching]
+  );
   const hasMore = visible < filtered.length;
 
   const resetPage = () => setVisible(PAGE);

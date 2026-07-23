@@ -8,6 +8,7 @@ import { isToday, isYesterday } from "@/lib/utils";
 import type { MediaFormat } from "@/lib/format";
 import { PhysicalMedia } from "./PhysicalMedia";
 import { Artwork } from "./Artwork";
+import { PLATFORMS } from "./platforms";
 import { isFavorite, toggleFavorite, inPlaylist, togglePlaylist } from "@/lib/collection";
 import { usePlayer } from "./player/PlayerProvider";
 
@@ -56,6 +57,8 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
 
   const isFresh = isToday(release.release_date) || isYesterday(release.release_date);
   const big = size === 2;
+  // DSP deep links available for this release (shown full-colour on 3s dwell).
+  const dsps = PLATFORMS.filter((p) => Boolean(release[p.key]));
 
   // No artwork could be resolved → don't show this release at all.
   if (artHidden) return null;
@@ -230,6 +233,41 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
           <Disc3 size={big ? 22 : 19} className="text-white drop-shadow" />
         </button>
       </div>
+
+      {/* after a 3-second dwell: full-colour DSP logos across the bottom,
+          each linking straight to this release on that service */}
+      {dsps.length > 0 && (
+        <div
+          className={`pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-center justify-around gap-1 rounded-b-2xl px-2 py-2 transition-all duration-300 ${
+            armed ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
+          }`}
+          style={{
+            background: "linear-gradient(0deg, rgba(4,4,10,0.92), rgba(4,4,10,0.55) 70%, transparent)",
+            backdropFilter: "blur(4px)",
+            WebkitBackdropFilter: "blur(4px)",
+          }}
+        >
+          {dsps.map((p) => (
+            <a
+              key={p.key}
+              href={release[p.key]!}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              aria-label={p.hint}
+              title={p.label}
+              className={`flex items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95 ${
+                armed ? "pointer-events-auto" : ""
+              } ${big ? "h-9 w-9" : "h-7 w-7"}`}
+              style={{ backgroundColor: `${p.color}2e`, color: p.color }}
+            >
+              <span className={big ? "[&>svg]:h-5 [&>svg]:w-5" : "[&>svg]:h-4 [&>svg]:w-4"}>
+                <p.Icon />
+              </span>
+            </a>
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 }
