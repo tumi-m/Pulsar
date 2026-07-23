@@ -300,74 +300,79 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
         <motion.div
           layout
           transition={{ type: "spring", stiffness: 260, damping: 30 }}
-          className={`fixed inset-x-0 z-40 flex flex-col-reverse items-center gap-[8px] border-white/10 bg-void/45 px-[21px] py-[10px] backdrop-blur-2xl md:px-10 ${
-            detailOpen ? "pointer-events-none opacity-0" : "opacity-100"
-          } ${
-            atTop
-              ? "top-[150px] border-b md:top-[248px]"
-              : `border-t ${player.current ? "bottom-[64px]" : "bottom-0"}`
+          className={`fixed left-0 right-0 z-40 flex flex-col-reverse items-center gap-2 px-4 ${
+            detailOpen
+              ? `opacity-0 pointer-events-none lg:right-[50vw] lg:opacity-100 lg:pointer-events-auto ${
+                  player.current ? "bottom-[72px]" : "bottom-3"
+                }`
+              : atTop
+                ? "top-[150px] opacity-100 md:top-[248px]"
+                : `opacity-100 ${player.current ? "bottom-[72px]" : "bottom-3"}`
           }`}
         >
-          {/* search — golden-ratio width (61.8% ≈ 1/φ), centered. Dims when
-              docked at the bottom so it recedes while browsing. */}
+          {/* ONE compact, immersive control row: menu · search · genre · refine.
+              Only as wide as its contents → maximal screen real estate. */}
           <div
-            className={`search-rainbow w-[86%] rounded-full p-[1.5px] transition-opacity duration-300 md:w-[61.8%] ${
-              atTop ? "opacity-100" : "opacity-[0.55]"
-            }`}
+            className="flex max-w-[94vw] items-center gap-2 rounded-full border border-white/12 p-1.5"
+            style={{
+              background: "rgba(10,10,18,0.6)",
+              backdropFilter: "blur(22px) saturate(170%)",
+              WebkitBackdropFilter: "blur(22px) saturate(170%)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.28), 0 12px 32px rgba(0,0,0,0.55)",
+            }}
           >
-            <div className="flex items-center gap-2 rounded-full px-4 py-2"
-              style={{
-                background: "rgba(255,255,255,0.1)",
-                backdropFilter: "blur(20px) saturate(180%)",
-                WebkitBackdropFilter: "blur(20px) saturate(180%)",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -3px 8px rgba(0,0,0,0.3)",
-              }}
-            >
-              <svg viewBox="0 0 20 20" className="h-4 w-4 flex-shrink-0 text-star-white/70" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="9" cy="9" r="6" />
-                <path d="M14 14l4 4" strokeLinecap="round" />
-              </svg>
-              <input
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  resetPage();
-                }}
-                placeholder="Search artists, albums, genres…"
-                className="w-full bg-transparent text-sm font-medium text-white placeholder:text-star-white/55 focus:outline-none"
-              />
-              {query && (
-                <button
-                  onClick={() => setQuery("")}
-                  aria-label="Clear search"
-                  className="flex-shrink-0 text-star-white/40 hover:text-star-white"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* controls row — bigger menu button grouped with Genre / Refine,
-              centred as one elegant, symmetrical cluster */}
-          <div className="flex items-center justify-center gap-3">
             <button
               onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
               aria-label="Open menu"
-              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-white/30 text-star-white/90 transition-transform hover:scale-105 active:scale-95"
-              style={{
-                background: "rgba(255,255,255,0.12)",
-                backdropFilter: "blur(18px) saturate(180%)",
-                WebkitBackdropFilter: "blur(18px) saturate(180%)",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -2px 5px rgba(0,0,0,0.3), 0 6px 16px rgba(0,0,0,0.4)",
-              }}
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-white/20 text-star-white/90 transition-transform hover:scale-105 active:scale-95"
+              style={{ background: "rgba(255,255,255,0.1)" }}
             >
-              <span className="flex flex-col gap-[3.5px]">
-                <span className="h-[2px] w-5 rounded-full bg-current" />
-                <span className="h-[2px] w-5 rounded-full bg-current" />
-                <span className="h-[2px] w-5 rounded-full bg-current" />
+              <span className="flex flex-col gap-[3px]">
+                <span className="h-[2px] w-4 rounded-full bg-current" />
+                <span className="h-[2px] w-4 rounded-full bg-current" />
+                <span className="h-[2px] w-4 rounded-full bg-current" />
               </span>
             </button>
+
+            {/* search — the bar is only as wide as the search field */}
+            <div
+              className={`search-rainbow rounded-full p-[1.5px] transition-opacity duration-300 ${
+                atTop ? "opacity-100" : "opacity-[0.6]"
+              }`}
+            >
+              <div
+                className="flex w-[200px] items-center gap-2 rounded-full px-3 py-1.5 sm:w-[300px] md:w-[360px]"
+                style={{
+                  background: "rgba(255,255,255,0.1)",
+                  backdropFilter: "blur(18px) saturate(180%)",
+                  WebkitBackdropFilter: "blur(18px) saturate(180%)",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.45)",
+                }}
+              >
+                <svg viewBox="0 0 20 20" className="h-4 w-4 flex-shrink-0 text-star-white/70" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="9" cy="9" r="6" />
+                  <path d="M14 14l4 4" strokeLinecap="round" />
+                </svg>
+                <input
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    resetPage();
+                  }}
+                  placeholder="Search artists, albums…"
+                  className="w-full bg-transparent text-sm font-medium text-white placeholder:text-star-white/55 focus:outline-none"
+                />
+                {query && (
+                  <button
+                    onClick={() => setQuery("")}
+                    aria-label="Clear search"
+                    className="flex-shrink-0 text-star-white/40 hover:text-star-white"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
             {/* expandable Genre button */}
             <button
               onClick={() => setShowGenres((v) => !v)}

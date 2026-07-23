@@ -114,33 +114,50 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
             </button>
           </div>
 
-          {/* bottom controls — mode switcher with prev/next arrows + play */}
+          {/* bottom controls — a "watch-wheel" carousel of the 5 modes */}
           <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col items-center gap-2.5 p-3 md:p-4">
-            <div
-              className="flex max-w-full items-center gap-1 rounded-full border border-white/15 p-1"
-              style={{
-                background: "rgba(255,255,255,0.1)",
-                backdropFilter: "blur(12px) saturate(150%)",
-                WebkitBackdropFilter: "blur(12px) saturate(150%)",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 6px 18px rgba(0,0,0,0.4)",
-              }}
-            >
+            <div className="flex items-center gap-1">
               <button
                 onClick={() => cycleMode(-1)}
                 aria-label="Previous visualisation"
-                className="flex h-6 w-6 items-center justify-center rounded-full text-star-white/70 hover:bg-white/10 hover:text-star-white"
+                className="flex h-7 w-7 items-center justify-center rounded-full text-star-white/60 hover:bg-white/10 hover:text-star-white"
               >
-                <ChevronLeft size={15} />
+                <ChevronLeft size={16} />
               </button>
-              <span className="min-w-[68px] text-center text-[11px] font-bold uppercase tracking-[0.14em] text-star-white">
-                {VISUAL_MODES.find((m) => m.id === mode)?.label}
-              </span>
+              {/* macOS-style segmented wheel: active pill centred & raised,
+                  neighbours scaled down / faded like a rotary picker */}
+              <div
+                className="scrollbar-none flex items-center gap-0.5 overflow-x-auto rounded-full border border-white/15 p-1"
+                style={{
+                  background: "rgba(255,255,255,0.08)",
+                  backdropFilter: "blur(14px) saturate(160%)",
+                  WebkitBackdropFilter: "blur(14px) saturate(160%)",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -2px 6px rgba(0,0,0,0.4), 0 6px 18px rgba(0,0,0,0.4)",
+                }}
+              >
+                {VISUAL_MODES.map((mo) => {
+                  const active = mo.id === mode;
+                  return (
+                    <button
+                      key={mo.id}
+                      onClick={() => setMode(mo.id)}
+                      className={`flex-shrink-0 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] transition-all duration-200 ${
+                        active
+                          ? "scale-105 bg-white text-void shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
+                          : "scale-90 text-star-white/45 hover:text-star-white"
+                      }`}
+                    >
+                      {mo.label}
+                    </button>
+                  );
+                })}
+              </div>
               <button
                 onClick={() => cycleMode(1)}
                 aria-label="Next visualisation"
-                className="flex h-6 w-6 items-center justify-center rounded-full text-star-white/70 hover:bg-white/10 hover:text-star-white"
+                className="flex h-7 w-7 items-center justify-center rounded-full text-star-white/60 hover:bg-white/10 hover:text-star-white"
               >
-                <ChevronRight size={15} />
+                <ChevronRight size={16} />
               </button>
             </div>
             {mode !== "video" && (

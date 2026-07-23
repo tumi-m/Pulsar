@@ -266,7 +266,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                         player.ensureGraph(); // desktop: build analyser in-gesture
                         setShowVisual(true);
                       }}
-                      className="group relative flex w-full items-center gap-4 overflow-hidden rounded-2xl px-5 py-5 transition-transform hover:-translate-y-0.5 active:translate-y-0.5"
+                      className="group relative flex w-full items-center justify-center gap-4 overflow-hidden rounded-2xl px-5 py-5 transition-transform hover:-translate-y-0.5 active:translate-y-0.5"
                       style={{
                         background: "linear-gradient(150deg, #1c1c22 0%, #0b0b0f 100%)",
                         boxShadow:
@@ -284,14 +284,11 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                       <span className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/20 transition-transform group-hover:scale-105">
                         <AudioLines size={24} className="text-white" />
                       </span>
-                      <span className="relative flex-1 text-left text-xl font-black uppercase tracking-[0.22em] text-white">
+                      <span className="relative text-xl font-black uppercase tracking-[0.22em] text-white">
                         Visualise
                       </span>
                       {/* Nothing signature red accent dot */}
-                      <span className="relative h-2.5 w-2.5 flex-shrink-0 rounded-full bg-[#ff2d20] shadow-[0_0_12px_#ff2d20]" />
-                      <span className="relative text-white/40 transition-all group-hover:translate-x-1 group-hover:text-white/80">
-                        →
-                      </span>
+                      <span className="absolute right-5 h-2.5 w-2.5 rounded-full bg-[#ff2d20] shadow-[0_0_12px_#ff2d20]" />
                     </button>
                   ) : (
                     <>
