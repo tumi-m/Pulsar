@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, Link as LinkIcon, Play, Pause, ChevronLeft, ChevronRight, Maximize2, AudioLines, Share2 } from "lucide-react";
+import { X, Check, Link as LinkIcon, Play, Pause, ChevronLeft, ChevronRight, Maximize2, Share2 } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { Artwork } from "./Artwork";
@@ -304,11 +304,11 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                         player.ensureGraph(); // desktop: build analyser in-gesture
                         setShowVisual(true);
                       }}
-                      className="group relative flex w-full items-center justify-center gap-4 overflow-hidden rounded-2xl px-5 py-5 transition-transform hover:-translate-y-0.5 active:translate-y-0.5"
+                      className="group relative flex w-full items-center justify-center gap-4 overflow-hidden rounded-2xl px-5 py-[22px] transition-transform hover:-translate-y-0.5 active:translate-y-0"
                       style={{
-                        background: "linear-gradient(150deg, #1c1c22 0%, #0b0b0f 100%)",
+                        background: "linear-gradient(150deg, #1d1d24 0%, #0a0a0e 100%)",
                         boxShadow:
-                          "inset 0 1px 0 rgba(255,255,255,0.14), inset 0 -3px 10px rgba(0,0,0,0.6), 0 12px 30px rgba(0,0,0,0.65)",
+                          "inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -3px 12px rgba(0,0,0,0.6), 0 16px 36px rgba(0,0,0,0.68)",
                       }}
                     >
                       {/* Nothing-style dot-matrix texture */}
@@ -319,14 +319,48 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                           backgroundSize: "9px 9px",
                         }}
                       />
-                      <span className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/20 transition-transform group-hover:scale-105">
-                        <AudioLines size={24} className="text-white" />
+                      {/* hover aurora glow */}
+                      <span
+                        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                        style={{ background: "radial-gradient(130% 130% at 50% 130%, rgba(155,93,229,0.4), rgba(0,212,255,0.12) 45%, transparent 65%)" }}
+                      />
+                      {/* live light sweep */}
+                      <motion.span
+                        className="pointer-events-none absolute inset-y-0 w-1/3 -skew-x-12"
+                        style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.09), transparent)" }}
+                        animate={{ x: ["-60%", "360%"] }}
+                        transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
+                      />
+                      {/* animated equalizer icon */}
+                      <span
+                        className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-white/25 transition-transform group-hover:scale-105"
+                        style={{ background: "linear-gradient(140deg, rgba(155,93,229,0.55), rgba(0,212,255,0.3))" }}
+                      >
+                        <span className="flex items-end gap-[3px]" aria-hidden>
+                          {[0, 1, 2, 3].map((i) => (
+                            <motion.span
+                              key={i}
+                              className="w-[3px] rounded-full bg-white"
+                              animate={{ height: [6, 17, 9, 19, 6] }}
+                              transition={{ duration: 0.95, repeat: Infinity, delay: i * 0.13, ease: "easeInOut" }}
+                            />
+                          ))}
+                        </span>
                       </span>
-                      <span className="relative text-xl font-black uppercase tracking-[0.22em] text-white">
-                        Visualise
+                      {/* label */}
+                      <span className="relative flex flex-col items-start leading-none">
+                        <span className="text-xl font-black uppercase tracking-[0.22em] text-white">Visualise</span>
+                        <span className="mt-1.5 text-[9px] font-bold uppercase tracking-[0.28em] text-white/40">
+                          Live audio-reactive
+                        </span>
                       </span>
-                      {/* Nothing signature red accent dot */}
-                      <span className="absolute right-5 h-2.5 w-2.5 rounded-full bg-[#ff2d20] shadow-[0_0_12px_#ff2d20]" />
+                      {/* Nothing signature red accent dot — pulsing */}
+                      <motion.span
+                        className="absolute right-5 h-2.5 w-2.5 rounded-full bg-[#ff2d20]"
+                        animate={{ opacity: [1, 0.45, 1], scale: [1, 0.85, 1] }}
+                        transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+                        style={{ boxShadow: "0 0 12px #ff2d20" }}
+                      />
                     </button>
                   ) : (
                     <>
