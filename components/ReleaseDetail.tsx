@@ -262,10 +262,10 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
                             return (
                               <div
                                 key={`${t.number}-${t.title}`}
-                                className={`group flex items-center gap-3 rounded-lg border px-2 py-1.5 backdrop-blur-sm transition-colors ${
+                                className={`group flex items-center gap-3 rounded-xl border px-2.5 py-1.5 backdrop-blur-md transition-colors ${
                                   isThis
-                                    ? "border-neon-blue/30 bg-neon-blue/[0.08]"
-                                    : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
+                                    ? "border-neon-blue/30 bg-neon-blue/[0.10]"
+                                    : "border-white/10 bg-white/[0.05] hover:bg-white/[0.09]"
                                 }`}
                               >
                                 <button

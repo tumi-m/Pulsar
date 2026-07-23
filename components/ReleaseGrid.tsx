@@ -1,7 +1,14 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import {
+  motion,
+  AnimatePresence,
+  useScroll,
+  useVelocity,
+  useSpring,
+  useTransform,
+} from "framer-motion";
 import type { Release } from "@/lib/types";
 import { ReleaseCard } from "./ReleaseCard";
 import { ReleaseDetail } from "./ReleaseDetail";
@@ -51,6 +58,13 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   // Search bar shrinks + centers when the user scrolls down (nav hides).
   const [searchCompact, setSearchCompact] = useState(false);
 
+  // macOS-style momentum: the grid subtly skews/settles with scroll velocity.
+  const { scrollY } = useScroll();
+  const scrollVelocity = useVelocity(scrollY);
+  const smoothVelocity = useSpring(scrollVelocity, { damping: 40, stiffness: 320 });
+  const gridSkew = useTransform(smoothVelocity, [-2400, 0, 2400], [1.6, 0, -1.6], { clamp: true });
+  const gridScale = useTransform(smoothVelocity, [-2400, 0, 2400], [0.985, 1, 0.985], { clamp: true });
+
   const detailOpen = Boolean(selectedRelease);
 
   // Tell the navbar when album mode is open so its header can go symmetrical.
@@ -90,6 +104,8 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       setVisible(PAGE);
       window.scrollTo({ top: 0, behavior: "smooth" });
     };
+    const onCloseDetail = () => setSelectedRelease(null);
+    window.addEventListener("pulsar-close-detail", onCloseDetail);
     window.addEventListener("pulsar-search", onSearch);
     window.addEventListener("pulsar-collection-change", onChange);
     window.addEventListener("pulsar-format-change", onFormat);
@@ -103,6 +119,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       window.removeEventListener("pulsar-retake-quiz", onRetake);
       window.removeEventListener("pulsar-nav-hidden", onNavHidden);
       window.removeEventListener("pulsar-search", onSearch);
+      window.removeEventListener("pulsar-close-detail", onCloseDetail);
     };
   }, []);
 
@@ -295,7 +312,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                   resetPage();
                 }}
                 placeholder="Search artists, albums, genres…"
-                className="w-full bg-transparent text-sm text-star-white placeholder:text-star-white/35 focus:outline-none"
+                className="w-full bg-transparent text-sm font-medium text-white placeholder:text-star-white/55 focus:outline-none"
               />
               {query && (
                 <button
@@ -476,7 +493,10 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
             <p className="font-mono text-sm tracking-widest text-star-white/30">NOTHING HERE YET</p>
           </div>
         ) : (
-          <div className={`grid grid-flow-dense gap-4 px-3 md:gap-5 md:px-5 ${gridCols}`}>
+          <motion.div
+            style={{ skewY: gridSkew, scale: gridScale, transformOrigin: "50% 0%" }}
+            className={`grid grid-flow-dense gap-4 px-3 md:gap-5 md:px-5 ${gridCols}`}
+          >
             {shown.map((release, i) => (
               <ReleaseCard
                 key={release.id}
@@ -489,7 +509,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 onVisualize={setVisualizing}
               />
             ))}
-          </div>
+          </motion.div>
         )}
 
         {/* infinite-scroll sentinel + subtle loader */}
