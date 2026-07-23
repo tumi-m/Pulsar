@@ -13,8 +13,10 @@ interface HeroSectionProps {
 export function HeroSection({ totalReleases, totalToday }: HeroSectionProps) {
   void totalReleases;
   void totalToday;
+  // Spacing follows the Fibonacci sequence (21 / 34 / 89 / 144 px) so the
+  // letterhead sits in golden proportion above the search bar.
   return (
-    <section className="px-5 pb-8 pt-24 text-center md:pt-32">
+    <section className="px-[21px] pb-[34px] pt-[89px] text-center md:pt-[144px]">
       <motion.h1
         initial={{ opacity: 0, y: 14, filter: "blur(6px)" }}
         animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
@@ -34,7 +36,7 @@ export function HeroSection({ totalReleases, totalToday }: HeroSectionProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.35, duration: 0.9 }}
-        className="mt-4 text-[11px] font-bold uppercase tracking-[0.4em] text-star-white/45"
+        className="mt-[13px] text-[11px] font-bold uppercase tracking-[0.4em] text-star-white/45"
       >
         Music discovery
       </motion.p>
