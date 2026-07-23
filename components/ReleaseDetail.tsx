@@ -159,7 +159,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
             onDragEnd={(_e, info) => {
               if (info.offset.y > 120 || info.velocity.y > 700) onClose();
             }}
-            className="fixed inset-x-0 bottom-0 z-40 flex h-[72vh] transform-gpu touch-pan-y flex-col rounded-t-2xl border border-b-0 border-white/15 bg-[#0a0a14]/70 backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-14 lg:bottom-0 lg:h-auto lg:w-1/2 lg:rounded-none lg:border-l lg:border-r-0 lg:border-t-0"
+            className="fixed inset-x-0 bottom-0 z-40 flex h-[72vh] transform-gpu touch-pan-y flex-col rounded-t-2xl border border-b-0 border-white/15 bg-[#0a0a14]/70 backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-16 lg:bottom-3 lg:h-auto lg:w-1/2 lg:rounded-l-2xl lg:border lg:border-r-0"
             style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35), 0 -20px 60px rgba(0,0,0,0.5)" }}
             role="dialog"
             aria-modal="false"
@@ -266,16 +266,30 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                         player.ensureGraph(); // desktop: build analyser in-gesture
                         setShowVisual(true);
                       }}
-                      className="group flex w-full items-center gap-3 rounded-full px-3 py-3 transition-colors hover:bg-neon-violet/10"
-                      style={{ background: "linear-gradient(100deg, rgba(155,93,229,0.14), rgba(0,212,255,0.06))" }}
+                      className="group relative flex w-full items-center gap-4 overflow-hidden rounded-2xl px-5 py-5 transition-transform hover:-translate-y-0.5 active:translate-y-0.5"
+                      style={{
+                        background: "linear-gradient(150deg, #1c1c22 0%, #0b0b0f 100%)",
+                        boxShadow:
+                          "inset 0 1px 0 rgba(255,255,255,0.14), inset 0 -3px 10px rgba(0,0,0,0.6), 0 12px 30px rgba(0,0,0,0.65)",
+                      }}
                     >
-                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-neon-violet/20 text-neon-violet">
-                        <AudioLines size={18} />
+                      {/* Nothing-style dot-matrix texture */}
+                      <span
+                        className="pointer-events-none absolute inset-0 opacity-[0.16]"
+                        style={{
+                          backgroundImage: "radial-gradient(rgba(255,255,255,0.7) 1px, transparent 1.4px)",
+                          backgroundSize: "9px 9px",
+                        }}
+                      />
+                      <span className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/20 transition-transform group-hover:scale-105">
+                        <AudioLines size={24} className="text-white" />
                       </span>
-                      <span className="flex-1 text-left text-sm font-bold uppercase tracking-wide text-star-white">
+                      <span className="relative flex-1 text-left text-xl font-black uppercase tracking-[0.22em] text-white">
                         Visualise
                       </span>
-                      <span className="text-star-white/30 transition-all group-hover:translate-x-0.5 group-hover:text-star-white/70">
+                      {/* Nothing signature red accent dot */}
+                      <span className="relative h-2.5 w-2.5 flex-shrink-0 rounded-full bg-[#ff2d20] shadow-[0_0_12px_#ff2d20]" />
+                      <span className="relative text-white/40 transition-all group-hover:translate-x-1 group-hover:text-white/80">
                         →
                       </span>
                     </button>

@@ -259,9 +259,10 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     return () => io.disconnect();
   }, [hasMore, filtered.length]);
 
-  // Grid columns reflow when the half-page detail is open.
+  // Grid columns reflow when the half-page detail is open — fewer columns so
+  // the tiles read ~15% larger in tracklist mode.
   const gridCols = detailOpen
-    ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3"
+    ? "grid-cols-2 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3"
     : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
 
   const refineActive =
