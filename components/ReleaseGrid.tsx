@@ -55,10 +55,14 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   // per-tile tap animation so tiles never flinch mid-scroll on mobile.
   const gridControls = useAnimationControls();
   const [scrolling, setScrolling] = useState(false);
+  // atTop: search bar rests below the letterhead; once scrolled it follows the
+  // user at the bottom (thumb reach). framer `layout` glides between the two.
+  const [atTop, setAtTop] = useState(true);
   useEffect(() => {
     let t: ReturnType<typeof setTimeout>;
     const onScroll = () => {
       setScrolling((s) => (s ? s : true));
+      setAtTop(window.scrollY < 80);
       clearTimeout(t);
       t = setTimeout(() => {
         setScrolling(false);
@@ -287,13 +291,22 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       <div
         className={`transition-[padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
           detailOpen ? "lg:pr-[50vw]" : ""
-        } ${player.current ? "pb-[89px]" : "pb-[34px]"}`}
+        } ${player.current ? "pb-[178px]" : "pb-[110px]"}`}
       >
-        {/* ── search block — sits at the TOP, right beneath the Pulsar
-            letterhead. Proportions follow the Fibonacci sequence / golden
-            ratio: 13px inner gap, 21px x-pad, 13px y-pad, 34px bottom margin,
-            and a search field at 61.8% (1/φ) width for symmetry. ── */}
-        <div className="mx-auto mb-[13px] flex flex-col items-center gap-[8px] px-[21px] py-[8px] md:px-10">
+        {/* ── search block — rests below the letterhead at the top, and
+            elegantly FOLLOWS the user to the bottom (above the player, no gap)
+            once they scroll. framer `layout` glides between the two. ── */}
+        <motion.div
+          layout
+          transition={{ type: "spring", stiffness: 260, damping: 30 }}
+          className={`fixed inset-x-0 z-40 flex flex-col-reverse items-center gap-[8px] border-white/10 bg-void/45 px-[21px] py-[10px] backdrop-blur-2xl md:px-10 ${
+            detailOpen ? "pointer-events-none opacity-0" : "opacity-100"
+          } ${
+            atTop
+              ? "top-[150px] border-b md:top-[248px]"
+              : `border-t ${player.current ? "bottom-[64px]" : "bottom-0"}`
+          }`}
+        >
           {/* search row — the menu (sidebar) button is pinned to the left edge
               while the search bar stays perfectly centered (symmetrical) */}
           <div className="relative flex w-full items-center justify-center">
@@ -509,7 +522,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+        </motion.div>
 
         {/* grid */}
         {shown.length === 0 ? (

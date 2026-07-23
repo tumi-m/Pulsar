@@ -209,7 +209,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                 </h2>
                 <button
                   onClick={openDiscography}
-                  className="mt-0.5 text-left text-sm text-neon-blue underline decoration-neon-blue/40 underline-offset-2 transition-colors hover:text-neon-blue/80"
+                  className="mt-0.5 text-left text-sm text-star-white/65 underline decoration-star-white/25 underline-offset-[3px] transition-colors hover:text-star-white hover:decoration-star-white/50"
                   title={`See ${release.artist}'s discography`}
                 >
                   {release.artist}
@@ -253,6 +253,97 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                 <p className="border-b border-star-white/5 px-5 py-4 text-sm italic leading-relaxed text-star-white/60">
                   {release.curator_note}
                 </p>
+              )}
+
+              {/* visualiser — sits ABOVE the tracklist (above the first track).
+                  OFF by default; only shown once the user taps Visualise. */}
+              {onVisualize && (
+                <div className="border-b border-star-white/5 p-3">
+                  {!showVisual ? (
+                    <button
+                      onClick={() => {
+                        player.play(release);
+                        player.ensureGraph(); // desktop: build analyser in-gesture
+                        setShowVisual(true);
+                      }}
+                      className="group flex w-full items-center gap-3 rounded-full px-3 py-3 transition-colors hover:bg-neon-violet/10"
+                      style={{ background: "linear-gradient(100deg, rgba(155,93,229,0.14), rgba(0,212,255,0.06))" }}
+                    >
+                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-neon-violet/20 text-neon-violet">
+                        <AudioLines size={18} />
+                      </span>
+                      <span className="flex-1 text-left text-sm font-bold uppercase tracking-wide text-star-white">
+                        Visualise
+                      </span>
+                      <span className="text-star-white/30 transition-all group-hover:translate-x-0.5 group-hover:text-star-white/70">
+                        →
+                      </span>
+                    </button>
+                  ) : (
+                    <>
+                      <div className="mb-2 flex items-center justify-between px-1">
+                        <span className="text-[10px] font-mono uppercase tracking-[0.22em] text-star-white/35">
+                          Visualise
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => {
+                              onVisualize(release);
+                              onClose(); // leave tracklist → full-screen visual
+                            }}
+                            aria-label="Expand visualiser"
+                            title="Expand"
+                            className="flex h-6 w-6 items-center justify-center rounded-full border border-white/20 text-star-white/70 transition-colors hover:border-white/50 hover:text-star-white"
+                          >
+                            <Maximize2 size={12} strokeWidth={2.5} />
+                          </button>
+                          <button
+                            onClick={() => setShowVisual(false)}
+                            aria-label="Hide visualiser"
+                            title="Hide"
+                            className="flex h-6 w-6 items-center justify-center rounded-full border border-white/20 text-star-white/70 transition-colors hover:border-white/50 hover:text-star-white"
+                          >
+                            <X size={12} strokeWidth={2.5} />
+                          </button>
+                        </div>
+                      </div>
+                      <div
+                        className="relative aspect-video w-full overflow-hidden rounded-xl border border-white/12"
+                        style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), 0 10px 30px rgba(0,0,0,0.5)" }}
+                      >
+                        <VisualCanvas release={release} mode={visualMode} className="absolute inset-0 h-full w-full" />
+                        <div className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-center gap-1 p-2">
+                          <div
+                            className="flex items-center gap-1 rounded-full border border-white/15 p-1"
+                            style={{
+                              background: "rgba(255,255,255,0.1)",
+                              backdropFilter: "blur(12px) saturate(150%)",
+                              WebkitBackdropFilter: "blur(12px) saturate(150%)",
+                            }}
+                          >
+                            <button
+                              onClick={() => cycleVisual(-1)}
+                              aria-label="Previous visualisation"
+                              className="flex h-6 w-6 items-center justify-center rounded-full text-star-white/70 hover:bg-white/10 hover:text-star-white"
+                            >
+                              <ChevronLeft size={15} />
+                            </button>
+                            <span className="min-w-[64px] text-center text-[10px] font-bold uppercase tracking-[0.14em] text-star-white">
+                              {VISUAL_MODES.find((m) => m.id === visualMode)?.label}
+                            </span>
+                            <button
+                              onClick={() => cycleVisual(1)}
+                              aria-label="Next visualisation"
+                              className="flex h-6 w-6 items-center justify-center rounded-full text-star-white/70 hover:bg-white/10 hover:text-star-white"
+                            >
+                              <ChevronRight size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
 
               {/* whole-album tracklist (albums / EPs) — collapsible */}
@@ -342,97 +433,6 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                       </motion.div>
                     )}
                   </AnimatePresence>
-                </div>
-              )}
-
-              {/* visualiser — OFF by default; only shown once the user taps
-                  the Visualise button. Never comes up on its own. */}
-              {onVisualize && (
-                <div className="border-b border-star-white/5 p-3">
-                  {!showVisual ? (
-                    <button
-                      onClick={() => {
-                        player.play(release);
-                        player.ensureGraph(); // desktop: build analyser in-gesture
-                        setShowVisual(true);
-                      }}
-                      className="group flex w-full items-center gap-3 rounded-full px-3 py-3 transition-colors hover:bg-neon-violet/10"
-                      style={{ background: "linear-gradient(100deg, rgba(155,93,229,0.14), rgba(0,212,255,0.06))" }}
-                    >
-                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-neon-violet/20 text-neon-violet">
-                        <AudioLines size={18} />
-                      </span>
-                      <span className="flex-1 text-left text-sm font-bold uppercase tracking-wide text-star-white">
-                        Visualise
-                      </span>
-                      <span className="text-star-white/30 transition-all group-hover:translate-x-0.5 group-hover:text-star-white/70">
-                        →
-                      </span>
-                    </button>
-                  ) : (
-                    <>
-                      <div className="mb-2 flex items-center justify-between px-1">
-                        <span className="text-[10px] font-mono uppercase tracking-[0.22em] text-star-white/35">
-                          Visualise
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => {
-                              onVisualize(release);
-                              onClose(); // leave tracklist → full-screen visual
-                            }}
-                            aria-label="Expand visualiser"
-                            title="Expand"
-                            className="flex h-6 w-6 items-center justify-center rounded-full border border-white/20 text-star-white/70 transition-colors hover:border-white/50 hover:text-star-white"
-                          >
-                            <Maximize2 size={12} strokeWidth={2.5} />
-                          </button>
-                          <button
-                            onClick={() => setShowVisual(false)}
-                            aria-label="Hide visualiser"
-                            title="Hide"
-                            className="flex h-6 w-6 items-center justify-center rounded-full border border-white/20 text-star-white/70 transition-colors hover:border-white/50 hover:text-star-white"
-                          >
-                            <X size={12} strokeWidth={2.5} />
-                          </button>
-                        </div>
-                      </div>
-                      <div
-                        className="relative aspect-video w-full overflow-hidden rounded-xl border border-white/12"
-                        style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), 0 10px 30px rgba(0,0,0,0.5)" }}
-                      >
-                        <VisualCanvas release={release} mode={visualMode} className="absolute inset-0 h-full w-full" />
-                        <div className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-center gap-1 p-2">
-                          <div
-                            className="flex items-center gap-1 rounded-full border border-white/15 p-1"
-                            style={{
-                              background: "rgba(255,255,255,0.1)",
-                              backdropFilter: "blur(12px) saturate(150%)",
-                              WebkitBackdropFilter: "blur(12px) saturate(150%)",
-                            }}
-                          >
-                            <button
-                              onClick={() => cycleVisual(-1)}
-                              aria-label="Previous visualisation"
-                              className="flex h-6 w-6 items-center justify-center rounded-full text-star-white/70 hover:bg-white/10 hover:text-star-white"
-                            >
-                              <ChevronLeft size={15} />
-                            </button>
-                            <span className="min-w-[64px] text-center text-[10px] font-bold uppercase tracking-[0.14em] text-star-white">
-                              {VISUAL_MODES.find((m) => m.id === visualMode)?.label}
-                            </span>
-                            <button
-                              onClick={() => cycleVisual(1)}
-                              aria-label="Next visualisation"
-                              className="flex h-6 w-6 items-center justify-center rounded-full text-star-white/70 hover:bg-white/10 hover:text-star-white"
-                            >
-                              <ChevronRight size={15} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  )}
                 </div>
               )}
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Heart, Plus, Play, Pause, Share2 } from "lucide-react";
+import { Heart, Play, Pause, Share2 } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";
 import { isToday, isYesterday } from "@/lib/utils";
@@ -247,11 +247,7 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
           aria-label="Add to a crate"
           className={`flex flex-1 items-center justify-center transition-colors hover:bg-white/10 ${big ? "h-12" : "h-10"}`}
         >
-          {inList ? (
-            <CrateIcon size={big ? 22 : 19} filled className="text-[#c08a4e] drop-shadow" />
-          ) : (
-            <Plus size={big ? 22 : 19} className="text-white drop-shadow" />
-          )}
+          <CrateIcon size={big ? 22 : 19} filled={inList} className="text-[#c08a4e] drop-shadow" />
         </button>
       </div>
 
