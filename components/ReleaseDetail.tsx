@@ -20,6 +20,7 @@ interface Track {
 interface ReleaseDetailProps {
   release: Release | null;
   onClose: () => void;
+  onOpen?: (release: Release) => void;
   onVisualize?: (release: Release) => void;
 }
 
@@ -33,7 +34,7 @@ const fmtDur = (ms: number) => {
  * Half-page detail — a right-side sheet. For an album (or EP) it fetches
  * and shows the whole tracklist; each track plays its own 30s preview.
  */
-export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailProps) {
+export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: ReleaseDetailProps) {
   const player = usePlayer();
   const [copied, setCopied] = useState<string | null>(null);
   const [tracks, setTracks] = useState<Track[] | null>(null);
@@ -44,6 +45,25 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
   // The visualiser stays OFF until the user taps the Visualise button.
   const [showVisual, setShowVisual] = useState(false);
   useEffect(() => setShowVisual(false), [release]);
+  // Artist discography (crate-style grid), fetched on demand.
+  const [discog, setDiscog] = useState<Release[] | null>(null);
+  const [discogLoading, setDiscogLoading] = useState(false);
+  useEffect(() => setDiscog(null), [release]);
+
+  async function openDiscography() {
+    if (!release) return;
+    setDiscogLoading(true);
+    setDiscog([]);
+    try {
+      const res = await fetch(`/api/artist?name=${encodeURIComponent(release.artist)}`);
+      const data = await res.json();
+      setDiscog(Array.isArray(data.releases) ? data.releases : []);
+    } catch {
+      setDiscog([]);
+    } finally {
+      setDiscogLoading(false);
+    }
+  }
 
   const cycleVisual = (dir: 1 | -1) =>
     setVisualMode((m) => {
@@ -177,6 +197,61 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
                 <X size={13} strokeWidth={2.5} />
               </button>
             </div>
+
+            {/* discography overlay — crate-style grid of the artist's projects */}
+            <AnimatePresence>
+              {discog !== null && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-x-0 bottom-0 top-[42px] z-30 flex flex-col bg-[#0a0a14]/97 backdrop-blur-2xl"
+                >
+                  <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
+                    <button
+                      onClick={() => setDiscog(null)}
+                      aria-label="Back"
+                      className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 text-star-white/75 hover:border-white/50 hover:text-star-white"
+                    >
+                      <span className="text-base leading-none">‹</span>
+                    </button>
+                    <div className="min-w-0">
+                      <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-star-white/40">Discography</p>
+                      <h3 className="truncate text-base font-bold uppercase tracking-tight text-star-white">
+                        {release.artist}
+                      </h3>
+                    </div>
+                  </div>
+                  {discogLoading ? (
+                    <p className="flex flex-1 items-center justify-center text-[11px] uppercase tracking-widest text-star-white/40">
+                      Loading discography…
+                    </p>
+                  ) : discog.length === 0 ? (
+                    <p className="flex flex-1 items-center justify-center px-6 text-center text-[11px] uppercase tracking-widest text-star-white/40">
+                      No discography found
+                    </p>
+                  ) : (
+                    <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto p-4 sm:grid-cols-3">
+                      {discog.map((r) => (
+                        <button key={r.id} onClick={() => onOpen?.(r)} className="group block text-left">
+                          <div className="relative aspect-square w-full overflow-hidden rounded-lg ring-1 ring-white/10 transition-transform group-hover:scale-[1.03]">
+                            <Artwork src={r.artwork_url} artist={r.artist} title={r.title} sizes="160px" />
+                          </div>
+                          <p className="mt-1 truncate text-[11px] font-bold uppercase text-star-white">{r.title}</p>
+                          <p className="truncate text-[9px] uppercase tracking-wide text-star-white/45">
+                            {r.type}
+                            {r.release_date && r.release_date !== "1900-01-01"
+                              ? ` · ${r.release_date.slice(0, 4)}`
+                              : ""}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* header row — artwork, meta */}
             <div className="flex items-start gap-4 border-b border-star-white/5 p-5">
               <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg">
@@ -186,7 +261,13 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
                 <h2 className="text-lg font-bold uppercase leading-tight tracking-tight text-star-white">
                   {release.title}
                 </h2>
-                <p className="mt-0.5 text-sm text-star-white/55">{release.artist}</p>
+                <button
+                  onClick={openDiscography}
+                  className="mt-0.5 text-left text-sm text-neon-blue underline decoration-neon-blue/40 underline-offset-2 transition-colors hover:text-neon-blue/80"
+                  title={`See ${release.artist}'s discography`}
+                >
+                  {release.artist}
+                </button>
                 <p className="mt-2 text-[10px] font-mono uppercase tracking-[0.18em] text-star-white/35">
                   {release.type} · {formatDate(origDate ?? release.release_date)}
                   {release.genre ? ` · ${release.genre}` : ""}
