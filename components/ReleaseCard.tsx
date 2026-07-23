@@ -21,10 +21,9 @@ interface ReleaseCardProps {
   format: MediaFormat;
   scrolling?: boolean;
   onOpen: (release: Release) => void;
-  onVisualize?: (release: Release) => void;
 }
 
-export function ReleaseCard({ release, index, size = 0, forYou = false, format, scrolling = false, onOpen, onVisualize }: ReleaseCardProps) {
+export function ReleaseCard({ release, index, size = 0, forYou = false, format, scrolling = false, onOpen }: ReleaseCardProps) {
   const player = usePlayer();
   const isCurrent = player.current?.id === release.id;
   const isPlayingThis = isCurrent && player.playing;
@@ -90,14 +89,14 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
       <button
         type="button"
         onClick={() => {
-          // Tapping anywhere OUTSIDE the play triangle enters album + visualiser.
+          // Tapping anywhere OUTSIDE the play triangle opens album mode and
+          // plays — the visualiser only comes up via its own Visualise button.
           player.play(release);
           onOpen(release);
-          onVisualize?.(release);
         }}
         onFocus={enter}
         onBlur={leave}
-        aria-label={`${release.artist} — ${release.title}. Open album & visualizer`}
+        aria-label={`${release.artist} — ${release.title}. Open album`}
         className="block w-full outline-none focus-visible:ring-2 focus-visible:ring-star-white/40"
       >
         <div

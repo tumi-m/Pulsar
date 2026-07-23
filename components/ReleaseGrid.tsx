@@ -550,7 +550,6 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 format={format}
                 scrolling={scrolling}
                 onOpen={setSelectedRelease}
-                onVisualize={setVisualizing}
               />
             ))}
           </motion.div>
