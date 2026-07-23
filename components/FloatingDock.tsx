@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, ListMusic, X, Trash2, Sparkles, Shuffle, Play, Share2, Upload } from "lucide-react";
+import { Heart, X, Trash2, Sparkles, Shuffle, Play, Share2, Upload } from "lucide-react";
+import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";
 import type { MediaFormat } from "@/lib/format";
 import { getFavorites, getPlaylist, toggleFavorite, removeFromPlaylist } from "@/lib/collection";
@@ -139,7 +140,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
 
   const dockBtn = (
     key: string,
-    Icon: typeof Heart,
+    renderIcon: (active: boolean) => React.ReactNode,
     label: string,
     count: number | null,
     onClick: () => void,
@@ -149,16 +150,16 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       key={key}
       onClick={onClick}
       aria-label={label}
-      className="group relative flex h-14 w-14 items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95"
+      className="group relative flex h-14 w-14 items-center justify-center rounded-full ring-1 ring-white/30 transition-transform hover:scale-110 active:scale-95"
       style={{
-        background: active
-          ? "linear-gradient(160deg, #f0f0f4, #c8c8d0)"
-          : "linear-gradient(160deg, #2a2a32, #16161c)",
+        background: active ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.12)",
+        backdropFilter: "blur(12px) saturate(150%)",
+        WebkitBackdropFilter: "blur(12px) saturate(150%)",
         boxShadow:
-          "0 6px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -2px 4px rgba(0,0,0,0.4)",
+          "0 8px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -2px 6px rgba(0,0,0,0.25)",
       }}
     >
-      <Icon size={22} className={active ? "text-void" : "text-star-white/85"} />
+      {renderIcon(active)}
       {count != null && count > 0 && (
         <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon-pink px-1 text-[9px] font-bold text-void">
           {count}
@@ -256,7 +257,9 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
 
         {dockBtn(
           "playlist",
-          ListMusic,
+          (active) => (
+            <CrateIcon size={22} filled className={active ? "text-[#7a4a1f]" : "text-[#c08a4e]"} />
+          ),
           "Your crate",
           list.length,
           () => setPanel(panel === "playlist" ? null : "playlist"),
@@ -264,7 +267,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
         )}
         {dockBtn(
           "fav",
-          Heart,
+          (active) => <Heart size={22} className={active ? "text-void" : "text-star-white/85"} />,
           "Your favorites",
           favs.length,
           () => setPanel(panel === "favorites" ? null : "favorites"),

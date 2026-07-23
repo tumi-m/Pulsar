@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Heart, Plus, Check, Play, Pause, Share2 } from "lucide-react";
+import { Heart, Plus, Play, Pause, Share2 } from "lucide-react";
+import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";
 import { isToday, isYesterday } from "@/lib/utils";
 import type { MediaFormat } from "@/lib/format";
@@ -241,7 +242,7 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
           className={`flex flex-1 items-center justify-center transition-colors hover:bg-white/10 ${big ? "h-12" : "h-10"}`}
         >
           {inList ? (
-            <Check size={big ? 22 : 19} className="text-neon-green drop-shadow" />
+            <CrateIcon size={big ? 22 : 19} filled className="text-[#c08a4e] drop-shadow" />
           ) : (
             <Plus size={big ? 22 : 19} className="text-white drop-shadow" />
           )}

@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Heart, ListMusic, Sparkles } from "lucide-react";
+import { X, Heart, Sparkles } from "lucide-react";
 import { CalabiYau } from "./CalabiYau";
+import { CrateIcon } from "./CrateIcon";
 import { FORMATS, loadFormat, saveFormat, type MediaFormat } from "@/lib/format";
 import { THEMES, loadTheme, saveTheme } from "@/lib/theme";
 import { getFavorites, getPlaylist } from "@/lib/collection";
@@ -117,7 +118,7 @@ export function Sidebar() {
                   onClick={() => openCrate("playlist")}
                   className="flex flex-col items-start gap-2 rounded-xl border border-star-white/10 bg-star-white/[0.03] p-3 transition-colors hover:border-star-white/30"
                 >
-                  <ListMusic size={18} className="text-neon-blue" />
+                  <CrateIcon size={18} filled className="text-[#c08a4e]" />
                   <span className="text-[11px] font-bold uppercase tracking-wide text-star-white">
                     Crate
                   </span>
