@@ -10,7 +10,6 @@ export const VISUAL_MODES: { id: VisualMode; label: string }[] = [
   { id: "nebula", label: "Nebula" },
   { id: "silhouette", label: "Silhouette" },
   { id: "aurora", label: "Aurora" },
-  { id: "crowd", label: "Crowd" },
   { id: "art", label: "Cover" },
   { id: "video", label: "Video" },
 ];
