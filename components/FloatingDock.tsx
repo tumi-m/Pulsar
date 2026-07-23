@@ -186,10 +186,17 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
 
   return (
     <>
-      {/* the dock */}
+      {/* the dock — rides higher when the bottom search bar is showing
+          (navbar hidden) so the search bar isn't in the way */}
       <div
-        className={`fixed right-5 z-40 flex flex-col gap-2.5 transition-[bottom] duration-300 ${
-          current ? "bottom-24" : "bottom-5"
+        className={`fixed right-4 z-40 flex flex-col items-end gap-2 transition-[bottom] duration-300 ${
+          navHidden
+            ? current
+              ? "bottom-[200px]"
+              : "bottom-[128px]"
+            : current
+              ? "bottom-24"
+              : "bottom-5"
         }`}
       >
         {/* Curator + Shuffle fly in above the three when the navbar hides */}

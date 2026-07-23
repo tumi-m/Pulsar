@@ -198,60 +198,6 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
               </button>
             </div>
 
-            {/* discography overlay — crate-style grid of the artist's projects */}
-            <AnimatePresence>
-              {discog !== null && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-x-0 bottom-0 top-[42px] z-30 flex flex-col bg-[#0a0a14]/97 backdrop-blur-2xl"
-                >
-                  <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
-                    <button
-                      onClick={() => setDiscog(null)}
-                      aria-label="Back"
-                      className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 text-star-white/75 hover:border-white/50 hover:text-star-white"
-                    >
-                      <span className="text-base leading-none">‹</span>
-                    </button>
-                    <div className="min-w-0">
-                      <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-star-white/40">Discography</p>
-                      <h3 className="truncate text-base font-bold uppercase tracking-tight text-star-white">
-                        {release.artist}
-                      </h3>
-                    </div>
-                  </div>
-                  {discogLoading ? (
-                    <p className="flex flex-1 items-center justify-center text-[11px] uppercase tracking-widest text-star-white/40">
-                      Loading discography…
-                    </p>
-                  ) : discog.length === 0 ? (
-                    <p className="flex flex-1 items-center justify-center px-6 text-center text-[11px] uppercase tracking-widest text-star-white/40">
-                      No discography found
-                    </p>
-                  ) : (
-                    <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto p-4 sm:grid-cols-3">
-                      {discog.map((r) => (
-                        <button key={r.id} onClick={() => onOpen?.(r)} className="group block text-left">
-                          <div className="relative aspect-square w-full overflow-hidden rounded-lg ring-1 ring-white/10 transition-transform group-hover:scale-[1.03]">
-                            <Artwork src={r.artwork_url} artist={r.artist} title={r.title} sizes="160px" />
-                          </div>
-                          <p className="mt-1 truncate text-[11px] font-bold uppercase text-star-white">{r.title}</p>
-                          <p className="truncate text-[9px] uppercase tracking-wide text-star-white/45">
-                            {r.type}
-                            {r.release_date && r.release_date !== "1900-01-01"
-                              ? ` · ${r.release_date.slice(0, 4)}`
-                              : ""}
-                          </p>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-
             {/* header row — artwork, meta */}
             <div className="flex items-start gap-4 border-b border-star-white/5 p-5">
               <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg">
@@ -556,6 +502,70 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
               </div>
             </div>
           </motion.aside>
+
+          {/* discography — its own fixed overlay (NOT inside the draggable
+              sheet, so it scrolls/taps reliably) */}
+          <AnimatePresence>
+            {discog !== null && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                transition={{ type: "spring", stiffness: 480, damping: 40 }}
+                className="fixed inset-x-0 bottom-0 top-0 z-[45] flex flex-col bg-[#0a0a14]/97 backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-14 lg:w-1/2"
+              >
+                <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
+                  <button
+                    onClick={() => setDiscog(null)}
+                    aria-label="Back"
+                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-white/20 text-star-white/75 hover:border-white/50 hover:text-star-white"
+                  >
+                    <span className="text-lg leading-none">‹</span>
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-star-white/40">Discography</p>
+                    <h3 className="truncate text-base font-bold uppercase tracking-tight text-star-white">
+                      {release.artist}
+                    </h3>
+                  </div>
+                  <button
+                    onClick={onClose}
+                    aria-label="Close"
+                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-star-white/50 hover:bg-white/10 hover:text-star-white"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                {discogLoading ? (
+                  <div className="flex flex-1 flex-col items-center justify-center gap-2">
+                    <span className="h-1.5 w-1.5 animate-ping rounded-full bg-neon-violet" />
+                    <p className="text-[11px] uppercase tracking-widest text-star-white/40">Loading discography…</p>
+                  </div>
+                ) : discog.length === 0 ? (
+                  <p className="flex flex-1 items-center justify-center px-6 text-center text-[11px] uppercase tracking-widest text-star-white/40">
+                    No discography found
+                  </p>
+                ) : (
+                  <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto overscroll-contain p-4 sm:grid-cols-3">
+                    {discog.map((r) => (
+                      <button key={r.id} onClick={() => onOpen?.(r)} className="group block text-left">
+                        <div className="relative aspect-square w-full overflow-hidden rounded-lg ring-1 ring-white/10 transition-transform active:scale-95 group-hover:scale-[1.03]">
+                          <Artwork src={r.artwork_url} artist={r.artist} title={r.title} sizes="160px" />
+                        </div>
+                        <p className="mt-1 truncate text-[11px] font-bold uppercase text-star-white">{r.title}</p>
+                        <p className="truncate text-[9px] uppercase tracking-wide text-star-white/45">
+                          {r.type}
+                          {r.release_date && r.release_date !== "1900-01-01"
+                            ? ` · ${r.release_date.slice(0, 4)}`
+                            : ""}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </>
       )}
     </AnimatePresence>

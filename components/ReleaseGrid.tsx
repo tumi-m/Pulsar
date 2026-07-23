@@ -62,6 +62,9 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     let t: ReturnType<typeof setTimeout>;
     const onScroll = () => {
       setScrolling((s) => (s ? s : true));
+      // Search bar sits at the top only while near the very top of the page;
+      // once scrolled down it moves to the bottom (thumb reach).
+      setBarHidden(window.scrollY > 120);
       clearTimeout(t);
       t = setTimeout(() => {
         setScrolling(false);
@@ -116,11 +119,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       setVisible(PAGE);
       window.scrollTo({ top: 0, behavior: "smooth" });
     };
-    // Reuse the navbar's scroll-direction signal: hidden===true means the user
-    // scrolled down → drop the bottom search bar out of view.
-    const onNavHidden = (e: Event) => setBarHidden((e as CustomEvent<boolean>).detail);
     const onCloseDetail = () => setSelectedRelease(null);
-    window.addEventListener("pulsar-nav-hidden", onNavHidden);
     window.addEventListener("pulsar-close-detail", onCloseDetail);
     window.addEventListener("pulsar-search", onSearch);
     window.addEventListener("pulsar-collection-change", onChange);
@@ -133,7 +132,6 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       window.removeEventListener("pulsar-type-change", onType);
       window.removeEventListener("pulsar-retake-quiz", onRetake);
       window.removeEventListener("pulsar-search", onSearch);
-      window.removeEventListener("pulsar-nav-hidden", onNavHidden);
       window.removeEventListener("pulsar-close-detail", onCloseDetail);
     };
   }, []);
@@ -302,9 +300,13 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
             filters stack above it; lifts above the now-playing bar when music
             is playing, and hides while an album panel is open. ── */}
         <div
-          className={`fixed inset-x-0 z-40 flex flex-col-reverse gap-2 border-t border-white/10 bg-void/40 px-6 py-3 backdrop-blur-2xl transition-all duration-300 md:px-10 ${
-            detailOpen || barHidden ? "pointer-events-none translate-y-[130%] opacity-0" : "opacity-100"
-          } ${player.current ? "bottom-[72px]" : "bottom-0"}`}
+          className={`fixed inset-x-0 z-40 flex gap-2 border-white/10 bg-void/40 px-6 py-3 backdrop-blur-2xl transition-opacity duration-300 md:px-10 ${
+            detailOpen ? "pointer-events-none opacity-0" : "opacity-100"
+          } ${
+            barHidden
+              ? `flex-col-reverse border-t ${player.current ? "bottom-[72px]" : "bottom-0"}`
+              : "flex-col border-b top-16"
+          }`}
         >
           {/* search row — the menu (sidebar) button is pinned to the left edge
               while the search bar stays perfectly centered (symmetrical) */}
