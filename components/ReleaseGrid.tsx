@@ -294,7 +294,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
         <div
           className={`sticky z-40 mb-6 transition-all duration-300 md:px-10 ${
             searchCompact
-              ? "top-0 border-b border-white/10 bg-void/35 px-6 py-2 backdrop-blur-2xl"
+              ? "-top-1 border-b border-white/10 bg-void/35 px-6 py-1 backdrop-blur-2xl"
               : "top-14 bg-void/20 px-6 py-3 backdrop-blur-xl"
           }`}
         >
