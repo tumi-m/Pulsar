@@ -49,9 +49,6 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   const [showRefine, setShowRefine] = useState(false);
   const [showGenres, setShowGenres] = useState(false);
   const [query, setQuery] = useState("");
-  // The bottom search bar slides down out of view while scrolling down,
-  // and slides back up when scrolling up (or at the top).
-  const [barHidden, setBarHidden] = useState(false);
 
   // Tiles hold perfectly still while scrolling, then settle together with one
   // gentle nudge the moment scrolling stops. `scrolling` also disables the
@@ -62,9 +59,6 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     let t: ReturnType<typeof setTimeout>;
     const onScroll = () => {
       setScrolling((s) => (s ? s : true));
-      // Search bar sits at the top only while near the very top of the page;
-      // once scrolled down it moves to the bottom (thumb reach).
-      setBarHidden(window.scrollY > 120);
       clearTimeout(t);
       t = setTimeout(() => {
         setScrolling(false);
@@ -289,28 +283,20 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       </AnimatePresence>
 
       {/* everything that reflows when the detail sheet opens. Bottom padding
-          clears the fixed bottom search bar (more when the player is up). */}
+          (Fibonacci: 34 / 89px) keeps the last row clear of the player bar. */}
       <div
         className={`transition-[padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
           detailOpen ? "lg:pr-[50vw]" : ""
-        } ${player.current ? "pb-64" : "pb-44"}`}
+        } ${player.current ? "pb-[89px]" : "pb-[34px]"}`}
       >
-        {/* ── search block, docked at the BOTTOM (thumb reach). Uses
-            flex-col-reverse so the search bar is lowest and the genre/refine
-            filters stack above it; lifts above the now-playing bar when music
-            is playing, and hides while an album panel is open. ── */}
-        <div
-          className={`fixed inset-x-0 z-40 flex gap-2 border-white/10 bg-void/40 px-6 py-3 backdrop-blur-2xl transition-opacity duration-300 md:px-10 ${
-            detailOpen ? "pointer-events-none opacity-0" : "opacity-100"
-          } ${
-            barHidden
-              ? `flex-col-reverse border-t ${player.current ? "bottom-[72px]" : "bottom-0"}`
-              : "flex-col border-b top-16"
-          }`}
-        >
+        {/* ── search block — sits at the TOP, right beneath the Pulsar
+            letterhead. Proportions follow the Fibonacci sequence / golden
+            ratio: 13px inner gap, 21px x-pad, 13px y-pad, 34px bottom margin,
+            and a search field at 61.8% (1/φ) width for symmetry. ── */}
+        <div className="mx-auto mb-[34px] flex flex-col items-center gap-[13px] px-[21px] py-[13px] md:px-10">
           {/* search row — the menu (sidebar) button is pinned to the left edge
               while the search bar stays perfectly centered (symmetrical) */}
-          <div className="relative flex items-center justify-center">
+          <div className="relative flex w-full items-center justify-center">
             <button
               onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
               aria-label="Open menu"
@@ -328,8 +314,8 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 <span className="h-[2px] w-4 rounded-full bg-current" />
               </span>
             </button>
-          {/* search — rounded liquid glass with a rainbow outer line */}
-          <div className="search-rainbow w-[74%] rounded-full p-[1.5px] md:w-[46%]">
+          {/* search — golden-ratio width (61.8% ≈ 1/φ) for symmetry */}
+          <div className="search-rainbow w-[86%] rounded-full p-[1.5px] md:w-[61.8%]">
             <div className="flex items-center gap-2 rounded-full px-4 py-2"
               style={{
                 background: "rgba(255,255,255,0.1)",
@@ -533,7 +519,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
         ) : (
           <motion.div
             animate={gridControls}
-            className={`grid grid-flow-dense gap-4 px-3 md:gap-5 md:px-5 ${gridCols}`}
+            className={`grid grid-flow-dense gap-[13px] px-[13px] md:gap-[21px] md:px-[21px] ${gridCols}`}
           >
             {shown.map((release, i) => (
               <ReleaseCard
