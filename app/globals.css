@@ -119,3 +119,18 @@ body {
   animation: tileFloat 7s ease-in-out infinite;
   will-change: transform;
 }
+
+/* ─── Rainbow search outline (animated) ─────── */
+@keyframes rainbowPan {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
+}
+.search-rainbow {
+  background-image: linear-gradient(
+    90deg,
+    #ff5fa2, #ffb347, #9b5de5, #00d4ff, #45f0a0, #ff5fa2
+  );
+  background-size: 300% 100%;
+  animation: rainbowPan 8s linear infinite;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.4);
+}

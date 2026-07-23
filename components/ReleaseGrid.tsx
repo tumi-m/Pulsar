@@ -80,6 +80,12 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       setShowQuiz(true);
     };
     const onNavHidden = (e: Event) => setSearchCompact((e as CustomEvent<boolean>).detail);
+    const onSearch = (e: Event) => {
+      setQuery((e as CustomEvent<string>).detail);
+      setVisible(PAGE);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    window.addEventListener("pulsar-search", onSearch);
     window.addEventListener("pulsar-collection-change", onChange);
     window.addEventListener("pulsar-format-change", onFormat);
     window.addEventListener("pulsar-type-change", onType);
@@ -91,6 +97,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       window.removeEventListener("pulsar-type-change", onType);
       window.removeEventListener("pulsar-retake-quiz", onRetake);
       window.removeEventListener("pulsar-nav-hidden", onNavHidden);
+      window.removeEventListener("pulsar-search", onSearch);
     };
   }, []);
 
@@ -237,41 +244,47 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       >
         {/* ── the menu: search + genre by default, one quiet "Refine" ── */}
         <div className="sticky top-14 z-30 mb-6 bg-void/85 px-6 py-3 backdrop-blur-xl md:px-10">
-          {/* search — centered translucent liquid glass; shrinks on scroll-down */}
+          {/* search — small, centered, rounded liquid glass with a rainbow
+              outer line; shrinks further on scroll-down */}
           <div
-            className={`mx-auto mb-3 flex items-center gap-2 rounded-full border border-white/15 focus-within:border-white/40 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-              searchCompact ? "w-[46%] px-3 py-1.5" : "w-[70%] px-4 py-2"
+            className={`search-rainbow mx-auto mb-3 rounded-full p-[1.5px] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              searchCompact ? "w-[34%]" : "w-[48%]"
             }`}
-            style={{
-              background: "rgba(255,255,255,0.07)",
-              backdropFilter: "blur(14px) saturate(150%)",
-              WebkitBackdropFilter: "blur(14px) saturate(150%)",
-              boxShadow:
-                "inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -2px 6px rgba(0,0,0,0.25), 0 8px 24px rgba(0,0,0,0.35)",
-            }}
           >
-            <svg viewBox="0 0 20 20" className="h-4 w-4 flex-shrink-0 text-star-white/40" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="9" cy="9" r="6" />
-              <path d="M14 14l4 4" strokeLinecap="round" />
-            </svg>
-            <input
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                resetPage();
+            <div
+              className={`flex items-center gap-2 rounded-full transition-all duration-300 ${
+                searchCompact ? "px-3 py-1.5" : "px-4 py-2"
+              }`}
+              style={{
+                background: "rgba(10,10,20,0.55)",
+                backdropFilter: "blur(16px) saturate(160%)",
+                WebkitBackdropFilter: "blur(16px) saturate(160%)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.28)",
               }}
-              placeholder="Search artists, albums, genres…"
-              className="w-full bg-transparent text-sm text-star-white placeholder:text-star-white/35 focus:outline-none"
-            />
-            {query && (
-              <button
-                onClick={() => setQuery("")}
-                aria-label="Clear search"
-                className="flex-shrink-0 text-star-white/40 hover:text-star-white"
-              >
-                ✕
-              </button>
-            )}
+            >
+              <svg viewBox="0 0 20 20" className="h-4 w-4 flex-shrink-0 text-star-white/40" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="9" cy="9" r="6" />
+                <path d="M14 14l4 4" strokeLinecap="round" />
+              </svg>
+              <input
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  resetPage();
+                }}
+                placeholder="Search artists, albums, genres…"
+                className="w-full bg-transparent text-sm text-star-white placeholder:text-star-white/35 focus:outline-none"
+              />
+              {query && (
+                <button
+                  onClick={() => setQuery("")}
+                  aria-label="Clear search"
+                  className="flex-shrink-0 text-star-white/40 hover:text-star-white"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
 
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Heart, Plus, Check, Play, Pause, Share2 } from "lucide-react";
+import { Heart, Plus, Check, Play, Pause, Disc3 } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { isToday, isYesterday } from "@/lib/utils";
 import type { MediaFormat } from "@/lib/format";
@@ -219,25 +219,15 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
         </button>
         <span className="my-2 w-px bg-white/25" />
         <button
-          onClick={async (e) => {
+          onClick={(e) => {
             e.stopPropagation();
-            const url = typeof window !== "undefined" ? window.location.href : "";
-            const data = {
-              title: `${release.title} — ${release.artist}`,
-              text: "Found on PULSAR",
-              url,
-            };
-            try {
-              if (navigator.share) await navigator.share(data);
-              else await navigator.clipboard.writeText(url);
-            } catch {
-              /* cancelled / unavailable */
-            }
+            // "More by" → surface more music from this artist via search.
+            window.dispatchEvent(new CustomEvent("pulsar-search", { detail: release.artist }));
           }}
-          aria-label="Share"
+          aria-label={`More by ${release.artist}`}
           className={`flex flex-1 items-center justify-center transition-colors hover:bg-white/10 ${big ? "h-12" : "h-10"}`}
         >
-          <Share2 size={big ? 20 : 17} className="text-white drop-shadow" />
+          <Disc3 size={big ? 22 : 19} className="text-white drop-shadow" />
         </button>
       </div>
     </motion.div>

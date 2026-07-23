@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, ListMusic, Share2, X, Trash2, Sparkles, Shuffle } from "lucide-react";
+import { Heart, ListMusic, X, Trash2, Sparkles, Shuffle } from "lucide-react";
 import type { Release } from "@/lib/types";
 import type { MediaFormat } from "@/lib/format";
 import { getFavorites, getPlaylist, toggleFavorite, removeFromPlaylist } from "@/lib/collection";
 import { PhysicalMedia } from "./PhysicalMedia";
+import { PLATFORMS } from "./platforms";
 import { usePlayer } from "./player/PlayerProvider";
 
 interface FloatingDockProps {
@@ -25,9 +26,8 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   const [panel, setPanel] = useState<Panel>(null);
   const [favs, setFavs] = useState<Release[]>([]);
   const [list, setList] = useState<Release[]>([]);
-  const [toast, setToast] = useState<string | null>(null);
-  // When the navbar hides on scroll-down, the Curator (AI) + Shuffle buttons
-  // relocate here, stacking above the three dock buttons.
+  // When the navbar hides on scroll-down, the Selector + Shuffle buttons
+  // relocate here, stacking above the dock buttons.
   const [navHidden, setNavHidden] = useState(false);
 
   const refresh = () => {
@@ -53,23 +53,10 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
     };
   }, []);
 
-  async function share() {
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    const data = { title: "PULSAR — Daily Music Discovery", text: "A universe of music, one link away.", url };
-    try {
-      if (navigator.share) {
-        await navigator.share(data);
-      } else {
-        await navigator.clipboard.writeText(url);
-        setToast("Link copied");
-        setTimeout(() => setToast(null), 1600);
-      }
-    } catch {
-      /* cancelled */
-    }
-  }
-
   const items = panel === "favorites" ? favs : list;
+
+  // Platform links for the currently-playing song (only those with a URL).
+  const currentLinks = current ? PLATFORMS.filter((p) => Boolean(current[p.key])) : [];
 
   const dockBtn = (
     key: string,
@@ -153,7 +140,41 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
             </>
           )}
         </AnimatePresence>
-        {dockBtn("share", Share2, "Share Pulsar", null, share, false)}
+
+        {/* platform links for the current song — Spotify/Apple/Tidal/SC/YT */}
+        <AnimatePresence>
+          {currentLinks.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 480, damping: 32 }}
+              className="flex flex-col items-center gap-1.5 rounded-full border border-white/15 p-1.5"
+              style={{
+                background: "rgba(255,255,255,0.1)",
+                backdropFilter: "blur(12px) saturate(150%)",
+                WebkitBackdropFilter: "blur(12px) saturate(150%)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 8px 22px rgba(0,0,0,0.45)",
+              }}
+            >
+              {currentLinks.map((p) => (
+                <a
+                  key={p.key}
+                  href={current![p.key]!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={p.hint}
+                  title={p.label}
+                  className="flex h-9 w-9 items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95"
+                  style={{ backgroundColor: `${p.color}26`, color: p.color }}
+                >
+                  <p.Icon />
+                </a>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {dockBtn(
           "playlist",
           ListMusic,
@@ -171,20 +192,6 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
           panel === "favorites"
         )}
       </div>
-
-      {/* toast */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="fixed bottom-24 right-5 z-40 rounded-md border border-white/15 bg-void/90 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-star-white backdrop-blur"
-          >
-            {toast}
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* crate panel */}
       <AnimatePresence>
