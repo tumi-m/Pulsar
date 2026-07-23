@@ -82,7 +82,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         const ctx = new AC();
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 1024;
-        analyser.smoothingTimeConstant = 0.55;
+        analyser.smoothingTimeConstant = 0.45; // snappier, more in-sync with beats
         const source = ctx.createMediaElementSource(audio);
         source.connect(analyser);
         analyser.connect(ctx.destination);
@@ -98,6 +98,41 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const getAnalyser = useCallback(() => analyserRef.current, []);
+
+  // iOS/mobile audio unlock. Safari blocks a play() that isn't inside a user
+  // gesture — and ours runs after an async preview fetch, which loses the
+  // gesture. On the first touch we (a) resume the AudioContext and (b) prime
+  // the <audio> element with a silent clip so later programmatic play() calls
+  // are allowed. Runs once, and never touches src after that so it can't
+  // interrupt real playback.
+  const unlockedRef = useRef(false);
+  useEffect(() => {
+    const unlock = () => {
+      ctxRef.current?.resume?.().catch(() => {});
+      const audio = audioRef.current;
+      if (audio && !unlockedRef.current) {
+        unlockedRef.current = true;
+        const SILENT =
+          "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+        const prevSrc = audio.src;
+        audio.src = SILENT;
+        audio
+          .play()
+          .then(() => {
+            audio.pause();
+            audio.currentTime = 0;
+            if (!prevSrc) audio.removeAttribute("src");
+          })
+          .catch(() => {});
+      }
+    };
+    document.addEventListener("pointerdown", unlock);
+    document.addEventListener("touchend", unlock);
+    return () => {
+      document.removeEventListener("pointerdown", unlock);
+      document.removeEventListener("touchend", unlock);
+    };
+  }, []);
 
   useEffect(() => {
     const audio = new Audio();
@@ -168,7 +203,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         audio.src = data.previewUrl;
         audio.load();
         setHasAudio(true);
-        await audio.play().catch(() => {});
+        // Resume the context (it may have re-suspended) so the routed audio
+        // isn't silent, then play. Retry once — the first mobile play can race
+        // the unlock.
+        if (ctxRef.current?.state === "suspended") await ctxRef.current.resume().catch(() => {});
+        try {
+          await audio.play();
+        } catch {
+          await new Promise((r) => setTimeout(r, 120));
+          await audio.play().catch(() => {});
+        }
       } catch {
         if (reqId === reqIdRef.current) {
           setHasAudio(false);

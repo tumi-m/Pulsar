@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Play, Pause, X, Maximize2, Loader2 } from "lucide-react";
 import { usePlayer } from "./PlayerProvider";
 import { Artwork } from "../Artwork";
 import { Visualizer } from "../Visualizer";
+import { CrateIcon } from "../CrateIcon";
+import { togglePlaylist, inPlaylist } from "@/lib/collection";
 import type { Release } from "@/lib/types";
 
 /**
@@ -17,6 +19,11 @@ import type { Release } from "@/lib/types";
 export function NowPlayingBar() {
   const { current, playing, loading, progress, hasAudio, toggle, stop, seek } = usePlayer();
   const [expanded, setExpanded] = useState<Release | null>(null);
+  const [inCrate, setInCrate] = useState(false);
+
+  useEffect(() => {
+    setInCrate(current ? inPlaylist(current.id) : false);
+  }, [current]);
 
   function openVisualizer() {
     // The visualizer now reads the SHARED player audio — keep it playing.
@@ -75,6 +82,22 @@ export function NowPlayingBar() {
                   ))}
                 </div>
               )}
+
+              {/* add to crate — brown crate glyph */}
+              <button
+                onClick={() => current && setInCrate(togglePlaylist(current))}
+                aria-label={inCrate ? "Remove from crate" : "Add to crate"}
+                title={inCrate ? "In your crate" : "Add to crate"}
+                className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
+                  inCrate ? "border-[#c08a4e]/60 bg-[#c08a4e]/15" : "border-white/25 bg-white/[0.06] hover:border-white/50"
+                }`}
+              >
+                <CrateIcon
+                  size={17}
+                  filled={inCrate}
+                  className={inCrate ? "text-[#c08a4e]" : "text-star-white/60"}
+                />
+              </button>
 
               {/* play / pause */}
               <button

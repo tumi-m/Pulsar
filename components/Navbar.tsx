@@ -1,10 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion";
+import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { Shuffle } from "lucide-react";
-import { CalabiYau } from "./CalabiYau";
 import { usePlayer } from "./player/PlayerProvider";
 
 export function Navbar() {
@@ -13,21 +11,14 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [visualizing, setVisualizing] = useState(false);
   const prevY = useRef(0);
 
   // Album mode (detail sheet) opens on the right half; confine the header to
-  // the left half so the logo sits symmetrically over the grid below. In
-  // visualiser mode the logo centers (matching the reference layout).
+  // the left half so the controls sit symmetrically over the grid below.
   useEffect(() => {
     const onDetail = (e: Event) => setDetailOpen((e as CustomEvent<boolean>).detail);
-    const onVis = (e: Event) => setVisualizing((e as CustomEvent<boolean>).detail);
     window.addEventListener("pulsar-detail-open", onDetail);
-    window.addEventListener("pulsar-visualizing", onVis);
-    return () => {
-      window.removeEventListener("pulsar-detail-open", onDetail);
-      window.removeEventListener("pulsar-visualizing", onVis);
-    };
+    return () => window.removeEventListener("pulsar-detail-open", onDetail);
   }, []);
 
   const setHiddenBroadcast = (h: boolean) => {
@@ -48,26 +39,6 @@ export function Navbar() {
 
   return (
     <>
-    {/* Persistent sidebar toggle — stays top-left even when the nav hides */}
-    <AnimatePresence>
-      {hidden && (
-        <motion.button
-          initial={{ opacity: 0, scale: 0.7 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.7 }}
-          transition={{ duration: 0.25 }}
-          onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
-          aria-label="Open menu"
-          className="fixed left-4 top-2.5 z-50 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-void/70 text-star-white/80 backdrop-blur-xl transition-colors hover:bg-star-white/10 hover:text-star-white md:left-9"
-        >
-          <span className="flex flex-col gap-[3px]">
-            <span className="h-[1.5px] w-4 rounded-full bg-current" />
-            <span className="h-[1.5px] w-4 rounded-full bg-current" />
-            <span className="h-[1.5px] w-4 rounded-full bg-current" />
-          </span>
-        </motion.button>
-      )}
-    </AnimatePresence>
     <motion.nav
       initial={{ opacity: 0, y: 0 }}
       animate={{ opacity: 1, y: hidden ? -64 : 0 }}
@@ -83,30 +54,8 @@ export function Navbar() {
           detailOpen ? "lg:pr-[50vw]" : ""
         }`}
       >
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
-            aria-label="Open menu"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 text-star-white/75 transition-colors hover:bg-star-white/10 hover:text-star-white"
-          >
-            <span className="flex flex-col gap-[4px]">
-              <span className="h-[2px] w-5 rounded-full bg-current" />
-              <span className="h-[2px] w-5 rounded-full bg-current" />
-              <span className="h-[2px] w-5 rounded-full bg-current" />
-            </span>
-          </button>
-          <Link
-            href="/"
-            className={`flex items-center gap-2.5 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-              visualizing ? "absolute left-1/2 -translate-x-1/2" : ""
-            }`}
-          >
-            <CalabiYau size={22} />
-            <span className="text-sm font-bold uppercase tracking-[0.3em] text-star-white">
-              PULSAR
-            </span>
-          </Link>
-        </div>
+        {/* left spacer — the menu button now lives in the search block */}
+        <div className="h-11 w-11" aria-hidden />
 
         <div className="flex items-center gap-2">
         <button

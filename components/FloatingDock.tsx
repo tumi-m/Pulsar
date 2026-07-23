@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, ListMusic, X, Trash2, Sparkles, Shuffle, Play, Share2, Upload } from "lucide-react";
+import { Heart, X, Trash2, Sparkles, Shuffle, Play, Share2, Upload } from "lucide-react";
+import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";
 import type { MediaFormat } from "@/lib/format";
 import { getFavorites, getPlaylist, toggleFavorite, removeFromPlaylist } from "@/lib/collection";
@@ -65,9 +66,6 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   const items = (panel === "favorites" ? favs : list).filter(
     (r) => r.artwork_url && r.artwork_url.trim().length > 0
   );
-
-  // Platform links for the currently-playing song (only those with a URL).
-  const currentLinks = current ? PLATFORMS.filter((p) => Boolean(current[p.key])) : [];
 
   async function shareRelease(r: Release) {
     const url = typeof window !== "undefined" ? window.location.href : "";
@@ -139,7 +137,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
 
   const dockBtn = (
     key: string,
-    Icon: typeof Heart,
+    renderIcon: (active: boolean) => React.ReactNode,
     label: string,
     count: number | null,
     onClick: () => void,
@@ -149,16 +147,16 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       key={key}
       onClick={onClick}
       aria-label={label}
-      className="group relative flex h-14 w-14 items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95"
+      className="group relative flex h-14 w-14 items-center justify-center rounded-full ring-1 ring-white/45 transition-transform hover:scale-110 active:scale-95"
       style={{
-        background: active
-          ? "linear-gradient(160deg, #f0f0f4, #c8c8d0)"
-          : "linear-gradient(160deg, #2a2a32, #16161c)",
+        background: active ? "rgba(255,255,255,0.92)" : "rgba(24,24,34,0.78)",
+        backdropFilter: "blur(12px) saturate(150%)",
+        WebkitBackdropFilter: "blur(12px) saturate(150%)",
         boxShadow:
-          "0 6px 16px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -2px 4px rgba(0,0,0,0.4)",
+          "0 8px 24px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 6px rgba(0,0,0,0.3)",
       }}
     >
-      <Icon size={22} className={active ? "text-void" : "text-star-white/85"} />
+      {renderIcon(active)}
       {count != null && count > 0 && (
         <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon-pink px-1 text-[9px] font-bold text-void">
           {count}
@@ -220,43 +218,11 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
           )}
         </AnimatePresence>
 
-        {/* platform links for the current song — Spotify/Apple/Tidal/SC/YT */}
-        <AnimatePresence>
-          {currentLinks.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.9 }}
-              transition={{ type: "spring", stiffness: 480, damping: 32 }}
-              className="flex flex-col items-center gap-1.5 rounded-full border border-white/15 p-1.5"
-              style={{
-                background: "rgba(255,255,255,0.1)",
-                backdropFilter: "blur(12px) saturate(150%)",
-                WebkitBackdropFilter: "blur(12px) saturate(150%)",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 8px 22px rgba(0,0,0,0.45)",
-              }}
-            >
-              {currentLinks.map((p) => (
-                <a
-                  key={p.key}
-                  href={current![p.key]!}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={p.hint}
-                  title={p.label}
-                  className="flex h-9 w-9 items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95"
-                  style={{ backgroundColor: `${p.color}26`, color: p.color }}
-                >
-                  <p.Icon />
-                </a>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {dockBtn(
           "playlist",
-          ListMusic,
+          (active) => (
+            <CrateIcon size={22} filled className={active ? "text-[#7a4a1f]" : "text-[#c08a4e]"} />
+          ),
           "Your crate",
           list.length,
           () => setPanel(panel === "playlist" ? null : "playlist"),
@@ -264,7 +230,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
         )}
         {dockBtn(
           "fav",
-          Heart,
+          (active) => <Heart size={22} className={active ? "text-void" : "text-star-white/85"} />,
           "Your favorites",
           favs.length,
           () => setPanel(panel === "favorites" ? null : "favorites"),
@@ -428,12 +394,12 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                           play(r);
                         }}
                         aria-label="Play"
-                        className="absolute left-1/2 top-[calc(50%-11px)] flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full opacity-0 ring-1 ring-white/40 transition-opacity group-hover:opacity-100"
+                        className="absolute left-1/2 top-[calc(50%-11px)] flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full opacity-0 ring-1 ring-white/45 transition-opacity group-hover:opacity-100"
                         style={{
-                          background: "rgba(255,255,255,0.14)",
+                          background: "rgba(12,12,20,0.5)",
                           backdropFilter: "blur(10px) saturate(140%)",
                           WebkitBackdropFilter: "blur(10px) saturate(140%)",
-                          boxShadow: "0 8px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.5)",
+                          boxShadow: "0 8px 24px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.4)",
                         }}
                       >
                         <Play size={15} className="ml-0.5 text-white drop-shadow" fill="currentColor" />

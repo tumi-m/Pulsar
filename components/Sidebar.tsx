@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Heart, ListMusic, Sparkles } from "lucide-react";
+import { X, Heart, Sparkles } from "lucide-react";
+import { CalabiYau } from "./CalabiYau";
+import { CrateIcon } from "./CrateIcon";
 import { FORMATS, loadFormat, saveFormat, type MediaFormat } from "@/lib/format";
 import { THEMES, loadTheme, saveTheme } from "@/lib/theme";
 import { getFavorites, getPlaylist } from "@/lib/collection";
@@ -74,11 +77,21 @@ export function Sidebar() {
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
             transition={{ type: "spring", stiffness: 520, damping: 42 }}
-            className="fixed inset-y-0 left-0 z-[55] flex w-[86%] max-w-xs transform-gpu flex-col overflow-y-auto border-r border-white/15 bg-[#0a0a14]/60 backdrop-blur-2xl"
+            className="fixed inset-y-0 left-0 z-[55] flex w-[92%] max-w-sm transform-gpu flex-col overflow-y-auto border-r border-white/15 bg-[#0a0a14]/60 backdrop-blur-2xl"
             style={{ boxShadow: "inset -1px 0 0 rgba(255,255,255,0.14), 20px 0 60px rgba(0,0,0,0.5)" }}
           >
-            <div className="flex items-center justify-between px-5 py-5">
-              <span className="text-sm font-bold uppercase tracking-[0.3em] text-star-white">Pulsar</span>
+            <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-5">
+              <Link
+                href="/"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2.5"
+                aria-label="Pulsar home"
+              >
+                <CalabiYau size={26} />
+                <span className="text-base font-bold uppercase tracking-[0.3em] text-star-white">
+                  Pulsar
+                </span>
+              </Link>
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close"
@@ -105,7 +118,7 @@ export function Sidebar() {
                   onClick={() => openCrate("playlist")}
                   className="flex flex-col items-start gap-2 rounded-xl border border-star-white/10 bg-star-white/[0.03] p-3 transition-colors hover:border-star-white/30"
                 >
-                  <ListMusic size={18} className="text-neon-blue" />
+                  <CrateIcon size={18} filled className="text-[#c08a4e]" />
                   <span className="text-[11px] font-bold uppercase tracking-wide text-star-white">
                     Crate
                   </span>
@@ -253,7 +266,7 @@ export function Sidebar() {
             </Section>
 
             <div className="mt-auto px-5 py-5 text-[9px] font-bold uppercase tracking-[0.24em] text-star-white/25">
-              Music discovery service
+              Music discovery
             </div>
           </motion.aside>
         </>

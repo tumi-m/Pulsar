@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, Link as LinkIcon, AudioLines, Play, Pause } from "lucide-react";
+import { X, Check, Link as LinkIcon, Play, Pause, ChevronLeft, ChevronRight, Maximize2, AudioLines, Share2 } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { Artwork } from "./Artwork";
 import { PLATFORMS } from "./platforms";
 import { usePlayer } from "./player/PlayerProvider";
+import { VisualCanvas, VISUAL_MODES, type VisualMode } from "./VisualCanvas";
 
 interface Track {
   number: number;
@@ -38,6 +39,17 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
   const [tracks, setTracks] = useState<Track[] | null>(null);
   const [tracksLoading, setTracksLoading] = useState(false);
   const [tracksOpen, setTracksOpen] = useState(true);
+  const [origDate, setOrigDate] = useState<string | null>(null);
+  const [visualMode, setVisualMode] = useState<VisualMode>("nebula");
+  // The visualiser stays OFF until the user taps the Visualise button.
+  const [showVisual, setShowVisual] = useState(false);
+  useEffect(() => setShowVisual(false), [release]);
+
+  const cycleVisual = (dir: 1 | -1) =>
+    setVisualMode((m) => {
+      const i = VISUAL_MODES.findIndex((x) => x.id === m);
+      return VISUAL_MODES[(i + dir + VISUAL_MODES.length) % VISUAL_MODES.length].id;
+    });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -45,9 +57,10 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // Fetch the whole album's tracklist when an album/EP is selected.
+  // Fetch the whole album's tracklist + original release date when selected.
   useEffect(() => {
     setTracks(null);
+    setOrigDate(null);
     if (!release || (release.type !== "album" && release.type !== "ep")) return;
     let cancelled = false;
     setTracksLoading(true);
@@ -57,7 +70,9 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
           `/api/album?artist=${encodeURIComponent(release.artist)}&title=${encodeURIComponent(release.title)}`
         );
         const data = await res.json();
-        if (!cancelled) setTracks(Array.isArray(data.tracks) ? data.tracks : []);
+        if (cancelled) return;
+        setTracks(Array.isArray(data.tracks) ? data.tracks : []);
+        if (typeof data.releaseDate === "string") setOrigDate(data.releaseDate);
       } catch {
         if (!cancelled) setTracks([]);
       } finally {
@@ -78,6 +93,22 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
       setTimeout(() => setCopied(null), 1600);
     } catch {
       /* clipboard unavailable */
+    }
+  }
+
+  async function shareRelease() {
+    if (!release) return;
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    const data = { title: `${release.title} — ${release.artist}`, text: "Found on PULSAR", url };
+    try {
+      if (navigator.share) await navigator.share(data);
+      else {
+        await navigator.clipboard.writeText(url);
+        setCopied("share");
+        setTimeout(() => setCopied(null), 1600);
+      }
+    } catch {
+      /* cancelled */
     }
   }
 
@@ -157,7 +188,7 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
                 </h2>
                 <p className="mt-0.5 text-sm text-star-white/55">{release.artist}</p>
                 <p className="mt-2 text-[10px] font-mono uppercase tracking-[0.18em] text-star-white/35">
-                  {release.type} · {formatDate(release.release_date)}
+                  {release.type} · {formatDate(origDate ?? release.release_date)}
                   {release.genre ? ` · ${release.genre}` : ""}
                 </p>
                 {/* DSP platform logos next to the artist / release date */}
@@ -195,31 +226,6 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
                 <p className="border-b border-star-white/5 px-5 py-4 text-sm italic leading-relaxed text-star-white/60">
                   {release.curator_note}
                 </p>
-              )}
-
-              {onVisualize && (
-                <div className="border-b border-star-white/5 p-3">
-                  <button
-                    onClick={() => {
-                      player.play(release); // start the shared audio (gesture)
-                      onVisualize(release);
-                    }}
-                    className="group flex w-full items-center gap-3 rounded-full px-3 py-3 transition-colors hover:bg-neon-violet/10"
-                    style={{ background: "linear-gradient(100deg, rgba(155,93,229,0.12), rgba(0,212,255,0.06))" }}
-                  >
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-neon-violet/20 text-neon-violet">
-                      <AudioLines size={18} />
-                    </span>
-                    <span className="flex-1 text-left">
-                      <span className="block text-sm font-bold uppercase tracking-wide text-star-white">
-                        Visualise
-                      </span>
-                    </span>
-                    <span className="text-star-white/30 transition-all group-hover:translate-x-0.5 group-hover:text-star-white/70">
-                      →
-                    </span>
-                  </button>
-                </div>
               )}
 
               {/* whole-album tracklist (albums / EPs) — collapsible */}
@@ -312,10 +318,114 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
                 </div>
               )}
 
+              {/* visualiser — OFF by default; only shown once the user taps
+                  the Visualise button. Never comes up on its own. */}
+              {onVisualize && (
+                <div className="border-b border-star-white/5 p-3">
+                  {!showVisual ? (
+                    <button
+                      onClick={() => {
+                        player.play(release);
+                        setShowVisual(true);
+                      }}
+                      className="group flex w-full items-center gap-3 rounded-full px-3 py-3 transition-colors hover:bg-neon-violet/10"
+                      style={{ background: "linear-gradient(100deg, rgba(155,93,229,0.14), rgba(0,212,255,0.06))" }}
+                    >
+                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-neon-violet/20 text-neon-violet">
+                        <AudioLines size={18} />
+                      </span>
+                      <span className="flex-1 text-left text-sm font-bold uppercase tracking-wide text-star-white">
+                        Visualise
+                      </span>
+                      <span className="text-star-white/30 transition-all group-hover:translate-x-0.5 group-hover:text-star-white/70">
+                        →
+                      </span>
+                    </button>
+                  ) : (
+                    <>
+                      <div className="mb-2 flex items-center justify-between px-1">
+                        <span className="text-[10px] font-mono uppercase tracking-[0.22em] text-star-white/35">
+                          Visualise
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => {
+                              onVisualize(release);
+                              onClose(); // leave tracklist → full-screen visual
+                            }}
+                            aria-label="Expand visualiser"
+                            title="Expand"
+                            className="flex h-6 w-6 items-center justify-center rounded-full border border-white/20 text-star-white/70 transition-colors hover:border-white/50 hover:text-star-white"
+                          >
+                            <Maximize2 size={12} strokeWidth={2.5} />
+                          </button>
+                          <button
+                            onClick={() => setShowVisual(false)}
+                            aria-label="Hide visualiser"
+                            title="Hide"
+                            className="flex h-6 w-6 items-center justify-center rounded-full border border-white/20 text-star-white/70 transition-colors hover:border-white/50 hover:text-star-white"
+                          >
+                            <X size={12} strokeWidth={2.5} />
+                          </button>
+                        </div>
+                      </div>
+                      <div
+                        className="relative aspect-video w-full overflow-hidden rounded-xl border border-white/12"
+                        style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), 0 10px 30px rgba(0,0,0,0.5)" }}
+                      >
+                        <VisualCanvas release={release} mode={visualMode} className="absolute inset-0 h-full w-full" />
+                        <div className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-center gap-1 p-2">
+                          <div
+                            className="flex items-center gap-1 rounded-full border border-white/15 p-1"
+                            style={{
+                              background: "rgba(255,255,255,0.1)",
+                              backdropFilter: "blur(12px) saturate(150%)",
+                              WebkitBackdropFilter: "blur(12px) saturate(150%)",
+                            }}
+                          >
+                            <button
+                              onClick={() => cycleVisual(-1)}
+                              aria-label="Previous visualisation"
+                              className="flex h-6 w-6 items-center justify-center rounded-full text-star-white/70 hover:bg-white/10 hover:text-star-white"
+                            >
+                              <ChevronLeft size={15} />
+                            </button>
+                            <span className="min-w-[64px] text-center text-[10px] font-bold uppercase tracking-[0.14em] text-star-white">
+                              {VISUAL_MODES.find((m) => m.id === visualMode)?.label}
+                            </span>
+                            <button
+                              onClick={() => cycleVisual(1)}
+                              aria-label="Next visualisation"
+                              className="flex h-6 w-6 items-center justify-center rounded-full text-star-white/70 hover:bg-white/10 hover:text-star-white"
+                            >
+                              <ChevronRight size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
               <div className="p-3">
-                <p className="px-2 pb-2 pt-1 text-[10px] font-mono uppercase tracking-[0.22em] text-star-white/35">
-                  Listen on your service
-                </p>
+                <div className="flex items-center justify-between px-2 pb-2 pt-1">
+                  <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-star-white/35">
+                    Listen on your service
+                  </p>
+                  <button
+                    onClick={shareRelease}
+                    aria-label="Share"
+                    className="flex items-center gap-1.5 rounded-full border border-white/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-star-white/75 transition-colors hover:border-white/50 hover:text-star-white"
+                  >
+                    {copied === "share" ? (
+                      <Check size={12} className="text-neon-green" />
+                    ) : (
+                      <Share2 size={12} />
+                    )}
+                    Share
+                  </button>
+                </div>
                 <div className="space-y-1">
                   {available.map((p, i) => (
                     <motion.div

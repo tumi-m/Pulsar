@@ -22,7 +22,12 @@ interface Track {
   previewUrl: string | null;
 }
 
-async function fromITunes(artist: string, title: string): Promise<Track[] | null> {
+interface AlbumResult {
+  tracks: Track[];
+  releaseDate: string | null; // original project release date (YYYY-MM-DD)
+}
+
+async function fromITunes(artist: string, title: string): Promise<AlbumResult | null> {
   try {
     const na = norm(artist);
     const searchRes = await fetch(
@@ -31,7 +36,7 @@ async function fromITunes(artist: string, title: string): Promise<Track[] | null
     );
     if (!searchRes.ok) return null;
     const search = await searchRes.json();
-    const albums: Array<{ collectionId?: number; artistName?: string; collectionName?: string }> =
+    const albums: Array<{ collectionId?: number; artistName?: string; collectionName?: string; releaseDate?: string }> =
       search.results ?? [];
     const nt = norm(title);
     const album =
@@ -39,6 +44,7 @@ async function fromITunes(artist: string, title: string): Promise<Track[] | null
         (a) => norm(a.artistName ?? "").includes(na.slice(0, 10)) && norm(a.collectionName ?? "").includes(nt)
       ) ?? albums.find((a) => norm(a.artistName ?? "").includes(na.slice(0, 10)));
     if (!album?.collectionId) return null;
+    const releaseDate = album.releaseDate ? album.releaseDate.slice(0, 10) : null;
 
     const lookupRes = await fetch(
       `https://itunes.apple.com/lookup?id=${album.collectionId}&entity=song&limit=200`,
@@ -63,13 +69,13 @@ async function fromITunes(artist: string, title: string): Promise<Track[] | null
         previewUrl: i.previewUrl ? proxied(i.previewUrl) : null,
       }))
       .sort((a, b) => a.number - b.number);
-    return tracks.length ? tracks : null;
+    return tracks.length ? { tracks, releaseDate } : null;
   } catch {
     return null;
   }
 }
 
-async function fromDeezer(artist: string, title: string): Promise<Track[] | null> {
+async function fromDeezer(artist: string, title: string): Promise<AlbumResult | null> {
   try {
     const searchRes = await fetch(
       `https://api.deezer.com/search/album?q=${encodeURIComponent(`${artist} ${title}`)}&limit=5`,
@@ -89,6 +95,10 @@ async function fromDeezer(artist: string, title: string): Promise<Track[] | null
     });
     if (!albRes.ok) return null;
     const alb = await albRes.json();
+    const releaseDate: string | null =
+      typeof alb.release_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(alb.release_date)
+        ? alb.release_date
+        : null;
     const tracks: Track[] = (alb.tracks?.data ?? []).map(
       (t: { track_position?: number; title?: string; duration?: number; preview?: string }, i: number) => ({
         number: t.track_position ?? i + 1,
@@ -97,7 +107,7 @@ async function fromDeezer(artist: string, title: string): Promise<Track[] | null
         previewUrl: t.preview ? proxied(t.preview) : null,
       })
     );
-    return tracks.length ? tracks : null;
+    return tracks.length ? { tracks, releaseDate } : null;
   } catch {
     return null;
   }
@@ -111,16 +121,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "artist and title required" }, { status: 400 });
   }
 
-  const tracks = (await fromITunes(artist, title)) ?? (await fromDeezer(artist, title));
-  if (!tracks) {
+  const result = (await fromITunes(artist, title)) ?? (await fromDeezer(artist, title));
+  if (!result) {
     return NextResponse.json(
-      { error: "no tracklist found", tracks: [] },
+      { error: "no tracklist found", tracks: [], releaseDate: null },
       { status: 404, headers: { "Cache-Control": "no-store" } }
     );
   }
 
   return NextResponse.json(
-    { tracks },
+    { tracks: result.tracks, releaseDate: result.releaseDate },
     { headers: { "Cache-Control": "public, max-age=86400", "Netlify-Vary": "query" } }
   );
 }

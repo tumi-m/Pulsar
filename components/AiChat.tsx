@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, X, Play, Plus, Check, LayoutGrid, MessagesSquare } from "lucide-react";
+import { Sparkles, X, Play, Plus, LayoutGrid, MessagesSquare } from "lucide-react";
+import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";
 import { genreBucket, type GenreBucket } from "@/lib/utils";
 import { usePlayer } from "./player/PlayerProvider";
@@ -287,7 +288,7 @@ function CrateToggle({ release }: { release: Release }) {
       aria-label={inList ? "Remove from crate" : "Add to crate"}
       className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-star-white/20 text-star-white/70 hover:border-white/50"
     >
-      {inList ? <Check size={14} className="text-neon-green" /> : <Plus size={14} />}
+      {inList ? <CrateIcon size={15} filled className="text-[#c08a4e]" /> : <Plus size={14} />}
     </button>
   );
 }

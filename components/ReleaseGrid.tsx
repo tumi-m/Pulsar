@@ -1,14 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
-import {
-  motion,
-  AnimatePresence,
-  useScroll,
-  useVelocity,
-  useSpring,
-  useTransform,
-} from "framer-motion";
+import { motion, AnimatePresence, useAnimationControls } from "framer-motion";
 import type { Release } from "@/lib/types";
 import { ReleaseCard } from "./ReleaseCard";
 import { ReleaseDetail } from "./ReleaseDetail";
@@ -58,12 +51,30 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   // Search bar shrinks + centers when the user scrolls down (nav hides).
   const [searchCompact, setSearchCompact] = useState(false);
 
-  // macOS-style momentum: the grid subtly skews/settles with scroll velocity.
-  const { scrollY } = useScroll();
-  const scrollVelocity = useVelocity(scrollY);
-  const smoothVelocity = useSpring(scrollVelocity, { damping: 40, stiffness: 320 });
-  const gridSkew = useTransform(smoothVelocity, [-2400, 0, 2400], [1.6, 0, -1.6], { clamp: true });
-  const gridScale = useTransform(smoothVelocity, [-2400, 0, 2400], [0.985, 1, 0.985], { clamp: true });
+  // Tiles hold perfectly still while scrolling, then settle together with one
+  // gentle nudge the moment scrolling stops. `scrolling` also disables the
+  // per-tile tap animation so tiles never flinch mid-scroll on mobile.
+  const gridControls = useAnimationControls();
+  const [scrolling, setScrolling] = useState(false);
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout>;
+    const onScroll = () => {
+      setScrolling((s) => (s ? s : true));
+      clearTimeout(t);
+      t = setTimeout(() => {
+        setScrolling(false);
+        gridControls.start({
+          y: [6, 0],
+          transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] }, // smooth, no bounce
+        });
+      }, 180); // fire once scrolling has actually stopped
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      clearTimeout(t);
+    };
+  }, [gridControls]);
 
   const detailOpen = Boolean(selectedRelease);
 
@@ -281,13 +292,40 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
           detailOpen ? "lg:pr-[50vw]" : ""
         }`}
       >
-        {/* ── the menu: search + genre by default, one quiet "Refine" ── */}
-        <div className="sticky top-14 z-30 mb-6 bg-void/85 px-6 py-3 backdrop-blur-xl md:px-10">
-          {/* search — small, centered, rounded liquid glass with a rainbow
-              outer line; shrinks further on scroll-down */}
+        {/* ── the menu: search + genre by default, one quiet "Refine".
+            On scroll-down it becomes a thin translucent liquid-glass bar
+            at the very top (nothing above it) that holds the menu button. ── */}
+        <div
+          className={`sticky z-40 mb-6 transition-all duration-300 md:px-10 ${
+            searchCompact
+              ? "-top-1 border-b border-white/10 bg-void/35 px-6 py-1 backdrop-blur-2xl"
+              : "top-14 bg-void/20 px-6 py-3 backdrop-blur-xl"
+          }`}
+        >
+          {/* search row — the menu (sidebar) button is pinned to the left edge
+              while the search bar stays perfectly centered (symmetrical) */}
+          <div className={`relative flex items-center justify-center ${searchCompact ? "" : "mb-3"}`}>
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
+              aria-label="Open menu"
+              className="absolute left-0 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-white/30 text-star-white/85 transition-transform hover:scale-105 active:scale-95"
+              style={{
+                background: "rgba(255,255,255,0.1)",
+                backdropFilter: "blur(18px) saturate(180%)",
+                WebkitBackdropFilter: "blur(18px) saturate(180%)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -2px 5px rgba(0,0,0,0.3), 0 6px 16px rgba(0,0,0,0.4)",
+              }}
+            >
+              <span className="flex flex-col gap-[3px]">
+                <span className="h-[2px] w-4 rounded-full bg-current" />
+                <span className="h-[2px] w-4 rounded-full bg-current" />
+                <span className="h-[2px] w-4 rounded-full bg-current" />
+              </span>
+            </button>
+          {/* search — rounded liquid glass with a rainbow outer line */}
           <div
-            className={`search-rainbow mx-auto mb-3 rounded-full p-[1.5px] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-              searchCompact ? "w-[34%]" : "w-[48%]"
+            className={`search-rainbow rounded-full p-[1.5px] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              searchCompact ? "w-[52%]" : "w-[48%]"
             }`}
           >
             <div
@@ -295,13 +333,13 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 searchCompact ? "px-3 py-1.5" : "px-4 py-2"
               }`}
               style={{
-                background: "rgba(10,10,20,0.55)",
-                backdropFilter: "blur(16px) saturate(160%)",
-                WebkitBackdropFilter: "blur(16px) saturate(160%)",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.28)",
+                background: "rgba(255,255,255,0.1)",
+                backdropFilter: "blur(20px) saturate(180%)",
+                WebkitBackdropFilter: "blur(20px) saturate(180%)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -3px 8px rgba(0,0,0,0.3)",
               }}
             >
-              <svg viewBox="0 0 20 20" className="h-4 w-4 flex-shrink-0 text-star-white/40" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg viewBox="0 0 20 20" className="h-4 w-4 flex-shrink-0 text-star-white/70" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="9" cy="9" r="6" />
                 <path d="M14 14l4 4" strokeLinecap="round" />
               </svg>
@@ -325,8 +363,11 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               )}
             </div>
           </div>
+          </div>
 
-
+          {/* genre + refine controls — hidden when the bar is compact */}
+          {!searchCompact && (
+          <>
           <div className="flex items-center gap-3">
             {/* expandable Genre button */}
             <button
@@ -485,6 +526,8 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               </motion.div>
             )}
           </AnimatePresence>
+          </>
+          )}
         </div>
 
         {/* grid */}
@@ -494,7 +537,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
           </div>
         ) : (
           <motion.div
-            style={{ skewY: gridSkew, scale: gridScale, transformOrigin: "50% 0%" }}
+            animate={gridControls}
             className={`grid grid-flow-dense gap-4 px-3 md:gap-5 md:px-5 ${gridCols}`}
           >
             {shown.map((release, i) => (
@@ -505,8 +548,8 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 size={(sizes[i] ?? 0) as 0 | 1 | 2}
                 forYou={Boolean(recProfile) && (sizes[i] ?? 0) > 0}
                 format={format}
+                scrolling={scrolling}
                 onOpen={setSelectedRelease}
-                onVisualize={setVisualizing}
               />
             ))}
           </motion.div>
