@@ -48,8 +48,6 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   const [showRefine, setShowRefine] = useState(false);
   const [showGenres, setShowGenres] = useState(false);
   const [query, setQuery] = useState("");
-  // Search bar shrinks + centers when the user scrolls down (nav hides).
-  const [searchCompact, setSearchCompact] = useState(false);
 
   // Tiles hold perfectly still while scrolling, then settle together with one
   // gentle nudge the moment scrolling stops. `scrolling` also disables the
@@ -109,7 +107,6 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       setView("latest");
       setShowQuiz(true);
     };
-    const onNavHidden = (e: Event) => setSearchCompact((e as CustomEvent<boolean>).detail);
     const onSearch = (e: Event) => {
       setQuery((e as CustomEvent<string>).detail);
       setVisible(PAGE);
@@ -122,13 +119,11 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     window.addEventListener("pulsar-format-change", onFormat);
     window.addEventListener("pulsar-type-change", onType);
     window.addEventListener("pulsar-retake-quiz", onRetake);
-    window.addEventListener("pulsar-nav-hidden", onNavHidden);
     return () => {
       window.removeEventListener("pulsar-collection-change", onChange);
       window.removeEventListener("pulsar-format-change", onFormat);
       window.removeEventListener("pulsar-type-change", onType);
       window.removeEventListener("pulsar-retake-quiz", onRetake);
-      window.removeEventListener("pulsar-nav-hidden", onNavHidden);
       window.removeEventListener("pulsar-search", onSearch);
       window.removeEventListener("pulsar-close-detail", onCloseDetail);
     };
@@ -286,25 +281,25 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
         )}
       </AnimatePresence>
 
-      {/* everything that reflows when the detail sheet opens */}
+      {/* everything that reflows when the detail sheet opens. Bottom padding
+          clears the fixed bottom search bar (more when the player is up). */}
       <div
         className={`transition-[padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
           detailOpen ? "lg:pr-[50vw]" : ""
-        }`}
+        } ${player.current ? "pb-64" : "pb-44"}`}
       >
-        {/* ── the menu: search + genre by default, one quiet "Refine".
-            On scroll-down it becomes a thin translucent liquid-glass bar
-            at the very top (nothing above it) that holds the menu button. ── */}
+        {/* ── search block, docked at the BOTTOM (thumb reach). Uses
+            flex-col-reverse so the search bar is lowest and the genre/refine
+            filters stack above it; lifts above the now-playing bar when music
+            is playing, and hides while an album panel is open. ── */}
         <div
-          className={`sticky z-40 mb-6 transition-all duration-300 md:px-10 ${
-            searchCompact
-              ? "-top-1 border-b border-white/10 bg-void/35 px-6 py-1 backdrop-blur-2xl"
-              : "top-14 bg-void/20 px-6 py-3 backdrop-blur-xl"
-          }`}
+          className={`fixed inset-x-0 z-40 flex flex-col-reverse gap-2 border-t border-white/10 bg-void/40 px-6 py-3 backdrop-blur-2xl transition-all duration-300 md:px-10 ${
+            detailOpen ? "pointer-events-none translate-y-8 opacity-0" : "opacity-100"
+          } ${player.current ? "bottom-[72px]" : "bottom-0"}`}
         >
           {/* search row — the menu (sidebar) button is pinned to the left edge
               while the search bar stays perfectly centered (symmetrical) */}
-          <div className={`relative flex items-center justify-center ${searchCompact ? "" : "mb-3"}`}>
+          <div className="relative flex items-center justify-center">
             <button
               onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
               aria-label="Open menu"
@@ -323,15 +318,8 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               </span>
             </button>
           {/* search — rounded liquid glass with a rainbow outer line */}
-          <div
-            className={`search-rainbow rounded-full p-[1.5px] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-              searchCompact ? "w-[52%]" : "w-[48%]"
-            }`}
-          >
-            <div
-              className={`flex items-center gap-2 rounded-full transition-all duration-300 ${
-                searchCompact ? "px-3 py-1.5" : "px-4 py-2"
-              }`}
+          <div className="search-rainbow w-[74%] rounded-full p-[1.5px] md:w-[46%]">
+            <div className="flex items-center gap-2 rounded-full px-4 py-2"
               style={{
                 background: "rgba(255,255,255,0.1)",
                 backdropFilter: "blur(20px) saturate(180%)",
@@ -365,9 +353,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
           </div>
           </div>
 
-          {/* genre + refine controls — hidden when the bar is compact */}
-          {!searchCompact && (
-          <>
+          {/* genre + refine controls — stacked above the search bar */}
           <div className="flex items-center gap-3">
             {/* expandable Genre button */}
             <button
@@ -526,8 +512,6 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               </motion.div>
             )}
           </AnimatePresence>
-          </>
-          )}
         </div>
 
         {/* grid */}
@@ -570,6 +554,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       <ReleaseDetail
         release={selectedRelease}
         onClose={() => setSelectedRelease(null)}
+        onOpen={setSelectedRelease}
         onVisualize={(r) => {
           setSelectedRelease(null);
           setVisualizing(r);
