@@ -379,7 +379,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               aria-expanded={showGenres}
               className={`flex flex-shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.1em] transition-colors sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.16em] ${
                 activeGenre
-                  ? "border-[#4aa3ff]/60 bg-[#4aa3ff]/15 text-[#8cc6ff]"
+                  ? "border-star-white/40 bg-star-white/[0.06] text-star-white"
                   : "border-star-white/15 text-star-white/60 hover:border-star-white/40 hover:text-star-white"
               }`}
             >
@@ -391,12 +391,12 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               aria-expanded={showRefine}
               className={`flex flex-shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.1em] transition-colors sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.2em] ${
                 showRefine || refineActive
-                  ? "border-[#4aa3ff]/60 bg-[#4aa3ff]/15 text-[#8cc6ff]"
+                  ? "border-star-white/40 bg-star-white/[0.06] text-star-white"
                   : "border-star-white/15 text-star-white/50 hover:border-star-white/40 hover:text-star-white"
               }`}
             >
               Refine
-              {refineActive && <span className="h-1 w-1 rounded-full bg-[#4aa3ff]" />}
+              {refineActive && <span className="h-1 w-1 rounded-full bg-neon-violet" />}
               <span className={`transition-transform ${showRefine ? "rotate-180" : ""}`}>⌄</span>
             </button>
           </div>
@@ -456,7 +456,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                                 setView(v);
                                 resetPage();
                               }}
-                              className="relative rounded-md px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors"
+                              className="relative rounded-md px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors"
                             >
                               {isActive && (
                                 <motion.span
@@ -469,7 +469,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                                   transition={{ type: "spring", stiffness: 400, damping: 32 }}
                                 />
                               )}
-                              <span className={`relative ${isActive ? "text-void" : "text-star-white/55"}`}>
+                              <span className={`relative ${isActive ? "text-void" : "text-[#a9d5ff]"}`}>
                                 {v === "latest" ? "Latest" : v === "streamed" ? "Most Streamed" : "For You"}
                               </span>
                             </button>
@@ -493,7 +493,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                         setView("latest");
                         setShowQuiz(true);
                       }}
-                      className="text-[9px] font-bold uppercase tracking-[0.2em] text-star-white/30 transition-colors hover:text-star-white"
+                      className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#8cc6ff]/80 transition-colors hover:text-[#a9d5ff]"
                     >
                       {profile ? "Retake quiz →" : "Take quiz →"}
                     </button>
@@ -501,8 +501,8 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
 
                   {/* labels */}
                   {labels.length > 0 && (
-                    <div className="scrollbar-none flex items-center gap-1 overflow-x-auto">
-                      <span className="flex-shrink-0 pr-1 text-[9px] font-bold uppercase tracking-[0.24em] text-star-white/30">
+                    <div className="scrollbar-none flex items-center gap-1.5 overflow-x-auto">
+                      <span className="flex-shrink-0 pr-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#8cc6ff]/70">
                         Label
                       </span>
                       <button
@@ -510,8 +510,8 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                           setActiveLabel(null);
                           resetPage();
                         }}
-                        className={`flex-shrink-0 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] transition-colors ${
-                          activeLabel === null ? "text-star-white" : "text-star-white/35 hover:text-star-white/70"
+                        className={`flex-shrink-0 rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                          activeLabel === null ? "bg-[#4aa3ff] text-void" : "text-[#a9d5ff] hover:text-white"
                         }`}
                       >
                         All
@@ -523,10 +523,10 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                             setActiveLabel(activeLabel === l ? null : l);
                             resetPage();
                           }}
-                          className={`flex-shrink-0 whitespace-nowrap rounded-md border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                          className={`flex-shrink-0 whitespace-nowrap rounded-md border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
                             activeLabel === l
-                              ? "border-[#4aa3ff]/60 bg-[#4aa3ff]/15 text-[#8cc6ff]"
-                              : "border-star-white/15 text-star-white/40 hover:border-star-white/40 hover:text-star-white"
+                              ? "border-transparent bg-[#4aa3ff] text-void"
+                              : "border-[#4aa3ff]/25 text-[#a9d5ff] hover:border-[#4aa3ff]/60 hover:text-white"
                           }`}
                         >
                           {l}

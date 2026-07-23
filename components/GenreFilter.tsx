@@ -12,10 +12,10 @@ export function GenreFilter({ active, onChange, available }: GenreFilterProps) {
   const genres = GENRE_BUCKETS.filter((g) => available.includes(g));
 
   const pill = (isActive: boolean) =>
-    `flex-shrink-0 rounded-full px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] transition-all duration-200 ${
+    `flex-shrink-0 rounded-full px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] transition-all duration-200 ${
       isActive
-        ? "bg-star-white text-void"
-        : "text-star-white/45 hover:bg-star-white/[0.07] hover:text-star-white"
+        ? "bg-[#4aa3ff] text-void"
+        : "text-[#a9d5ff] hover:bg-[#4aa3ff]/15 hover:text-white"
     }`;
 
   return (

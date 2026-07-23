@@ -15,7 +15,7 @@ interface FormatPickerProps {
 export function FormatPicker({ active, onChange }: FormatPickerProps) {
   return (
     <div className="flex items-center gap-2">
-      <span className="hidden text-[9px] font-bold uppercase tracking-[0.24em] text-star-white/35 sm:block">
+      <span className="hidden text-[10px] font-bold uppercase tracking-[0.24em] text-[#8cc6ff]/70 sm:block">
         Format
       </span>
       <div
@@ -35,7 +35,7 @@ export function FormatPicker({ active, onChange }: FormatPickerProps) {
               title={f.blurb}
               aria-label={`Show music as ${f.label}`}
               aria-pressed={isActive}
-              className="relative rounded-md px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors"
+              className="relative rounded-md px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors"
             >
               {isActive && (
                 <motion.span
@@ -48,7 +48,7 @@ export function FormatPicker({ active, onChange }: FormatPickerProps) {
                   transition={{ type: "spring", stiffness: 400, damping: 32 }}
                 />
               )}
-              <span className={`relative ${isActive ? "text-void" : "text-star-white/55"}`}>
+              <span className={`relative ${isActive ? "text-void" : "text-[#a9d5ff]"}`}>
                 {f.label}
               </span>
             </button>
