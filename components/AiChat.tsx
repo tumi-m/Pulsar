@@ -281,11 +281,16 @@ export function AiChat({ releases }: AiChatProps) {
 
 function CrateToggle({ release }: { release: Release }) {
   const [inList, setInList] = useState(false);
-  useEffect(() => setInList(inPlaylist(release.id)), [release.id]);
+  useEffect(() => {
+    const sync = () => setInList(inPlaylist(release.id));
+    sync();
+    window.addEventListener("pulsar-collection-change", sync);
+    return () => window.removeEventListener("pulsar-collection-change", sync);
+  }, [release.id]);
   return (
     <button
-      onClick={() => setInList(togglePlaylist(release))}
-      aria-label={inList ? "Remove from crate" : "Add to crate"}
+      onClick={() => window.dispatchEvent(new CustomEvent("pulsar-crate-picker", { detail: release }))}
+      aria-label="Add to a crate"
       className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-star-white/20 text-star-white/70 hover:border-white/50"
     >
       {inList ? <CrateIcon size={15} filled className="text-[#c08a4e]" /> : <Plus size={14} />}

@@ -11,6 +11,7 @@ import { FormatPicker } from "./FormatPicker";
 import { FloatingDock } from "./FloatingDock";
 import { Visualizer } from "./Visualizer";
 import { AiChat } from "./AiChat";
+import { CratePicker } from "./CratePicker";
 import { usePlayer } from "./player/PlayerProvider";
 import { genreBucket, GENRE_BUCKETS, type GenreBucket } from "@/lib/utils";
 import { loadFormat, saveFormat, type MediaFormat } from "@/lib/format";
@@ -48,6 +49,9 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   const [showRefine, setShowRefine] = useState(false);
   const [showGenres, setShowGenres] = useState(false);
   const [query, setQuery] = useState("");
+  // The bottom search bar slides down out of view while scrolling down,
+  // and slides back up when scrolling up (or at the top).
+  const [barHidden, setBarHidden] = useState(false);
 
   // Tiles hold perfectly still while scrolling, then settle together with one
   // gentle nudge the moment scrolling stops. `scrolling` also disables the
@@ -112,7 +116,11 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       setVisible(PAGE);
       window.scrollTo({ top: 0, behavior: "smooth" });
     };
+    // Reuse the navbar's scroll-direction signal: hidden===true means the user
+    // scrolled down → drop the bottom search bar out of view.
+    const onNavHidden = (e: Event) => setBarHidden((e as CustomEvent<boolean>).detail);
     const onCloseDetail = () => setSelectedRelease(null);
+    window.addEventListener("pulsar-nav-hidden", onNavHidden);
     window.addEventListener("pulsar-close-detail", onCloseDetail);
     window.addEventListener("pulsar-search", onSearch);
     window.addEventListener("pulsar-collection-change", onChange);
@@ -125,6 +133,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       window.removeEventListener("pulsar-type-change", onType);
       window.removeEventListener("pulsar-retake-quiz", onRetake);
       window.removeEventListener("pulsar-search", onSearch);
+      window.removeEventListener("pulsar-nav-hidden", onNavHidden);
       window.removeEventListener("pulsar-close-detail", onCloseDetail);
     };
   }, []);
@@ -294,7 +303,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
             is playing, and hides while an album panel is open. ── */}
         <div
           className={`fixed inset-x-0 z-40 flex flex-col-reverse gap-2 border-t border-white/10 bg-void/40 px-6 py-3 backdrop-blur-2xl transition-all duration-300 md:px-10 ${
-            detailOpen ? "pointer-events-none translate-y-8 opacity-0" : "opacity-100"
+            detailOpen || barHidden ? "pointer-events-none translate-y-[130%] opacity-0" : "opacity-100"
           } ${player.current ? "bottom-[72px]" : "bottom-0"}`}
         >
           {/* search row — the menu (sidebar) button is pinned to the left edge
@@ -569,6 +578,9 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
 
       {/* AI mood/taste assistant */}
       <AiChat releases={releases} />
+
+      {/* "add to which crate?" picker (event-driven, global) */}
+      <CratePicker />
     </>
   );
 }

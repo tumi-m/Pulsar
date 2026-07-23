@@ -10,7 +10,7 @@ import type { MediaFormat } from "@/lib/format";
 import { PhysicalMedia } from "./PhysicalMedia";
 import { Artwork } from "./Artwork";
 import { PLATFORMS } from "./platforms";
-import { isFavorite, toggleFavorite, inPlaylist, togglePlaylist } from "@/lib/collection";
+import { isFavorite, toggleFavorite, inPlaylist } from "@/lib/collection";
 import { usePlayer } from "./player/PlayerProvider";
 
 interface ReleaseCardProps {
@@ -40,8 +40,13 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
   const dspTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setFav(isFavorite(release.id));
-    setInList(inPlaylist(release.id));
+    const sync = () => {
+      setFav(isFavorite(release.id));
+      setInList(inPlaylist(release.id));
+    };
+    sync();
+    window.addEventListener("pulsar-collection-change", sync);
+    return () => window.removeEventListener("pulsar-collection-change", sync);
   }, [release.id]);
 
   useEffect(() => () => {
@@ -237,9 +242,9 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
         <button
           onClick={(e) => {
             e.stopPropagation();
-            setInList(togglePlaylist(release));
+            window.dispatchEvent(new CustomEvent("pulsar-crate-picker", { detail: release }));
           }}
-          aria-label={inList ? "Remove from crate" : "Add to crate"}
+          aria-label="Add to a crate"
           className={`flex flex-1 items-center justify-center transition-colors hover:bg-white/10 ${big ? "h-12" : "h-10"}`}
         >
           {inList ? (
