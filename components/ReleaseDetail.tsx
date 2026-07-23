@@ -37,6 +37,7 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
   const [copied, setCopied] = useState<string | null>(null);
   const [tracks, setTracks] = useState<Track[] | null>(null);
   const [tracksLoading, setTracksLoading] = useState(false);
+  const [tracksOpen, setTracksOpen] = useState(true);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -159,8 +160,29 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
                   {release.type} · {formatDate(release.release_date)}
                   {release.genre ? ` · ${release.genre}` : ""}
                 </p>
+                {/* DSP platform logos next to the artist / release date */}
+                {available.length > 0 && (
+                  <div className="mt-2 flex items-center gap-1.5">
+                    {available.map((p) => (
+                      <a
+                        key={p.key}
+                        href={release[p.key]!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={p.hint}
+                        title={p.label}
+                        className="flex h-6 w-6 items-center justify-center rounded-full transition-transform hover:scale-110"
+                        style={{ backgroundColor: `${p.color}26`, color: p.color }}
+                      >
+                        <span className="[&>svg]:h-3.5 [&>svg]:w-3.5">
+                          <p.Icon />
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                )}
                 {release.label && (
-                  <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-neon-green/70">
+                  <p className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-neon-green/70">
                     ▪ {release.label}
                   </p>
                 )}
@@ -182,18 +204,18 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
                       player.play(release); // start the shared audio (gesture)
                       onVisualize(release);
                     }}
-                    className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-neon-violet/10"
+                    className="group flex w-full items-center gap-3 rounded-full px-3 py-3 transition-colors hover:bg-neon-violet/10"
                     style={{ background: "linear-gradient(100deg, rgba(155,93,229,0.12), rgba(0,212,255,0.06))" }}
                   >
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-neon-violet/20 text-neon-violet">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-neon-violet/20 text-neon-violet">
                       <AudioLines size={18} />
                     </span>
                     <span className="flex-1 text-left">
                       <span className="block text-sm font-bold uppercase tracking-wide text-star-white">
-                        Play & Visualize
+                        Visualise
                       </span>
                       <span className="block text-[11px] text-star-white/45">
-                        30-second preview · live 3D particle visuals
+                        30-second preview · live 3D visuals
                       </span>
                     </span>
                     <span className="text-star-white/30 transition-all group-hover:translate-x-0.5 group-hover:text-star-white/70">
@@ -203,13 +225,20 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
                 </div>
               )}
 
-              {/* whole-album tracklist (albums / EPs) */}
+              {/* whole-album tracklist (albums / EPs) — collapsible */}
               {(release.type === "album" || release.type === "ep") && (
                 <div className="border-b border-star-white/5 p-3">
-                  <p className="flex items-center justify-between px-2 pb-2 pt-1 text-[10px] font-mono uppercase tracking-[0.22em] text-star-white/35">
-                    <span>Tracklist</span>
+                  <button
+                    onClick={() => setTracksOpen((v) => !v)}
+                    aria-expanded={tracksOpen}
+                    className="flex w-full items-center justify-between px-2 pb-2 pt-1 text-[10px] font-mono uppercase tracking-[0.22em] text-star-white/35 transition-colors hover:text-star-white/60"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className={`transition-transform ${tracksOpen ? "rotate-90" : ""}`}>›</span>
+                      Tracklist
+                    </span>
                     {tracks && tracks.length > 0 && <span>{tracks.length} tracks</span>}
-                  </p>
+                  </button>
                   {tracksLoading && (
                     <p className="px-2 py-3 text-[11px] text-star-white/30">Loading tracks…</p>
                   )}
@@ -218,55 +247,71 @@ export function ReleaseDetail({ release, onClose, onVisualize }: ReleaseDetailPr
                       Tracklist unavailable for this release.
                     </p>
                   )}
-                  <div className="space-y-0.5">
-                    {(tracks ?? []).map((t) => {
-                      const trackDisplay: Release = { ...release, title: t.title };
-                      const isThis =
-                        player.current?.artist === release.artist && player.current?.title === t.title;
-                      const playingThis = isThis && player.playing;
-                      return (
-                        <div
-                          key={`${t.number}-${t.title}`}
-                          className="group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-star-white/[0.05]"
-                        >
-                          <button
-                            onClick={() => {
-                              if (isThis) player.toggle();
-                              else if (t.previewUrl) player.playDirect(trackDisplay, t.previewUrl);
-                            }}
-                            disabled={!t.previewUrl}
-                            aria-label={playingThis ? "Pause" : "Play track"}
-                            className="flex h-6 w-6 flex-shrink-0 items-center justify-center text-star-white/45 transition-colors group-hover:text-star-white disabled:opacity-30"
-                          >
-                            <span className="group-hover:hidden">
-                              {playingThis ? (
-                                <Pause size={12} className="text-neon-blue" fill="currentColor" />
-                              ) : (
-                                <span className="text-[11px] font-mono">{t.number || "•"}</span>
-                              )}
-                            </span>
-                            <span className="hidden group-hover:inline">
-                              {playingThis ? (
-                                <Pause size={12} fill="currentColor" />
-                              ) : (
-                                <Play size={12} fill="currentColor" />
-                              )}
-                            </span>
-                          </button>
-                          <span
-                            className={`flex-1 truncate text-[13px] ${
-                              isThis ? "text-neon-blue" : "text-star-white/85"
-                            }`}
-                          >
-                            {t.title}
-                          </span>
-                          <span className="flex-shrink-0 font-mono text-[10px] text-star-white/30">
-                            {fmtDur(t.durationMs)}
-                          </span>
+                  <AnimatePresence initial={false}>
+                    {tracksOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.25 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="space-y-1">
+                          {(tracks ?? []).map((t) => {
+                            const trackDisplay: Release = { ...release, title: t.title };
+                            const isThis =
+                              player.current?.artist === release.artist && player.current?.title === t.title;
+                            const playingThis = isThis && player.playing;
+                            return (
+                              <div
+                                key={`${t.number}-${t.title}`}
+                                className={`group flex items-center gap-3 rounded-lg border px-2 py-1.5 backdrop-blur-sm transition-colors ${
+                                  isThis
+                                    ? "border-neon-blue/30 bg-neon-blue/[0.08]"
+                                    : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
+                                }`}
+                              >
+                                <button
+                                  onClick={() => {
+                                    if (isThis) player.toggle();
+                                    else if (t.previewUrl) player.playDirect(trackDisplay, t.previewUrl);
+                                  }}
+                                  disabled={!t.previewUrl}
+                                  aria-label={playingThis ? "Pause" : "Play track"}
+                                  className="flex h-6 w-6 flex-shrink-0 items-center justify-center text-star-white/45 transition-colors group-hover:text-star-white disabled:opacity-30"
+                                >
+                                  <span className="group-hover:hidden">
+                                    {playingThis ? (
+                                      <Pause size={12} className="text-neon-blue" fill="currentColor" />
+                                    ) : (
+                                      <span className="text-[11px] font-mono">{t.number || "•"}</span>
+                                    )}
+                                  </span>
+                                  <span className="hidden group-hover:inline">
+                                    {playingThis ? (
+                                      <Pause size={12} fill="currentColor" />
+                                    ) : (
+                                      <Play size={12} fill="currentColor" />
+                                    )}
+                                  </span>
+                                </button>
+                                <span
+                                  className={`flex-1 truncate text-[13px] ${
+                                    isThis ? "text-neon-blue" : "text-star-white/85"
+                                  }`}
+                                >
+                                  {t.title}
+                                </span>
+                                <span className="flex-shrink-0 font-mono text-[10px] text-star-white/30">
+                                  {fmtDur(t.durationMs)}
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
-                  </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               )}
 
