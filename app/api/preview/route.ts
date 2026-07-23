@@ -26,8 +26,25 @@ function proxied(src: string): string {
   return `/api/preview/stream?src=${encodeURIComponent(src)}`;
 }
 
+// The artist MUST reasonably match, or we don't return a preview at all —
+// better silent than the wrong song.
+const artistMatches = (candidate: string, wanted: string): boolean => {
+  const c = norm(candidate);
+  const w = norm(wanted);
+  if (!c || !w) return false;
+  const cw = c.slice(0, 12);
+  const ww = w.slice(0, 12);
+  return c.includes(ww) || w.includes(cw);
+};
+const titleCloseness = (candidate: string, wanted: string): number => {
+  const c = norm(candidate);
+  const w = norm(wanted);
+  if (!c || !w) return 0;
+  if (c === w) return 2;
+  return c.includes(w) || w.includes(c) ? 1 : 0;
+};
+
 async function fromITunes(artist: string, title: string): Promise<Preview | null> {
-  const na = norm(artist);
   try {
     // Prefer tracks from the matching album, else a plain song search.
     const urls = [
@@ -44,15 +61,23 @@ async function fromITunes(artist: string, title: string): Promise<Preview | null
         previewUrl?: string;
         artworkUrl100?: string;
       }> = data.results ?? [];
-      const match =
-        results.find((r) => r.previewUrl && norm(r.artistName ?? "").includes(na.slice(0, 10))) ??
-        results.find((r) => r.previewUrl);
-      if (match?.previewUrl) {
+      // Require the artist to match; pick the closest title among those.
+      let best: (typeof results)[number] | null = null;
+      let bestScore = -1;
+      for (const r of results) {
+        if (!r.previewUrl || !artistMatches(r.artistName ?? "", artist)) continue;
+        const score = titleCloseness(r.trackName ?? "", title);
+        if (score > bestScore) {
+          bestScore = score;
+          best = r;
+        }
+      }
+      if (best?.previewUrl) {
         return {
-          previewUrl: proxied(match.previewUrl),
-          track: match.trackName ?? title,
-          artist: match.artistName ?? artist,
-          artworkUrl: match.artworkUrl100?.replace("100x100bb", "600x600bb") ?? null,
+          previewUrl: proxied(best.previewUrl),
+          track: best.trackName ?? title,
+          artist: best.artistName ?? artist,
+          artworkUrl: best.artworkUrl100?.replace("100x100bb", "600x600bb") ?? null,
           source: "itunes",
         };
       }
@@ -71,22 +96,29 @@ async function fromDeezer(artist: string, title: string): Promise<Preview | null
     );
     if (!res.ok) return null;
     const data = await res.json();
-    const na = norm(artist);
     const results: Array<{
       preview?: string;
       title?: string;
       artist?: { name?: string };
       album?: { cover_big?: string };
     }> = data.data ?? [];
-    const match =
-      results.find((r) => r.preview && norm(r.artist?.name ?? "").includes(na.slice(0, 10))) ??
-      results.find((r) => r.preview);
-    if (match?.preview) {
+    // Require the artist to match; pick the closest title among those.
+    let best: (typeof results)[number] | null = null;
+    let bestScore = -1;
+    for (const r of results) {
+      if (!r.preview || !artistMatches(r.artist?.name ?? "", artist)) continue;
+      const score = titleCloseness(r.title ?? "", title);
+      if (score > bestScore) {
+        bestScore = score;
+        best = r;
+      }
+    }
+    if (best?.preview) {
       return {
-        previewUrl: proxied(match.preview),
-        track: match.title ?? title,
-        artist: match.artist?.name ?? artist,
-        artworkUrl: match.album?.cover_big ?? null,
+        previewUrl: proxied(best.preview),
+        track: best.title ?? title,
+        artist: best.artist?.name ?? artist,
+        artworkUrl: best.album?.cover_big ?? null,
         source: "deezer",
       };
     }
