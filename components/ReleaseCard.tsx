@@ -19,11 +19,12 @@ interface ReleaseCardProps {
   size?: 0 | 1 | 2;
   forYou?: boolean;
   format: MediaFormat;
+  scrolling?: boolean;
   onOpen: (release: Release) => void;
   onVisualize?: (release: Release) => void;
 }
 
-export function ReleaseCard({ release, index, size = 0, forYou = false, format, onOpen, onVisualize }: ReleaseCardProps) {
+export function ReleaseCard({ release, index, size = 0, forYou = false, format, scrolling = false, onOpen, onVisualize }: ReleaseCardProps) {
   const player = usePlayer();
   const isCurrent = player.current?.id === release.id;
   const isPlayingThis = isCurrent && player.playing;
@@ -83,7 +84,7 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
       }}
       onHoverStart={enter}
       onHoverEnd={leave}
-      whileTap={{ scale: 0.95 }}
+      whileTap={scrolling ? undefined : { scale: 0.95 }}
       className={`group relative ${size === 2 ? "col-span-2 row-span-2" : size === 1 ? "col-span-2" : ""}`}
     >
       <button

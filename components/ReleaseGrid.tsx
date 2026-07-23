@@ -51,19 +51,23 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   // Search bar shrinks + centers when the user scrolls down (nav hides).
   const [searchCompact, setSearchCompact] = useState(false);
 
-  // iOS-8-style: no skew while scrolling — the tiles just settle together with
-  // a gentle collective nudge the moment the user stops scrolling.
+  // Tiles hold perfectly still while scrolling, then settle together with one
+  // gentle nudge the moment scrolling stops. `scrolling` also disables the
+  // per-tile tap animation so tiles never flinch mid-scroll on mobile.
   const gridControls = useAnimationControls();
+  const [scrolling, setScrolling] = useState(false);
   useEffect(() => {
     let t: ReturnType<typeof setTimeout>;
     const onScroll = () => {
+      setScrolling((s) => (s ? s : true));
       clearTimeout(t);
       t = setTimeout(() => {
+        setScrolling(false);
         gridControls.start({
-          y: [8, 0],
-          transition: { type: "spring", stiffness: 280, damping: 15 },
+          y: [6, 0],
+          transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] }, // smooth, no bounce
         });
-      }, 130); // fire once scrolling has actually stopped
+      }, 180); // fire once scrolling has actually stopped
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
@@ -544,6 +548,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 size={(sizes[i] ?? 0) as 0 | 1 | 2}
                 forYou={Boolean(recProfile) && (sizes[i] ?? 0) > 0}
                 format={format}
+                scrolling={scrolling}
                 onOpen={setSelectedRelease}
                 onVisualize={setVisualizing}
               />
