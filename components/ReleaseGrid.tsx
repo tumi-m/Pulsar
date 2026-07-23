@@ -308,28 +308,13 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               : `border-t ${player.current ? "bottom-[64px]" : "bottom-0"}`
           }`}
         >
-          {/* search row — the menu (sidebar) button is pinned to the left edge
-              while the search bar stays perfectly centered (symmetrical) */}
-          <div className="relative flex w-full items-center justify-center">
-            <button
-              onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
-              aria-label="Open menu"
-              className="absolute left-0 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-white/30 text-star-white/85 transition-transform hover:scale-105 active:scale-95"
-              style={{
-                background: "rgba(255,255,255,0.1)",
-                backdropFilter: "blur(18px) saturate(180%)",
-                WebkitBackdropFilter: "blur(18px) saturate(180%)",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -2px 5px rgba(0,0,0,0.3), 0 6px 16px rgba(0,0,0,0.4)",
-              }}
-            >
-              <span className="flex flex-col gap-[3px]">
-                <span className="h-[2px] w-4 rounded-full bg-current" />
-                <span className="h-[2px] w-4 rounded-full bg-current" />
-                <span className="h-[2px] w-4 rounded-full bg-current" />
-              </span>
-            </button>
-          {/* search — golden-ratio width (61.8% ≈ 1/φ) for symmetry */}
-          <div className="search-rainbow w-[86%] rounded-full p-[1.5px] md:w-[61.8%]">
+          {/* search — golden-ratio width (61.8% ≈ 1/φ), centered. Dims when
+              docked at the bottom so it recedes while browsing. */}
+          <div
+            className={`search-rainbow w-[86%] rounded-full p-[1.5px] transition-opacity duration-300 md:w-[61.8%] ${
+              atTop ? "opacity-100" : "opacity-[0.55]"
+            }`}
+          >
             <div className="flex items-center gap-2 rounded-full px-4 py-2"
               style={{
                 background: "rgba(255,255,255,0.1)",
@@ -362,10 +347,27 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               )}
             </div>
           </div>
-          </div>
 
-          {/* genre + refine controls — stacked above the search bar */}
-          <div className="flex items-center gap-3">
+          {/* controls row — bigger menu button grouped with Genre / Refine,
+              centred as one elegant, symmetrical cluster */}
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
+              aria-label="Open menu"
+              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-white/30 text-star-white/90 transition-transform hover:scale-105 active:scale-95"
+              style={{
+                background: "rgba(255,255,255,0.12)",
+                backdropFilter: "blur(18px) saturate(180%)",
+                WebkitBackdropFilter: "blur(18px) saturate(180%)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -2px 5px rgba(0,0,0,0.3), 0 6px 16px rgba(0,0,0,0.4)",
+              }}
+            >
+              <span className="flex flex-col gap-[3.5px]">
+                <span className="h-[2px] w-5 rounded-full bg-current" />
+                <span className="h-[2px] w-5 rounded-full bg-current" />
+                <span className="h-[2px] w-5 rounded-full bg-current" />
+              </span>
+            </button>
             {/* expandable Genre button */}
             <button
               onClick={() => setShowGenres((v) => !v)}
@@ -394,8 +396,10 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
             <button
               onClick={() => setShowRefine((v) => !v)}
               aria-expanded={showRefine}
-              className={`ml-auto flex flex-shrink-0 items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] transition-colors ${
-                showRefine || refineActive ? "text-star-white" : "text-star-white/40 hover:text-star-white"
+              className={`flex flex-shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] transition-colors ${
+                showRefine || refineActive
+                  ? "border-star-white/40 bg-star-white/[0.06] text-star-white"
+                  : "border-star-white/15 text-star-white/40 hover:border-star-white/40 hover:text-star-white"
               }`}
             >
               Refine
