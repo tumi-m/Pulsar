@@ -2,11 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, X, Trash2, Sparkles, Shuffle, Play, Share2, Upload } from "lucide-react";
+import { Heart, X, Trash2, Sparkles, Shuffle, Play, Share2, Upload, Plus, Pencil } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";
 import type { MediaFormat } from "@/lib/format";
-import { getFavorites, getPlaylist, toggleFavorite, removeFromPlaylist } from "@/lib/collection";
+import {
+  getFavorites,
+  getPlaylist,
+  toggleFavorite,
+  getCrates,
+  createCrate,
+  renameCrate,
+  deleteCrate,
+  removeFromCrate,
+  type Crate,
+} from "@/lib/collection";
 import { PhysicalMedia } from "./PhysicalMedia";
 import { PLATFORMS } from "./platforms";
 import { usePlayer } from "./player/PlayerProvider";
@@ -27,6 +37,9 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   const [panel, setPanel] = useState<Panel>(null);
   const [favs, setFavs] = useState<Release[]>([]);
   const [list, setList] = useState<Release[]>([]);
+  const [crates, setCrates] = useState<Crate[]>([]);
+  const [activeCrateId, setActiveCrateId] = useState<string>("default");
+  const [renaming, setRenaming] = useState(false);
   // When the navbar hides on scroll-down, the Selector + Shuffle buttons
   // relocate here, stacking above the dock buttons.
   const [navHidden, setNavHidden] = useState(false);
@@ -42,7 +55,12 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   const refresh = () => {
     setFavs(getFavorites());
     setList(getPlaylist());
+    const cs = getCrates();
+    setCrates(cs);
+    setActiveCrateId((id) => (cs.some((c) => c.id === id) ? id : cs[0]?.id ?? "default"));
   };
+
+  const activeCrate = crates.find((c) => c.id === activeCrateId) ?? crates[0];
 
   useEffect(() => {
     refresh();
@@ -63,7 +81,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   }, []);
 
   // Crate/favorites only show entries that actually have artwork.
-  const items = (panel === "favorites" ? favs : list).filter(
+  const items = (panel === "favorites" ? favs : activeCrate?.releases ?? []).filter(
     (r) => r.artwork_url && r.artwork_url.trim().length > 0
   );
 
@@ -78,7 +96,8 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   }
 
   // ── Crate export → a playlist on the DSP of choice ──────────────
-  const crateName = () => `PULSAR Crate ${new Date().toISOString().slice(0, 10)}`;
+  const crateName = () =>
+    panel === "favorites" ? "PULSAR Favorites" : activeCrate?.name ?? "PULSAR Crate";
   const asLines = () => items.map((r) => `${r.artist} — ${r.title}`).join("\n");
 
   const download = (filename: string, text: string, type = "text/plain") => {
@@ -256,33 +275,100 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               transition={{ type: "spring", stiffness: 320, damping: 34 }}
               className="crate-weave fixed bottom-0 right-0 top-0 z-40 flex w-full max-w-md flex-col border-l border-[#5a3d24]/60"
             >
-              <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-                <div>
-                  <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-star-white/40">
-                    {panel === "favorites" ? "Favorites" : "The Crate"}
-                  </p>
-                  <h3 className="text-lg font-bold uppercase tracking-tight text-star-white">
-                    {panel === "favorites" ? "Loved" : "Your Crate"} · {items.length}
-                  </h3>
-                </div>
-                <div className="flex items-center gap-2">
-                  {items.length > 0 && (
+              <div className="border-b border-white/10 px-5 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-star-white/40">
+                      {panel === "favorites" ? "Favorites" : "Crate"}
+                    </p>
+                    {panel === "favorites" ? (
+                      <h3 className="text-lg font-bold uppercase tracking-tight text-star-white">
+                        Loved · {items.length}
+                      </h3>
+                    ) : renaming ? (
+                      <input
+                        autoFocus
+                        defaultValue={activeCrate?.name}
+                        onBlur={(e) => {
+                          renameCrate(activeCrateId, e.target.value);
+                          setRenaming(false);
+                          refresh();
+                        }}
+                        onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                        className="w-full rounded-md border border-white/20 bg-white/[0.06] px-2 py-1 text-lg font-bold uppercase tracking-tight text-star-white focus:outline-none"
+                      />
+                    ) : (
+                      <button
+                        onClick={() => setRenaming(true)}
+                        className="flex items-center gap-2 text-left text-lg font-bold uppercase tracking-tight text-star-white"
+                      >
+                        <span className="truncate">{activeCrate?.name ?? "Crate"} · {items.length}</span>
+                        <Pencil size={12} className="flex-shrink-0 text-star-white/30" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-shrink-0 items-center gap-2">
+                    {items.length > 0 && (
+                      <button
+                        onClick={() => setExporting(true)}
+                        className="flex items-center gap-1.5 rounded-full border border-neon-green/40 bg-neon-green/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-neon-green transition-colors hover:bg-neon-green/20"
+                      >
+                        <Upload size={13} />
+                        Export
+                      </button>
+                    )}
                     <button
-                      onClick={() => setExporting(true)}
-                      className="flex items-center gap-1.5 rounded-full border border-neon-green/40 bg-neon-green/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-neon-green transition-colors hover:bg-neon-green/20"
+                      onClick={() => setPanel(null)}
+                      aria-label="Close"
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-star-white/50 hover:bg-white/10 hover:text-star-white"
                     >
-                      <Upload size={13} />
-                      Export
+                      <X size={16} />
                     </button>
-                  )}
-                  <button
-                    onClick={() => setPanel(null)}
-                    aria-label="Close"
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-star-white/50 hover:bg-white/10 hover:text-star-white"
-                  >
-                    <X size={16} />
-                  </button>
+                  </div>
                 </div>
+
+                {/* crate tabs — switch between your many crates + new / delete */}
+                {panel === "playlist" && (
+                  <div className="scrollbar-none mt-3 flex items-center gap-1.5 overflow-x-auto">
+                    {crates.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => setActiveCrateId(c.id)}
+                        className={`flex-shrink-0 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide transition-colors ${
+                          c.id === activeCrateId
+                            ? "border-[#c08a4e]/60 bg-[#c08a4e]/15 text-[#e0b070]"
+                            : "border-white/12 text-star-white/50 hover:text-star-white"
+                        }`}
+                      >
+                        {c.name}
+                        <span className="ml-1.5 text-star-white/40">{c.releases.length}</span>
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => {
+                        const c = createCrate(`Crate ${crates.length + 1}`);
+                        refresh();
+                        setActiveCrateId(c.id);
+                      }}
+                      aria-label="New crate"
+                      className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/15 text-star-white/60 hover:border-white/40 hover:text-star-white"
+                    >
+                      <Plus size={14} />
+                    </button>
+                    {crates.length > 1 && (
+                      <button
+                        onClick={() => {
+                          deleteCrate(activeCrateId);
+                          refresh();
+                        }}
+                        aria-label="Delete this crate"
+                        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/15 text-star-white/50 hover:border-neon-pink/50 hover:text-neon-pink"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* export → playlist sheet */}
@@ -431,7 +517,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                           onClick={(e) => {
                             e.stopPropagation();
                             if (panel === "favorites") toggleFavorite(r);
-                            else removeFromPlaylist(r.id);
+                            else removeFromCrate(activeCrateId, r.id);
                           }}
                           aria-label="Remove"
                           className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-void/70 text-star-white/60 backdrop-blur hover:text-neon-pink"

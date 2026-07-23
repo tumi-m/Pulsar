@@ -7,7 +7,7 @@ import { usePlayer } from "./PlayerProvider";
 import { Artwork } from "../Artwork";
 import { Visualizer } from "../Visualizer";
 import { CrateIcon } from "../CrateIcon";
-import { togglePlaylist, inPlaylist } from "@/lib/collection";
+import { inPlaylist } from "@/lib/collection";
 import type { Release } from "@/lib/types";
 
 /**
@@ -22,7 +22,10 @@ export function NowPlayingBar() {
   const [inCrate, setInCrate] = useState(false);
 
   useEffect(() => {
-    setInCrate(current ? inPlaylist(current.id) : false);
+    const sync = () => setInCrate(current ? inPlaylist(current.id) : false);
+    sync();
+    window.addEventListener("pulsar-collection-change", sync);
+    return () => window.removeEventListener("pulsar-collection-change", sync);
   }, [current]);
 
   function openVisualizer() {
@@ -85,9 +88,9 @@ export function NowPlayingBar() {
 
               {/* add to crate — brown crate glyph */}
               <button
-                onClick={() => current && setInCrate(togglePlaylist(current))}
-                aria-label={inCrate ? "Remove from crate" : "Add to crate"}
-                title={inCrate ? "In your crate" : "Add to crate"}
+                onClick={() => current && window.dispatchEvent(new CustomEvent("pulsar-crate-picker", { detail: current }))}
+                aria-label="Add to a crate"
+                title={inCrate ? "In a crate" : "Add to a crate"}
                 className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
                   inCrate ? "border-[#c08a4e]/60 bg-[#c08a4e]/15" : "border-white/25 bg-white/[0.06] hover:border-white/50"
                 }`}
