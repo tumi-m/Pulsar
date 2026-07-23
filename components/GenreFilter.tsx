@@ -14,8 +14,8 @@ export function GenreFilter({ active, onChange, available }: GenreFilterProps) {
   const pill = (isActive: boolean) =>
     `flex-shrink-0 rounded-full px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] transition-all duration-200 ${
       isActive
-        ? "bg-[#4aa3ff] text-void"
-        : "text-[#a9d5ff] hover:bg-[#4aa3ff]/15 hover:text-white"
+        ? "bg-[#4aa3ff] text-void shadow-[0_1px_3px_rgba(0,0,0,0.5)]"
+        : "bg-white/[0.06] text-[#a9d5ff] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-white/[0.1] hover:text-white"
     }`;
 
   return (
