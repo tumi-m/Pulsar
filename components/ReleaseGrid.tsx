@@ -282,7 +282,11 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
         }`}
       >
         {/* ── the menu: search + genre by default, one quiet "Refine" ── */}
-        <div className="sticky top-14 z-30 mb-6 bg-void/85 px-6 py-3 backdrop-blur-xl md:px-10">
+        <div
+          className={`sticky z-40 mb-6 bg-void/85 px-6 py-3 backdrop-blur-xl transition-[top] duration-300 md:px-10 ${
+            searchCompact ? "top-0" : "top-14"
+          }`}
+        >
           {/* search — small, centered, rounded liquid glass with a rainbow
               outer line; shrinks further on scroll-down */}
           <div
