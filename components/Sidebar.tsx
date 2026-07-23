@@ -77,7 +77,7 @@ export function Sidebar() {
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
             transition={{ type: "spring", stiffness: 520, damping: 42 }}
-            className="fixed inset-y-0 left-0 z-[55] flex w-[86%] max-w-xs transform-gpu flex-col overflow-y-auto border-r border-white/15 bg-[#0a0a14]/60 backdrop-blur-2xl"
+            className="fixed inset-y-0 left-0 z-[55] flex w-[92%] max-w-sm transform-gpu flex-col overflow-y-auto border-r border-white/15 bg-[#0a0a14]/60 backdrop-blur-2xl"
             style={{ boxShadow: "inset -1px 0 0 rgba(255,255,255,0.14), 20px 0 60px rgba(0,0,0,0.5)" }}
           >
             <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-5">

@@ -245,9 +245,11 @@ export function VisualCanvas({
         level = 0.1;
       }
 
+      // Punchier, more in-sync beat detection: lower threshold, higher gain,
+      // faster decay so hits land on the beat instead of smearing.
       const rise = bass - prevBass;
       prevBass = bass;
-      kick = Math.max(kick * 0.86, rise > 0.05 ? Math.min(1, rise * 5) : 0);
+      kick = Math.max(kick * 0.82, rise > 0.035 ? Math.min(1, rise * 7) : 0);
 
       ctx.fillStyle = "rgba(4,4,10,0.22)";
       ctx.fillRect(0, 0, W, H);
@@ -263,20 +265,26 @@ export function VisualCanvas({
         ctx.fillStyle = "rgba(4,4,10,1)";
         ctx.fillRect(0, 0, W, H);
         if (img && img.width) {
-          const pulse = 1 + bass * 0.06 + kick * 0.05;
-          const side = Math.min(W, H) * 0.72 * pulse;
-          const x = cx - side / 2;
-          const y = cy - side / 2;
+          // React hard to the music: punch on the kick, sway + bob to the beat,
+          // and a slight tilt so the cover really dances.
+          const pulse = 1 + bass * 0.22 + kick * 0.3;
+          const sway = Math.sin(time * 1.6) * (5 + level * 14) + kick * 10;
+          const bob = Math.sin(time * 2.3) * (4 + bass * 12);
+          const tilt = Math.sin(time * 0.9) * 0.02 + kick * 0.04;
+          const side = Math.min(W, H) * 0.64 * pulse;
           ctx.save();
-          ctx.shadowColor = `hsla(265, 90%, 60%, ${0.4 + kick * 0.4})`;
-          ctx.shadowBlur = 40 + bass * 80 + kick * 60;
+          ctx.translate(cx + sway, cy + bob);
+          ctx.rotate(tilt);
+          ctx.shadowColor = `hsla(${265 + treble * 80}, 90%, 60%, ${0.4 + kick * 0.5})`;
+          ctx.shadowBlur = 40 + bass * 140 + kick * 120;
           ctx.fillStyle = "#000";
-          ctx.fillRect(x, y, side, side);
+          ctx.fillRect(-side / 2, -side / 2, side, side);
+          ctx.shadowBlur = 0;
+          ctx.drawImage(img, -side / 2, -side / 2, side, side);
+          ctx.strokeStyle = `hsla(0,0%,100%,${0.15 + treble * 0.3 + kick * 0.3})`;
+          ctx.lineWidth = 1.5 + kick * 2;
+          ctx.strokeRect(-side / 2, -side / 2, side, side);
           ctx.restore();
-          ctx.drawImage(img, x, y, side, side);
-          ctx.strokeStyle = `hsla(0,0%,100%,${0.12 + treble * 0.2})`;
-          ctx.lineWidth = 1.5;
-          ctx.strokeRect(x, y, side, side);
         } else {
           ctx.fillStyle = "hsla(0,0%,100%,0.3)";
           ctx.font = "600 12px ui-monospace, monospace";
