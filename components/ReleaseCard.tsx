@@ -177,11 +177,11 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
           big ? "h-20 w-20" : "h-14 w-14"
         } ${isCurrent || hovered ? "scale-100 opacity-100" : "scale-90 opacity-0"}`}
         style={{
-          background: "rgba(255,255,255,0.14)",
+          background: "rgba(12,12,20,0.5)",
           backdropFilter: "blur(10px) saturate(140%)",
           WebkitBackdropFilter: "blur(10px) saturate(140%)",
           boxShadow:
-            "0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -2px 6px rgba(0,0,0,0.25)",
+            "0 8px 32px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 6px rgba(0,0,0,0.35)",
         }}
       >
         {isPlayingThis ? (
@@ -194,15 +194,15 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
       {/* quick actions — a full-width liquid-glass bar (matches the play
           triangle): Share · Favorite · Crate, spanning the tile's width */}
       <div
-        className={`absolute inset-x-2 top-2 z-20 flex items-stretch overflow-hidden rounded-full ring-1 ring-white/40 transition-all duration-200 ${
+        className={`absolute inset-x-2 top-2 z-20 flex items-stretch overflow-hidden rounded-full ring-1 ring-white/45 transition-all duration-200 ${
           hovered ? "translate-y-0 opacity-100" : "-translate-y-1.5 opacity-0"
         }`}
         style={{
-          background: "rgba(255,255,255,0.14)",
+          background: "rgba(12,12,20,0.5)",
           backdropFilter: "blur(10px) saturate(140%)",
           WebkitBackdropFilter: "blur(10px) saturate(140%)",
           boxShadow:
-            "0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -2px 6px rgba(0,0,0,0.25)",
+            "0 8px 32px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 6px rgba(0,0,0,0.35)",
         }}
       >
         <button

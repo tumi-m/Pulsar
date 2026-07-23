@@ -88,7 +88,9 @@ export function NowPlayingBar() {
                 onClick={() => current && setInCrate(togglePlaylist(current))}
                 aria-label={inCrate ? "Remove from crate" : "Add to crate"}
                 title={inCrate ? "In your crate" : "Add to crate"}
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-white/15 transition-colors hover:border-white/40"
+                className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
+                  inCrate ? "border-[#c08a4e]/60 bg-[#c08a4e]/15" : "border-white/25 bg-white/[0.06] hover:border-white/50"
+                }`}
               >
                 <CrateIcon
                   size={17}

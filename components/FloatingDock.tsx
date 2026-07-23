@@ -147,13 +147,13 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       key={key}
       onClick={onClick}
       aria-label={label}
-      className="group relative flex h-14 w-14 items-center justify-center rounded-full ring-1 ring-white/30 transition-transform hover:scale-110 active:scale-95"
+      className="group relative flex h-14 w-14 items-center justify-center rounded-full ring-1 ring-white/45 transition-transform hover:scale-110 active:scale-95"
       style={{
-        background: active ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.12)",
+        background: active ? "rgba(255,255,255,0.92)" : "rgba(24,24,34,0.78)",
         backdropFilter: "blur(12px) saturate(150%)",
         WebkitBackdropFilter: "blur(12px) saturate(150%)",
         boxShadow:
-          "0 8px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -2px 6px rgba(0,0,0,0.25)",
+          "0 8px 24px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 6px rgba(0,0,0,0.3)",
       }}
     >
       {renderIcon(active)}
@@ -394,12 +394,12 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                           play(r);
                         }}
                         aria-label="Play"
-                        className="absolute left-1/2 top-[calc(50%-11px)] flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full opacity-0 ring-1 ring-white/40 transition-opacity group-hover:opacity-100"
+                        className="absolute left-1/2 top-[calc(50%-11px)] flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full opacity-0 ring-1 ring-white/45 transition-opacity group-hover:opacity-100"
                         style={{
-                          background: "rgba(255,255,255,0.14)",
+                          background: "rgba(12,12,20,0.5)",
                           backdropFilter: "blur(10px) saturate(140%)",
                           WebkitBackdropFilter: "blur(10px) saturate(140%)",
-                          boxShadow: "0 8px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.5)",
+                          boxShadow: "0 8px 24px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.4)",
                         }}
                       >
                         <Play size={15} className="ml-0.5 text-white drop-shadow" fill="currentColor" />
