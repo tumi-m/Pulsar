@@ -1,14 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
-import {
-  motion,
-  AnimatePresence,
-  useScroll,
-  useVelocity,
-  useSpring,
-  useTransform,
-} from "framer-motion";
+import { motion, AnimatePresence, useAnimationControls } from "framer-motion";
 import type { Release } from "@/lib/types";
 import { ReleaseCard } from "./ReleaseCard";
 import { ReleaseDetail } from "./ReleaseDetail";
@@ -58,12 +51,26 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   // Search bar shrinks + centers when the user scrolls down (nav hides).
   const [searchCompact, setSearchCompact] = useState(false);
 
-  // macOS-style momentum: the grid subtly skews/settles with scroll velocity.
-  const { scrollY } = useScroll();
-  const scrollVelocity = useVelocity(scrollY);
-  const smoothVelocity = useSpring(scrollVelocity, { damping: 40, stiffness: 320 });
-  const gridSkew = useTransform(smoothVelocity, [-2400, 0, 2400], [1.6, 0, -1.6], { clamp: true });
-  const gridScale = useTransform(smoothVelocity, [-2400, 0, 2400], [0.985, 1, 0.985], { clamp: true });
+  // iOS-8-style: no skew while scrolling — the tiles just settle together with
+  // a gentle collective nudge the moment the user stops scrolling.
+  const gridControls = useAnimationControls();
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout>;
+    const onScroll = () => {
+      clearTimeout(t);
+      t = setTimeout(() => {
+        gridControls.start({
+          y: [8, 0],
+          transition: { type: "spring", stiffness: 280, damping: 15 },
+        });
+      }, 130); // fire once scrolling has actually stopped
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      clearTimeout(t);
+    };
+  }, [gridControls]);
 
   const detailOpen = Boolean(selectedRelease);
 
@@ -522,7 +529,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
           </div>
         ) : (
           <motion.div
-            style={{ skewY: gridSkew, scale: gridScale, transformOrigin: "50% 0%" }}
+            animate={gridControls}
             className={`grid grid-flow-dense gap-4 px-3 md:gap-5 md:px-5 ${gridCols}`}
           >
             {shown.map((release, i) => (

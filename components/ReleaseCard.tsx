@@ -83,6 +83,7 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
       }}
       onHoverStart={enter}
       onHoverEnd={leave}
+      whileTap={{ scale: 0.95 }}
       className={`group relative ${size === 2 ? "col-span-2 row-span-2" : size === 1 ? "col-span-2" : ""}`}
     >
       <button
