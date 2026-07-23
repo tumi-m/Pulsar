@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, AnimatePresence, useScroll, useMotionValueEvent } from "framer-motion";
+import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { Shuffle } from "lucide-react";
 import { usePlayer } from "./player/PlayerProvider";
@@ -39,26 +39,6 @@ export function Navbar() {
 
   return (
     <>
-    {/* Persistent sidebar toggle — stays top-left even when the nav hides */}
-    <AnimatePresence>
-      {hidden && (
-        <motion.button
-          initial={{ opacity: 0, scale: 0.7 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.7 }}
-          transition={{ duration: 0.25 }}
-          onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
-          aria-label="Open menu"
-          className="fixed left-4 top-2.5 z-50 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-void/70 text-star-white/80 backdrop-blur-xl transition-colors hover:bg-star-white/10 hover:text-star-white md:left-9"
-        >
-          <span className="flex flex-col gap-[3px]">
-            <span className="h-[1.5px] w-4 rounded-full bg-current" />
-            <span className="h-[1.5px] w-4 rounded-full bg-current" />
-            <span className="h-[1.5px] w-4 rounded-full bg-current" />
-          </span>
-        </motion.button>
-      )}
-    </AnimatePresence>
     <motion.nav
       initial={{ opacity: 0, y: 0 }}
       animate={{ opacity: 1, y: hidden ? -64 : 0 }}

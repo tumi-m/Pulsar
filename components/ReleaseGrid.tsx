@@ -281,17 +281,36 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
           detailOpen ? "lg:pr-[50vw]" : ""
         }`}
       >
-        {/* ── the menu: search + genre by default, one quiet "Refine" ── */}
+        {/* ── the menu: search + genre by default, one quiet "Refine".
+            On scroll-down it becomes a thin translucent liquid-glass bar
+            at the very top (nothing above it) that holds the menu button. ── */}
         <div
-          className={`sticky z-40 mb-6 bg-void/85 px-6 py-3 backdrop-blur-xl transition-[top] duration-300 md:px-10 ${
-            searchCompact ? "top-0" : "top-14"
+          className={`sticky z-40 mb-6 transition-all duration-300 md:px-10 ${
+            searchCompact
+              ? "top-0 border-b border-white/10 bg-white/[0.04] px-6 py-2 backdrop-blur-2xl"
+              : "top-14 bg-void/85 px-6 py-3 backdrop-blur-xl"
           }`}
         >
+          {/* search row — the menu (sidebar) button sits in the bar when compact */}
+          <div className={`flex items-center justify-center gap-3 ${searchCompact ? "" : "mb-3"}`}>
+            {searchCompact && (
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
+                aria-label="Open menu"
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/[0.05] text-star-white/80 backdrop-blur transition-colors hover:bg-white/10 hover:text-star-white"
+              >
+                <span className="flex flex-col gap-[3px]">
+                  <span className="h-[2px] w-4 rounded-full bg-current" />
+                  <span className="h-[2px] w-4 rounded-full bg-current" />
+                  <span className="h-[2px] w-4 rounded-full bg-current" />
+                </span>
+              </button>
+            )}
           {/* search — small, centered, rounded liquid glass with a rainbow
               outer line; shrinks further on scroll-down */}
           <div
-            className={`search-rainbow mx-auto mb-3 rounded-full p-[1.5px] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-              searchCompact ? "w-[34%]" : "w-[48%]"
+            className={`search-rainbow rounded-full p-[1.5px] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              searchCompact ? "w-[52%]" : "w-[48%]"
             }`}
           >
             <div
@@ -329,8 +348,11 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               )}
             </div>
           </div>
+          </div>
 
-
+          {/* genre + refine controls — hidden when the bar is compact */}
+          {!searchCompact && (
+          <>
           <div className="flex items-center gap-3">
             {/* expandable Genre button */}
             <button
@@ -489,6 +511,8 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               </motion.div>
             )}
           </AnimatePresence>
+          </>
+          )}
         </div>
 
         {/* grid */}
