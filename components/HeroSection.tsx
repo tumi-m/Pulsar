@@ -36,7 +36,7 @@ export function HeroSection({ totalReleases, totalToday }: HeroSectionProps) {
         transition={{ delay: 0.35, duration: 0.9 }}
         className="mt-4 text-[11px] font-bold uppercase tracking-[0.4em] text-star-white/45"
       >
-        Music discovery service
+        Music discovery
       </motion.p>
     </section>
   );

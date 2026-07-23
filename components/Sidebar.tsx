@@ -266,7 +266,7 @@ export function Sidebar() {
             </Section>
 
             <div className="mt-auto px-5 py-5 text-[9px] font-bold uppercase tracking-[0.24em] text-star-white/25">
-              Music discovery service
+              Music discovery
             </div>
           </motion.aside>
         </>
