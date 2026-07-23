@@ -46,6 +46,9 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   // Crate → playlist export sheet.
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  // Hide the floating dock while the album/tracklist panel is open so it never
+  // covers the tracklist's text/icons (especially on mobile).
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const flash = (msg: string) => {
     setToast(msg);
@@ -70,13 +73,16 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       setPanel(which);
     };
     const onNavHidden = (e: Event) => setNavHidden((e as CustomEvent<boolean>).detail);
+    const onDetail = (e: Event) => setDetailOpen((e as CustomEvent<boolean>).detail);
     window.addEventListener("pulsar-collection-change", h);
     window.addEventListener("pulsar-open-crate", openFromSidebar);
     window.addEventListener("pulsar-nav-hidden", onNavHidden);
+    window.addEventListener("pulsar-detail-open", onDetail);
     return () => {
       window.removeEventListener("pulsar-collection-change", h);
       window.removeEventListener("pulsar-open-crate", openFromSidebar);
       window.removeEventListener("pulsar-nav-hidden", onNavHidden);
+      window.removeEventListener("pulsar-detail-open", onDetail);
     };
   }, []);
 
@@ -186,10 +192,13 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
 
   return (
     <>
-      {/* the dock — rides higher when the bottom search bar is showing
-          (navbar hidden) so the search bar isn't in the way */}
+      {/* the dock — rides higher when the bottom search bar is showing, and
+          hides entirely while the album panel is open so it never overlaps the
+          tracklist's text/icons */}
       <div
-        className={`fixed right-4 z-40 flex flex-col items-end gap-2 transition-[bottom] duration-300 ${
+        className={`fixed right-4 z-40 flex flex-col items-end gap-2 transition-all duration-300 ${
+          detailOpen ? "pointer-events-none translate-x-6 opacity-0" : "opacity-100"
+        } ${
           navHidden
             ? current
               ? "bottom-[200px]"
