@@ -334,14 +334,14 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               </span>
             </button>
 
-            {/* search — the bar is only as wide as the search field */}
+            {/* search — flexes to fill, shrinking so genre/refine always fit */}
             <div
-              className={`search-rainbow rounded-full p-[1.5px] transition-opacity duration-300 ${
+              className={`search-rainbow min-w-0 flex-1 rounded-full p-[1.5px] transition-opacity duration-300 sm:w-[300px] sm:flex-none md:w-[380px] ${
                 atTop ? "opacity-100" : "opacity-[0.6]"
               }`}
             >
               <div
-                className="flex w-[200px] items-center gap-2 rounded-full px-3 py-1.5 sm:w-[300px] md:w-[360px]"
+                className="flex w-full items-center gap-2 rounded-full px-3 py-1.5"
                 style={{
                   background: "rgba(255,255,255,0.1)",
                   backdropFilter: "blur(18px) saturate(180%)",
@@ -373,42 +373,30 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 )}
               </div>
             </div>
-            {/* expandable Genre button */}
+            {/* expandable Genre button — compact on mobile so it always fits */}
             <button
               onClick={() => setShowGenres((v) => !v)}
               aria-expanded={showGenres}
-              className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
+              className={`flex flex-shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.1em] transition-colors sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.16em] ${
                 activeGenre
-                  ? "border-star-white/40 bg-star-white/[0.06] text-star-white"
-                  : "border-star-white/15 text-star-white/55 hover:border-star-white/40 hover:text-star-white"
+                  ? "border-[#4aa3ff]/60 bg-[#4aa3ff]/15 text-[#8cc6ff]"
+                  : "border-star-white/15 text-star-white/60 hover:border-star-white/40 hover:text-star-white"
               }`}
             >
               {activeGenre ?? "Genre"}
               <span className={`transition-transform ${showGenres ? "rotate-180" : ""}`}>⌄</span>
             </button>
-            {activeGenre && (
-              <button
-                onClick={() => {
-                  setActiveGenre(null);
-                  resetPage();
-                }}
-                aria-label="Clear genre"
-                className="text-[10px] font-bold uppercase tracking-widest text-star-white/35 hover:text-star-white"
-              >
-                Clear
-              </button>
-            )}
             <button
               onClick={() => setShowRefine((v) => !v)}
               aria-expanded={showRefine}
-              className={`flex flex-shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] transition-colors ${
+              className={`flex flex-shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.1em] transition-colors sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.2em] ${
                 showRefine || refineActive
-                  ? "border-star-white/40 bg-star-white/[0.06] text-star-white"
-                  : "border-star-white/15 text-star-white/40 hover:border-star-white/40 hover:text-star-white"
+                  ? "border-[#4aa3ff]/60 bg-[#4aa3ff]/15 text-[#8cc6ff]"
+                  : "border-star-white/15 text-star-white/50 hover:border-star-white/40 hover:text-star-white"
               }`}
             >
               Refine
-              {refineActive && <span className="h-1 w-1 rounded-full bg-neon-violet" />}
+              {refineActive && <span className="h-1 w-1 rounded-full bg-[#4aa3ff]" />}
               <span className={`transition-transform ${showRefine ? "rotate-180" : ""}`}>⌄</span>
             </button>
           </div>
@@ -449,26 +437,44 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 className="overflow-hidden"
               >
                 <div className="flex flex-col gap-3 pt-4">
-                  {/* view + format */}
+                  {/* view + format — macOS-style segmented controls (sky blue) */}
                   <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-1.5">
+                    <div
+                      className="flex items-center gap-0.5 rounded-lg p-1"
+                      style={{
+                        background: "linear-gradient(160deg, #26262e, #14141a)",
+                        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -2px 4px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4)",
+                      }}
+                    >
                       {(["latest", ...(hasCharts ? ["streamed"] : []), ...(profile ? ["foryou"] : [])] as ViewMode[]).map(
-                        (v) => (
-                          <button
-                            key={v}
-                            onClick={() => {
-                              setView(v);
-                              resetPage();
-                            }}
-                            className={`border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
-                              view === v
-                                ? "border-star-white bg-star-white text-void"
-                                : "border-star-white/20 text-star-white/45 hover:border-star-white/60 hover:text-star-white"
-                            }`}
-                          >
-                            {v === "latest" ? "Latest" : v === "streamed" ? "Most Streamed" : "For You"}
-                          </button>
-                        )
+                        (v) => {
+                          const isActive = view === v;
+                          return (
+                            <button
+                              key={v}
+                              onClick={() => {
+                                setView(v);
+                                resetPage();
+                              }}
+                              className="relative rounded-md px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] transition-colors"
+                            >
+                              {isActive && (
+                                <motion.span
+                                  layoutId="view-active"
+                                  className="absolute inset-0 rounded-md"
+                                  style={{
+                                    background: "linear-gradient(160deg, #8cc6ff, #3f9bff)",
+                                    boxShadow: "0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.5)",
+                                  }}
+                                  transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                                />
+                              )}
+                              <span className={`relative ${isActive ? "text-void" : "text-star-white/55"}`}>
+                                {v === "latest" ? "Latest" : v === "streamed" ? "Most Streamed" : "For You"}
+                              </span>
+                            </button>
+                          );
+                        }
                       )}
                     </div>
                     <span className="hidden h-4 w-px bg-star-white/15 sm:block" />
@@ -517,9 +523,9 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                             setActiveLabel(activeLabel === l ? null : l);
                             resetPage();
                           }}
-                          className={`flex-shrink-0 whitespace-nowrap border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                          className={`flex-shrink-0 whitespace-nowrap rounded-md border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] transition-colors ${
                             activeLabel === l
-                              ? "border-neon-green/60 bg-neon-green/10 text-neon-green"
+                              ? "border-[#4aa3ff]/60 bg-[#4aa3ff]/15 text-[#8cc6ff]"
                               : "border-star-white/15 text-star-white/40 hover:border-star-white/40 hover:text-star-white"
                           }`}
                         >

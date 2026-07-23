@@ -65,6 +65,32 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
     }
   }
 
+  // For a single: jump to the parent project's full tracklist (if there is one).
+  const [parentLoading, setParentLoading] = useState(false);
+  async function openParentProject() {
+    if (!release || !onOpen) return;
+    setParentLoading(true);
+    try {
+      const res = await fetch(
+        `/api/parent?artist=${encodeURIComponent(release.artist)}&title=${encodeURIComponent(release.title)}`
+      );
+      const data = await res.json();
+      if (data.album?.title) {
+        onOpen({
+          ...release,
+          id: `album-${release.id}`,
+          title: data.album.title,
+          type: "album",
+          artwork_url: data.album.artwork ?? release.artwork_url,
+        });
+      }
+    } catch {
+      /* no parent found */
+    } finally {
+      setParentLoading(false);
+    }
+  }
+
   const cycleVisual = (dir: 1 | -1) =>
     setVisualMode((m) => {
       const i = VISUAL_MODES.findIndex((x) => x.id === m);
@@ -204,9 +230,21 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                 <Artwork src={release.artwork_url} artist={release.artist} title={release.title} sizes="96px" />
               </div>
               <div className="min-w-0 flex-1 pt-1">
-                <h2 className="text-lg font-bold uppercase leading-tight tracking-tight text-star-white">
-                  {release.title}
-                </h2>
+                {release.type === "single" && onOpen ? (
+                  <button
+                    onClick={openParentProject}
+                    disabled={parentLoading}
+                    title="Open the full project"
+                    className="text-left text-lg font-bold uppercase leading-tight tracking-tight text-star-white underline decoration-star-white/25 underline-offset-[3px] transition-colors hover:decoration-star-white/60 disabled:opacity-60"
+                  >
+                    {release.title}
+                    {parentLoading && <span className="ml-2 text-[10px] text-star-white/40">…</span>}
+                  </button>
+                ) : (
+                  <h2 className="text-lg font-bold uppercase leading-tight tracking-tight text-star-white">
+                    {release.title}
+                  </h2>
+                )}
                 <button
                   onClick={openDiscography}
                   className="mt-0.5 text-left text-sm text-star-white/65 underline decoration-star-white/25 underline-offset-[3px] transition-colors hover:text-star-white hover:decoration-star-white/50"
