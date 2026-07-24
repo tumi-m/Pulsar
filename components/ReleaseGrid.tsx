@@ -425,28 +425,10 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                   player.current ? "bottom-[72px]" : "bottom-3"
                 }`
               : atTop
-                ? "top-[178px] opacity-100 md:top-[258px]"
+                ? "top-[178px] opacity-100 md:top-[248px]"
                 : `opacity-100 ${player.current ? "bottom-[72px]" : "bottom-3"}`
           }`}
         >
-          {/* feature reel — sits just BELOW the pill (first child in a
-              flex-col-reverse column) and only while resting at the top, so it
-              never collides with the letterhead. Fades away on scroll. */}
-          <AnimatePresence>
-            {atTop && !detailOpen && !searching && (
-              <motion.div
-                key="reel"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                className="overflow-hidden"
-              >
-                <FeatureReel />
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           {/* ONE compact, immersive control row: menu · search · genre · refine.
               Only as wide as its contents → maximal screen real estate. */}
           <div
@@ -692,6 +674,24 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                     </div>
                   )}
                 </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* feature reel — LAST child so, in this flex-col-reverse column, it
+              renders at the TOP of the block: neatly between the Pulsar header
+              and the search pill. Only while resting at the top; fades on scroll. */}
+          <AnimatePresence>
+            {atTop && !detailOpen && !searching && (
+              <motion.div
+                key="reel"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                className="overflow-hidden pb-1"
+              >
+                <FeatureReel />
               </motion.div>
             )}
           </AnimatePresence>
