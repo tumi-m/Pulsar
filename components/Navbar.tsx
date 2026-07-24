@@ -2,7 +2,8 @@
 
 import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { Shuffle } from "lucide-react";
+import { Shuffle, Sparkles } from "lucide-react";
+import { CrateIcon } from "./CrateIcon";
 import { usePlayer } from "./player/PlayerProvider";
 
 export function Navbar() {
@@ -80,11 +81,16 @@ export function Navbar() {
             boxShadow: "0 4px 16px rgba(155,93,229,0.45)",
           }}
         >
+          <Sparkles size={14} className="text-white" />
           <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white">Selector</span>
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute h-full w-full animate-ping rounded-full bg-white/80" />
-            <span className="relative h-1.5 w-1.5 rounded-full bg-white" />
-          </span>
+        </button>
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent("pulsar-open-crate", { detail: "playlist" }))}
+          aria-label="Open your crate"
+          className="flex items-center gap-2 rounded-full border border-[#c08a4e]/40 bg-[#c08a4e]/10 px-4 py-2 transition-all hover:scale-105 hover:border-[#c08a4e]/70 hover:bg-[#c08a4e]/20 active:scale-95"
+        >
+          <CrateIcon size={16} filled className="text-[#d69a5c]" />
+          <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#e0b070]">Crate</span>
         </button>
         </div>
       </div>
