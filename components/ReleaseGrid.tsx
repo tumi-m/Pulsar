@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence, useAnimationControls } from "framer-motion";
 import type { Release } from "@/lib/types";
 import { ReleaseCard } from "./ReleaseCard";
@@ -50,6 +50,123 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   const [showGenres, setShowGenres] = useState(false);
   const [query, setQuery] = useState("");
 
+  // ── iOS Photos-style pinch-to-zoom grid density ──────────────
+  // Pinch OUT → fewer, bigger tiles; pinch IN → more tiles per row. `zoom` is a
+  // delta from the width-derived default so the choice survives orientation /
+  // window resizes. Trackpad pinch (wheel + ctrl) works too. Min 2 cols keeps
+  // the taste-driven span-2 tiles from ever overflowing a row.
+  const GRID_MIN = 2;
+  const GRID_MAX = 8;
+  const [zoom, setZoom] = useState(0);
+  const [baseCols, setBaseCols] = useState(3);
+  const [colHud, setColHud] = useState<number | null>(null);
+  const baseColsRef = useRef(3);
+  const zoomRef = useRef(0);
+  const detailOpenRef = useRef(false);
+  const hudTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pinchRef = useRef<number | null>(null);
+  const gridCleanup = useRef<(() => void) | null>(null);
+
+  const clampCols = (n: number) => Math.max(GRID_MIN, Math.min(GRID_MAX, n));
+  const cols = clampCols(baseCols + zoom);
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+  useEffect(() => {
+    baseColsRef.current = baseCols;
+  }, [baseCols]);
+
+  // Restore the saved density delta once.
+  useEffect(() => {
+    const saved = Number(localStorage.getItem("pulsar_grid_zoom") ?? "0");
+    if (Number.isFinite(saved)) setZoom(saved);
+  }, []);
+
+  // The width-derived default column count (mirrors the old breakpoint grid).
+  useEffect(() => {
+    const compute = () => {
+      const w = window.innerWidth;
+      setBaseCols(w < 640 ? 2 : w < 768 ? 3 : w < 1024 ? 4 : w < 1280 ? 5 : 6);
+    };
+    compute();
+    window.addEventListener("resize", compute);
+    return () => window.removeEventListener("resize", compute);
+  }, []);
+
+  const flashHud = (n: number) => {
+    setColHud(n);
+    if (hudTimer.current) clearTimeout(hudTimer.current);
+    hudTimer.current = setTimeout(() => setColHud(null), 900);
+  };
+
+  // Step the density by ±1 column, clamped, and persist + show the HUD. Uses
+  // refs so rapid consecutive pinch steps compute off the latest value.
+  const stepZoom = (dir: number) => {
+    const curCols = clampCols(baseColsRef.current + zoomRef.current);
+    const nextCols = clampCols(curCols + dir);
+    if (nextCols === curCols) return; // already at a limit
+    const nextZoom = nextCols - baseColsRef.current;
+    zoomRef.current = nextZoom;
+    setZoom(nextZoom);
+    localStorage.setItem("pulsar_grid_zoom", String(nextZoom));
+    flashHud(nextCols);
+  };
+
+  // Native pinch (two-finger) + trackpad pinch (ctrl+wheel). A callback ref
+  // (re)binds the listeners whenever the grid element mounts.
+  const attachGrid = useCallback((el: HTMLDivElement | null) => {
+    if (gridCleanup.current) {
+      gridCleanup.current();
+      gridCleanup.current = null;
+    }
+    if (!el) return;
+    const dist = (t: TouchList) =>
+      Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (detailOpenRef.current) return;
+      if (e.touches.length === 2) pinchRef.current = dist(e.touches);
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (detailOpenRef.current || e.touches.length !== 2 || pinchRef.current == null) return;
+      e.preventDefault(); // we own the pinch; one-finger vertical scroll still works
+      const d = dist(e.touches);
+      const ratio = d / pinchRef.current;
+      if (ratio > 1.25) {
+        stepZoom(-1); // spread apart → zoom in → fewer columns
+        pinchRef.current = d;
+      } else if (ratio < 0.8) {
+        stepZoom(1); // pinch together → zoom out → more columns
+        pinchRef.current = d;
+      }
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) pinchRef.current = null;
+    };
+    let wheelCooldown = 0;
+    const onWheel = (e: WheelEvent) => {
+      if (detailOpenRef.current || !e.ctrlKey) return; // ctrl+wheel = trackpad pinch
+      e.preventDefault();
+      const now = e.timeStamp;
+      if (now - wheelCooldown < 120) return;
+      wheelCooldown = now;
+      stepZoom(e.deltaY > 0 ? 1 : -1);
+    };
+
+    el.addEventListener("touchstart", onTouchStart, { passive: false });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd);
+    el.addEventListener("wheel", onWheel, { passive: false });
+    gridCleanup.current = () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("wheel", onWheel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Tiles hold perfectly still while scrolling, then settle together with one
   // gentle nudge the moment scrolling stops. `scrolling` also disables the
   // per-tile tap animation so tiles never flinch mid-scroll on mobile.
@@ -80,6 +197,9 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   }, [gridControls]);
 
   const detailOpen = Boolean(selectedRelease);
+  useEffect(() => {
+    detailOpenRef.current = detailOpen;
+  }, [detailOpen]);
 
   // Tell the navbar when album mode is open so its header can go symmetrical.
   useEffect(() => {
@@ -259,11 +379,9 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     return () => io.disconnect();
   }, [hasMore, filtered.length]);
 
-  // Grid columns reflow when the half-page detail is open — fewer columns so
-  // the tiles read ~15% larger in tracklist mode.
-  const gridCols = detailOpen
-    ? "grid-cols-2 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3"
-    : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
+  // In the half-page detail (tracklist) mode the grid keeps a fixed, calmer
+  // column count; in the main browse view columns come from pinch-zoom (`cols`).
+  const gridCols = "grid-cols-2 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3";
 
   const refineActive =
     view !== "latest" || Boolean(activeLabel) || format !== "vinyl";
@@ -567,8 +685,16 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
           </div>
         ) : (
           <motion.div
+            ref={attachGrid}
             animate={gridControls}
-            className={`grid grid-flow-dense gap-[13px] px-[13px] md:gap-[21px] md:px-[21px] ${gridCols}`}
+            className={`grid grid-flow-dense gap-[13px] px-[13px] md:gap-[21px] md:px-[21px] ${
+              detailOpen ? gridCols : ""
+            }`}
+            style={
+              detailOpen
+                ? undefined
+                : { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, touchAction: "pan-y" }
+            }
           >
             {shown.map((release, i) => (
               <ReleaseCard
@@ -584,6 +710,41 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
             ))}
           </motion.div>
         )}
+
+        {/* pinch-to-zoom density readout — brief, iOS Photos style */}
+        <AnimatePresence>
+          {colHud != null && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.85 }}
+              transition={{ duration: 0.18 }}
+              className="pointer-events-none fixed left-1/2 top-1/2 z-[55] -translate-x-1/2 -translate-y-1/2"
+            >
+              <div
+                className="flex flex-col items-center gap-2 rounded-2xl px-6 py-4"
+                style={{
+                  background: "rgba(10,10,18,0.72)",
+                  backdropFilter: "blur(22px) saturate(170%)",
+                  WebkitBackdropFilter: "blur(22px) saturate(170%)",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.25), 0 16px 44px rgba(0,0,0,0.6)",
+                }}
+              >
+                <div
+                  className="grid gap-[3px]"
+                  style={{ gridTemplateColumns: `repeat(${colHud}, 1fr)` }}
+                >
+                  {Array.from({ length: colHud * 2 }).map((_, k) => (
+                    <span key={k} className="h-2.5 w-2.5 rounded-[3px] bg-star-white/85" />
+                  ))}
+                </div>
+                <span className="text-[11px] font-bold uppercase tracking-[0.24em] text-star-white/70">
+                  {colHud} across
+                </span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* infinite-scroll sentinel + subtle loader */}
         {hasMore && (
