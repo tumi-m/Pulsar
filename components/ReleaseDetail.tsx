@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, Link as LinkIcon, Play, Pause, ChevronLeft, ChevronRight, Maximize2, Share2 } from "lucide-react";
+import { X, Check, Link as LinkIcon, Play, Pause, ChevronLeft, ChevronRight, Maximize2, Share2, Mic2, AudioLines } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 import { Artwork } from "./Artwork";
 import { PLATFORMS } from "./platforms";
 import { usePlayer } from "./player/PlayerProvider";
 import { VisualCanvas, VISUAL_MODES, type VisualMode } from "./VisualCanvas";
+import { SamplePage, type SampleRef, type SampleSubject } from "./SamplePage";
+import { LyricsPanel, type LyricsSubject } from "./LyricsPanel";
 
 interface Track {
   number: number;
@@ -30,6 +32,148 @@ const fmtDur = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
 
+// ── Sample lookups (WhoSampled-style) ──────────────────────────
+// Cached + throttled so a whole tracklist scrolling into view doesn't stampede
+// MusicBrainz. Results are keyed by artist|title and reused across renders.
+const sampleCache = new Map<string, SampleRef[]>();
+let sampleActive = 0;
+const sampleQueue: (() => void)[] = [];
+function pumpSamples() {
+  while (sampleActive < 3 && sampleQueue.length) sampleQueue.shift()!();
+}
+function fetchSamples(artist: string, title: string): Promise<SampleRef[]> {
+  const key = `${artist}|${title}`.toLowerCase();
+  const cached = sampleCache.get(key);
+  if (cached) return Promise.resolve(cached);
+  return new Promise((resolve) => {
+    sampleQueue.push(async () => {
+      sampleActive++;
+      try {
+        const res = await fetch(
+          `/api/samples?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`
+        );
+        const data = await res.json();
+        const s: SampleRef[] = Array.isArray(data.samples) ? data.samples : [];
+        sampleCache.set(key, s);
+        resolve(s);
+      } catch {
+        sampleCache.set(key, []);
+        resolve([]);
+      } finally {
+        sampleActive--;
+        pumpSamples();
+      }
+    });
+    pumpSamples();
+  });
+}
+
+/** One album track row: play/pause, a Lyrics action, and a Sample indicator
+ *  that appears only once documented samples are found (lazily, on scroll). */
+function TrackRow({
+  release,
+  track,
+  onOpenSample,
+  onOpenLyrics,
+}: {
+  release: Release;
+  track: Track;
+  onOpenSample: (subject: SampleSubject, samples: SampleRef[]) => void;
+  onOpenLyrics: (subject: LyricsSubject) => void;
+}) {
+  const player = usePlayer();
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  const [samples, setSamples] = useState<SampleRef[] | null>(null);
+
+  const trackDisplay: Release = { ...release, title: track.title };
+  const isThis = player.current?.artist === release.artist && player.current?.title === track.title;
+  const playingThis = isThis && player.playing;
+  const hasSample = Boolean(samples && samples.length > 0);
+
+  // Detect samples once the row nears the viewport.
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!el) return;
+    let done = false;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !done) {
+          done = true;
+          io.disconnect();
+          fetchSamples(release.artist, track.title).then(setSamples);
+        }
+      },
+      { rootMargin: "150px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [release.artist, track.title]);
+
+  return (
+    <div
+      ref={rowRef}
+      className={`group flex items-center gap-2.5 rounded-xl border px-2.5 py-1.5 backdrop-blur-md transition-colors ${
+        isThis
+          ? "border-neon-blue/30 bg-neon-blue/[0.10]"
+          : "border-white/10 bg-white/[0.05] hover:bg-white/[0.09]"
+      }`}
+    >
+      <button
+        onClick={() => {
+          if (isThis) player.toggle();
+          else if (track.previewUrl) player.playDirect(trackDisplay, track.previewUrl);
+        }}
+        disabled={!track.previewUrl}
+        aria-label={playingThis ? "Pause" : "Play track"}
+        className="flex h-6 w-6 flex-shrink-0 items-center justify-center text-star-white/45 transition-colors group-hover:text-star-white disabled:opacity-30"
+      >
+        <span className="group-hover:hidden">
+          {playingThis ? (
+            <Pause size={12} className="text-neon-blue" fill="currentColor" />
+          ) : (
+            <span className="text-[11px] font-mono">{track.number || "•"}</span>
+          )}
+        </span>
+        <span className="hidden group-hover:inline">
+          {playingThis ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+        </span>
+      </button>
+
+      <span className={`flex-1 truncate text-[13px] ${isThis ? "text-neon-blue" : "text-star-white/85"}`}>
+        {track.title}
+      </span>
+
+      {/* Sample indicator — only when a song actually has a documented sample */}
+      {hasSample && (
+        <button
+          onClick={() => onOpenSample({ artist: release.artist, title: track.title, artwork_url: release.artwork_url }, samples!)}
+          aria-label="View sample breakdown"
+          title="Contains a sample — see the breakdown"
+          className="flex flex-shrink-0 items-center gap-1 rounded-full border border-neon-violet/40 bg-neon-violet/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] text-neon-violet transition-transform hover:scale-105 active:scale-95"
+          style={{ boxShadow: "0 0 12px rgba(155,93,229,0.35)" }}
+        >
+          <AudioLines size={10} />
+          Smp
+        </button>
+      )}
+
+      {/* Lyrics — always available per track */}
+      <button
+        onClick={() => onOpenLyrics({ artist: release.artist, title: track.title })}
+        aria-label="View lyrics"
+        title="Lyrics"
+        className="flex h-6 w-6 flex-shrink-0 items-center justify-center text-star-white/25 transition-colors hover:text-neon-blue"
+      >
+        <Mic2 size={13} />
+      </button>
+
+      <span className="w-9 flex-shrink-0 text-right font-mono text-[10px] text-star-white/30">
+        {fmtDur(track.durationMs)}
+      </span>
+    </div>
+  );
+}
+
 /**
  * Half-page detail — a right-side sheet. For an album (or EP) it fetches
  * and shows the whole tracklist; each track plays its own 30s preview.
@@ -49,6 +193,35 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
   const [discog, setDiscog] = useState<Release[] | null>(null);
   const [discogLoading, setDiscogLoading] = useState(false);
   useEffect(() => setDiscog(null), [release]);
+
+  // WhoSampled-style sample breakdown + lyrics overlays.
+  const [sampleSubject, setSampleSubject] = useState<SampleSubject | null>(null);
+  const [sampleList, setSampleList] = useState<SampleRef[]>([]);
+  const [lyricsSubject, setLyricsSubject] = useState<LyricsSubject | null>(null);
+  // For a single (no tracklist), detect its own samples so the header can show
+  // the indicator only when there's something to show.
+  const [singleSamples, setSingleSamples] = useState<SampleRef[] | null>(null);
+
+  useEffect(() => {
+    // Reset overlays + single-sample state whenever the release changes.
+    setSampleSubject(null);
+    setLyricsSubject(null);
+    setSingleSamples(null);
+    if (!release || (release.type !== "single" && release.type !== "album" && release.type !== "ep")) return;
+    if (release.type !== "single") return; // albums detect per-track in TrackRow
+    let cancelled = false;
+    fetchSamples(release.artist, release.title).then((s) => {
+      if (!cancelled) setSingleSamples(s);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [release]);
+
+  const openSample = (subject: SampleSubject, samples: SampleRef[]) => {
+    setSampleSubject(subject);
+    setSampleList(samples);
+  };
 
   async function openDiscography() {
     if (!release) return;
@@ -282,6 +455,34 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                     ▪ {release.label}
                   </p>
                 )}
+
+                {/* single: Sample breakdown (only if found) + Lyrics */}
+                {release.type === "single" && (
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                    {singleSamples && singleSamples.length > 0 && (
+                      <button
+                        onClick={() =>
+                          openSample(
+                            { artist: release.artist, title: release.title, artwork_url: release.artwork_url },
+                            singleSamples
+                          )
+                        }
+                        className="flex items-center gap-1.5 rounded-full border border-neon-violet/40 bg-neon-violet/15 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-neon-violet transition-transform hover:scale-105 active:scale-95"
+                        style={{ boxShadow: "0 0 14px rgba(155,93,229,0.35)" }}
+                      >
+                        <AudioLines size={12} />
+                        {singleSamples.length} Sample{singleSamples.length > 1 ? "s" : ""}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setLyricsSubject({ artist: release.artist, title: release.title })}
+                      className="flex items-center gap-1.5 rounded-full border border-neon-blue/40 bg-neon-blue/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-neon-blue transition-transform hover:scale-105 active:scale-95"
+                    >
+                      <Mic2 size={12} />
+                      Lyrics
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -461,57 +662,15 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                         className="overflow-hidden"
                       >
                         <div className="space-y-1">
-                          {(tracks ?? []).map((t) => {
-                            const trackDisplay: Release = { ...release, title: t.title };
-                            const isThis =
-                              player.current?.artist === release.artist && player.current?.title === t.title;
-                            const playingThis = isThis && player.playing;
-                            return (
-                              <div
-                                key={`${t.number}-${t.title}`}
-                                className={`group flex items-center gap-3 rounded-xl border px-2.5 py-1.5 backdrop-blur-md transition-colors ${
-                                  isThis
-                                    ? "border-neon-blue/30 bg-neon-blue/[0.10]"
-                                    : "border-white/10 bg-white/[0.05] hover:bg-white/[0.09]"
-                                }`}
-                              >
-                                <button
-                                  onClick={() => {
-                                    if (isThis) player.toggle();
-                                    else if (t.previewUrl) player.playDirect(trackDisplay, t.previewUrl);
-                                  }}
-                                  disabled={!t.previewUrl}
-                                  aria-label={playingThis ? "Pause" : "Play track"}
-                                  className="flex h-6 w-6 flex-shrink-0 items-center justify-center text-star-white/45 transition-colors group-hover:text-star-white disabled:opacity-30"
-                                >
-                                  <span className="group-hover:hidden">
-                                    {playingThis ? (
-                                      <Pause size={12} className="text-neon-blue" fill="currentColor" />
-                                    ) : (
-                                      <span className="text-[11px] font-mono">{t.number || "•"}</span>
-                                    )}
-                                  </span>
-                                  <span className="hidden group-hover:inline">
-                                    {playingThis ? (
-                                      <Pause size={12} fill="currentColor" />
-                                    ) : (
-                                      <Play size={12} fill="currentColor" />
-                                    )}
-                                  </span>
-                                </button>
-                                <span
-                                  className={`flex-1 truncate text-[13px] ${
-                                    isThis ? "text-neon-blue" : "text-star-white/85"
-                                  }`}
-                                >
-                                  {t.title}
-                                </span>
-                                <span className="flex-shrink-0 font-mono text-[10px] text-star-white/30">
-                                  {fmtDur(t.durationMs)}
-                                </span>
-                              </div>
-                            );
-                          })}
+                          {(tracks ?? []).map((t) => (
+                            <TrackRow
+                              key={`${t.number}-${t.title}`}
+                              release={release}
+                              track={t}
+                              onOpenSample={openSample}
+                              onOpenLyrics={setLyricsSubject}
+                            />
+                          ))}
                         </div>
                       </motion.div>
                     )}
@@ -648,6 +807,24 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                   </div>
                 )}
               </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* WhoSampled-style sample breakdown overlay */}
+          <AnimatePresence>
+            {sampleSubject && (
+              <SamplePage
+                subject={sampleSubject}
+                samples={sampleList}
+                onClose={() => setSampleSubject(null)}
+              />
+            )}
+          </AnimatePresence>
+
+          {/* lyrics overlay */}
+          <AnimatePresence>
+            {lyricsSubject && (
+              <LyricsPanel subject={lyricsSubject} onClose={() => setLyricsSubject(null)} />
             )}
           </AnimatePresence>
         </>
