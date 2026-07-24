@@ -29,7 +29,7 @@ export function HeroSection({ totalReleases, totalToday }: HeroSectionProps) {
   // floating search bar + feature reel so the grid always starts below them.
   return (
     <section
-      className={`px-[21px] pb-[128px] pt-[89px] text-center transition-[padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:pb-[132px] md:pt-[120px] ${
+      className={`px-[21px] pb-[132px] pt-[89px] text-center transition-[padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:pb-[140px] md:pt-[120px] ${
         detailOpen ? "lg:pr-[50vw]" : ""
       }`}
     >
