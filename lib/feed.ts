@@ -43,6 +43,13 @@ const GENRE_MOOD: Record<string, MoodTag> = {
   country: "tender",
   folk: "tender",
   singer: "tender",
+  gospel: "euphoric",
+  worship: "tender",
+  praise: "euphoric",
+  amapiano: "hypnotic",
+  afrobeat: "euphoric",
+  reggae: "euphoric",
+  latin: "euphoric",
 };
 
 function moodFor(genre: string): MoodTag {
@@ -213,7 +220,7 @@ async function fromDeezerGenres(): Promise<Release[]> {
   const genres = (await fetchJSON("https://api.deezer.com/genre")) as {
     data?: { id: number; name: string }[];
   } | null;
-  const ids = (genres?.data ?? []).map((g) => g.id).filter((id) => id > 0).slice(0, 24);
+  const ids = (genres?.data ?? []).map((g) => g.id).filter((id) => id > 0).slice(0, 29);
   const out: Release[] = [];
   await Promise.all(
     ids.map(async (id) => {
@@ -275,6 +282,49 @@ async function fromAfrica(): Promise<Release[]> {
   return out;
 }
 
+// ── Source 1d: Gospel & worship (global + South African) ─────────────
+// A curated, keyless sweep so the catalogue always carries gospel — from
+// contemporary worship to SA gospel legends. Releases are tagged "Gospel" so
+// they filter cleanly under the Gospel bucket.
+const GOSPEL_ARTISTS = [
+  // Global gospel / worship / CCM
+  "Kirk Franklin", "Tasha Cobbs Leonard", "CeCe Winans", "Marvin Sapp",
+  "Fred Hammond", "Donnie McClurkin", "Yolanda Adams", "Travis Greene",
+  "Tamela Mann", "William McDowell", "Jonathan McReynolds", "Maverick City Music",
+  "Elevation Worship", "Hillsong Worship", "Bethel Music", "Sinach",
+  "Nathaniel Bassey", "Mercy Chinwo", "Victoria Orenze", "Dunsin Oyekan",
+  "Tim Godfrey", "Ada Ehi", "Frank Edwards",
+  // South African gospel
+  "Joyous Celebration", "Spirit Of Praise", "Rebecca Malope", "Benjamin Dube",
+  "Dr Tumi", "Ntokozo Mbambo", "Hlengiwe Mhlaba", "Solly Mahlangu",
+  "Sipho Makhabane", "Winnie Mashaba", "Takie Ndou", "Bongo Maffin",
+  "Zaza", "Lebo Sekgobela", "Women In Praise", "Ncandweni Christ Ambassadors",
+];
+
+async function fromGospel(): Promise<Release[]> {
+  const out: Release[] = [];
+  await Promise.all(
+    GOSPEL_ARTISTS.map(async (name) => {
+      const q = encodeURIComponent(`artist:"${name}"`);
+      const data = (await fetchJSON(
+        `https://api.deezer.com/search/album?q=${q}&limit=10&order=RANKING`
+      )) as { data?: DeezerAlbum[] } | null;
+      for (const a of data?.data ?? []) {
+        const r = mapDeezer(a, null);
+        if (r) {
+          // Curated as gospel → tag it so it buckets correctly regardless of
+          // Deezer's own genre label.
+          r.genre = "Gospel";
+          r.tags = ["gospel"];
+          r.mood = "euphoric";
+          out.push(r);
+        }
+      }
+    })
+  );
+  return out;
+}
+
 // ── Source 2: Apple most-played albums + songs (current, popular) ────
 interface AppleFeedResult {
   artistName?: string;
@@ -328,21 +378,23 @@ async function fromApple(): Promise<Release[]> {
  * Never throws — on total failure it returns an empty array.
  */
 export async function getLiveFeed(): Promise<Release[]> {
-  const [deezer, apple, genres, africa] = await Promise.all([
+  const [deezer, apple, genres, africa, gospel] = await Promise.all([
     fromDeezer(),
     fromApple(),
     fromDeezerGenres(),
     fromAfrica(),
+    fromGospel(),
   ]);
   console.log(
-    `[feed] deezer: ${deezer.length} · apple: ${apple.length} · genres: ${genres.length} · africa: ${africa.length}`
+    `[feed] deezer: ${deezer.length} · apple: ${apple.length} · genres: ${genres.length} · africa: ${africa.length} · gospel: ${gospel.length}`
   );
 
   const all: FeedRelease[] = [];
   const byKey = new Map<string, FeedRelease>();
-  // Apple + deezer chart first (best popularity signal), then the genre sweep
-  // and the African / South African sweep.
-  for (const r of [...apple, ...deezer, ...genres, ...africa] as FeedRelease[]) {
+  // Apple + deezer chart first (best popularity signal). Gospel comes before the
+  // genre / African sweeps so its explicit "Gospel" tag wins the dedup for any
+  // album that also appears in those broader sweeps.
+  for (const r of [...apple, ...deezer, ...gospel, ...genres, ...africa] as FeedRelease[]) {
     const key = `${r.artist.toLowerCase()}::${r.title.toLowerCase()}`;
     const existing = byKey.get(key);
     if (!existing) {
