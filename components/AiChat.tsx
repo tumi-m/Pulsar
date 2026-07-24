@@ -86,6 +86,17 @@ export function AiChat({ releases }: AiChatProps) {
   const [view, setView] = useState<"choose" | "chat" | null>(null);
   const [text, setText] = useState("");
   const [result, setResult] = useState<Release[] | null>(null);
+  // On phones the panel is a bottom sheet (thumb-reachable, keyboard-safe);
+  // on larger screens it's a centered card.
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const sync = () => setIsMobile(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   // The navbar AI button fires "pulsar-ai-activate" → show the chooser first.
   useEffect(() => {
@@ -128,57 +139,135 @@ export function AiChat({ releases }: AiChatProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={close}
-            className="fixed inset-0 z-[58] bg-void/70 backdrop-blur-sm"
+            className="fixed inset-0 z-[58] bg-void/75 backdrop-blur-md"
           />
           <motion.div
-            initial={{ opacity: 0, y: 16, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.97 }}
-            transition={{ type: "spring", stiffness: 520, damping: 40 }}
-            className="fixed left-1/2 top-1/2 z-[58] flex max-h-[80vh] w-[min(92vw,26rem)] -translate-x-1/2 -translate-y-1/2 transform-gpu flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#0a0a14]/45 backdrop-blur-2xl"
-            style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.4), 0 24px 70px rgba(0,0,0,0.6)" }}
+            initial={isMobile ? { y: "100%" } : { opacity: 0, y: 16, scale: 0.97 }}
+            animate={isMobile ? { y: 0 } : { opacity: 1, y: 0, scale: 1 }}
+            exit={isMobile ? { y: "100%" } : { opacity: 0, y: 12, scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 480, damping: 42 }}
+            drag={isMobile ? "y" : false}
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0, bottom: 0.4 }}
+            onDragEnd={(_, info) => {
+              if (info.offset.y > 120) close();
+            }}
+            className="
+              fixed inset-x-0 bottom-0 z-[58] flex max-h-[88vh] w-full transform-gpu flex-col
+              overflow-hidden rounded-t-[26px] border border-white/15 border-b-0
+              bg-[#0a0a14]/60 pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl
+              sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-h-[80vh]
+              sm:w-[min(92vw,26rem)] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border-b
+            "
+            style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35), 0 -12px 60px rgba(0,0,0,0.6), 0 24px 70px rgba(0,0,0,0.6)" }}
           >
+            {/* aurora glow strip across the top — the "AI" signature */}
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-24 opacity-70"
+              style={{
+                background:
+                  "radial-gradient(120% 90% at 50% 0%, rgba(155,93,229,0.35), rgba(255,95,162,0.18) 45%, transparent 72%)",
+              }}
+            />
+            {/* drag grabber — mobile only */}
+            <div className="relative z-10 flex justify-center pt-2.5 sm:hidden">
+              <span className="h-1.5 w-11 rounded-full bg-white/25" />
+            </div>
+
             {view === "choose" ? (
               /* ── left / right choice before entering ── */
-              <div className="p-5">
-                <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-sm font-bold uppercase tracking-wide text-star-white">
-                    How do you want to pick?
-                  </h3>
-                  <button onClick={close} aria-label="Close" className="text-star-white/50 hover:text-star-white">
+              <div className="relative z-10 p-5 sm:p-6">
+                <div className="mb-1 flex items-start justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className="flex h-9 w-9 items-center justify-center rounded-xl"
+                      style={{
+                        background: "linear-gradient(135deg, #9b5de5, #ff5fa2 60%, #ffb347)",
+                        boxShadow: "0 6px 18px rgba(155,93,229,0.5), inset 0 1px 0 rgba(255,255,255,0.4)",
+                      }}
+                    >
+                      <Sparkles size={18} className="text-white" />
+                    </span>
+                    <div>
+                      <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-star-white/40">
+                        Selector
+                      </p>
+                      <h3 className="bg-gradient-to-r from-white to-white/70 bg-clip-text text-lg font-bold tracking-tight text-transparent">
+                        How do you want to pick?
+                      </h3>
+                    </div>
+                  </div>
+                  <button
+                    onClick={close}
+                    aria-label="Close"
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-star-white/50 hover:bg-white/10 hover:text-star-white"
+                  >
                     <X size={16} />
                   </button>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
                     onClick={chooseSurvey}
-                    className="flex flex-col items-center gap-2 rounded-xl border border-star-white/12 bg-star-white/[0.03] p-4 text-center transition-colors hover:border-neon-violet/40 hover:bg-neon-violet/[0.06]"
+                    className="group relative flex flex-col items-center gap-3 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-center transition-all hover:border-neon-violet/50 hover:bg-neon-violet/[0.07]"
                   >
-                    <LayoutGrid size={26} className="text-neon-violet" />
-                    <span className="text-[12px] font-bold uppercase tracking-wide text-star-white">
+                    <span
+                      className="pointer-events-none absolute -inset-8 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                      style={{ background: "radial-gradient(50% 50% at 50% 30%, rgba(155,93,229,0.25), transparent 70%)" }}
+                    />
+                    <span
+                      className="relative flex h-14 w-14 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110"
+                      style={{
+                        background: "linear-gradient(135deg, rgba(155,93,229,0.9), rgba(107,63,175,0.7))",
+                        boxShadow: "0 8px 22px rgba(155,93,229,0.4), inset 0 1px 0 rgba(255,255,255,0.35)",
+                      }}
+                    >
+                      <LayoutGrid size={24} className="text-white" />
+                    </span>
+                    <span className="relative text-[13px] font-bold uppercase tracking-wide text-star-white">
                       Visual Survey
                     </span>
-                    <span className="text-[10px] leading-snug text-star-white/40">Tap images ·  no typing</span>
-                  </button>
-                  <button
+                    <span className="relative text-[10px] leading-snug text-star-white/45">
+                      Tap images · no typing
+                    </span>
+                  </motion.button>
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
                     onClick={() => setView("chat")}
-                    className="flex flex-col items-center gap-2 rounded-xl border border-star-white/12 bg-star-white/[0.03] p-4 text-center transition-colors hover:border-neon-blue/40 hover:bg-neon-blue/[0.06]"
+                    className="group relative flex flex-col items-center gap-3 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-center transition-all hover:border-neon-blue/50 hover:bg-neon-blue/[0.07]"
                   >
-                    <MessagesSquare size={26} className="text-neon-blue" />
-                    <span className="text-[12px] font-bold uppercase tracking-wide text-star-white">
+                    <span
+                      className="pointer-events-none absolute -inset-8 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                      style={{ background: "radial-gradient(50% 50% at 50% 30%, rgba(74,163,255,0.25), transparent 70%)" }}
+                    />
+                    <span
+                      className="relative flex h-14 w-14 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110"
+                      style={{
+                        background: "linear-gradient(135deg, rgba(74,163,255,0.9), rgba(38,110,214,0.7))",
+                        boxShadow: "0 8px 22px rgba(74,163,255,0.4), inset 0 1px 0 rgba(255,255,255,0.35)",
+                      }}
+                    >
+                      <MessagesSquare size={24} className="text-white" />
+                    </span>
+                    <span className="relative text-[13px] font-bold uppercase tracking-wide text-star-white">
                       Chat
                     </span>
-                    <span className="text-[10px] leading-snug text-star-white/40">Describe a mood in words</span>
-                  </button>
+                    <span className="relative text-[10px] leading-snug text-star-white/45">
+                      Describe a mood in words
+                    </span>
+                  </motion.button>
                 </div>
               </div>
             ) : (
               /* ── compact chat ── */
               <>
-                <div className="flex items-center justify-between gap-3 border-b border-star-white/8 p-3">
+                <div className="relative z-10 flex items-center justify-between gap-3 border-b border-white/8 p-3">
                   {/* one-tap switch between Chat and Visual Survey */}
-                  <div className="flex items-center gap-1 rounded-full border border-star-white/12 bg-star-white/[0.03] p-0.5">
-                    <span className="flex items-center gap-1.5 rounded-full bg-star-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-void">
+                  <div className="flex items-center gap-1 rounded-full border border-white/12 bg-white/[0.03] p-0.5">
+                    <span
+                      className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white"
+                      style={{ background: "linear-gradient(120deg, #9b5de5, #ff5fa2 70%, #ffb347)" }}
+                    >
                       <Sparkles size={12} /> Chat
                     </span>
                     <button
@@ -188,12 +277,16 @@ export function AiChat({ releases }: AiChatProps) {
                       <LayoutGrid size={12} /> Visual Survey
                     </button>
                   </div>
-                  <button onClick={close} aria-label="Close" className="text-star-white/50 hover:text-star-white">
+                  <button
+                    onClick={close}
+                    aria-label="Close"
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-star-white/50 hover:bg-white/10 hover:text-star-white"
+                  >
                     <X size={16} />
                   </button>
                 </div>
 
-                <div className="p-3.5">
+                <div className="relative z-10 p-3.5">
                   <textarea
                     value={text}
                     onChange={(e) => setText(e.target.value)}
@@ -221,7 +314,11 @@ export function AiChat({ releases }: AiChatProps) {
                   <div className="mt-3 flex items-center gap-2">
                     <button
                       onClick={run}
-                      className="flex-1 rounded-lg bg-star-white py-2.5 text-[11px] font-bold uppercase tracking-widest text-void transition-transform active:scale-[0.98]"
+                      className="flex-1 rounded-lg py-2.5 text-[11px] font-bold uppercase tracking-widest text-white transition-transform active:scale-[0.98]"
+                      style={{
+                        background: "linear-gradient(120deg, #9b5de5, #ff5fa2 60%, #ffb347)",
+                        boxShadow: "0 6px 18px rgba(155,93,229,0.4)",
+                      }}
                     >
                       Build my list
                     </button>
@@ -238,7 +335,7 @@ export function AiChat({ releases }: AiChatProps) {
 
                 {/* results — only when there are any (keeps the card compact) */}
                 {result && (
-                  <div className="max-h-[42vh] flex-1 overflow-y-auto border-t border-star-white/8 p-2">
+                  <div className="relative z-10 max-h-[42vh] flex-1 overflow-y-auto border-t border-white/8 p-2">
                     {result.length === 0 && (
                       <p className="p-6 text-center text-sm text-star-white/40">
                         Nothing matched that vibe — try different words or a genre.
