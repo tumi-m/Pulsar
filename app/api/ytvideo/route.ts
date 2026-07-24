@@ -14,13 +14,16 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const artist = searchParams.get("artist")?.slice(0, 200);
   const title = searchParams.get("title")?.slice(0, 200);
+  // kind=live → find a live performance instead of the official video.
+  const kind = searchParams.get("kind") === "live" ? "live" : "video";
 
   if (!artist || !title) {
     return NextResponse.json({ error: "artist and title required" }, { status: 400 });
   }
 
   try {
-    const q = encodeURIComponent(`${artist} ${title} official video`);
+    const suffix = kind === "live" ? "live performance" : "official video";
+    const q = encodeURIComponent(`${artist} ${title} ${suffix}`);
     const res = await fetch(`https://www.youtube.com/results?search_query=${q}`, {
       headers: {
         "User-Agent":

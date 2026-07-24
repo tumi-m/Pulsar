@@ -28,12 +28,20 @@ const MOOD_WORDS: Record<string, string[]> = {
 
 const GENRE_WORDS: Record<GenreBucket, string[]> = {
   "Hip-Hop": ["hip hop", "hip-hop", "rap", "trap", "drill", "boom bap"],
-  Electronic: ["electronic", "edm", "house", "techno", "dance", "synth", "disco", "idm"],
+  Afrobeats: ["afrobeats", "afrobeat", "afropop", "afro-fusion", "naija", "highlife"],
+  Amapiano: ["amapiano", "yanos", "log drum"],
+  House: ["house", "gqom", "kwaito", "afro house", "deep house"],
+  Electronic: ["electronic", "edm", "techno", "dance", "synth", "disco", "idm", "trance"],
+  Reggae: ["reggae", "dancehall", "dub", "ska"],
+  "Soul / R&B": ["soul", "r&b", "rnb", "funk", "neo-soul"],
+  Gospel: ["gospel", "worship", "praise", "christian", "spiritual", "hymn"],
+  Pop: ["pop", "synth-pop", "bedroom pop"],
   Rock: ["rock", "punk", "grunge", "indie", "shoegaze", "alt", "guitar"],
   Metal: ["metal", "doom", "sludge", "stoner", "hardcore"],
-  "Soul / R&B": ["soul", "r&b", "rnb", "funk", "neo-soul"],
-  Pop: ["pop", "synth-pop", "bedroom pop"],
   Jazz: ["jazz", "bebop", "fusion", "swing"],
+  Blues: ["blues", "delta blues", "rhythm and blues"],
+  Latin: ["latin", "reggaeton", "salsa", "bachata", "cumbia", "bossa"],
+  Classical: ["classical", "orchestra", "symphony", "opera", "piano"],
   "Folk / Country": ["folk", "country", "americana", "singer-songwriter", "acoustic"],
 };
 

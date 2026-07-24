@@ -55,27 +55,43 @@ export const MOOD_LABELS: Record<string, string> = {
 
 export const GENRE_BUCKETS = [
   "Hip-Hop",
+  "Afrobeats",
+  "Amapiano",
+  "House",
   "Electronic",
+  "Reggae",
+  "Soul / R&B",
+  "Gospel",
+  "Pop",
   "Rock",
   "Metal",
-  "Soul / R&B",
-  "Pop",
   "Jazz",
+  "Blues",
+  "Latin",
+  "Classical",
   "Folk / Country",
 ] as const;
 
 export type GenreBucket = (typeof GENRE_BUCKETS)[number];
 
-// Ordered keyword rules — first match wins.
+// Ordered keyword rules — first match wins, so more specific buckets come first.
 const GENRE_RULES: { bucket: GenreBucket; keywords: string[] }[] = [
-  { bucket: "Hip-Hop", keywords: ["hip-hop", "hip hop", "rap", "trap"] },
-  { bucket: "Metal", keywords: ["metal", "doom", "sludge", "stoner"] },
-  { bucket: "Electronic", keywords: ["electronic", "house", "techno", "idm", "ambient", "dance", "disco", "synth"] },
-  { bucket: "Soul / R&B", keywords: ["soul", "r&b", "rnb", "funk", "neo-soul"] },
-  { bucket: "Jazz", keywords: ["jazz"] },
+  { bucket: "Amapiano", keywords: ["amapiano", "yanos", "private school piano"] },
+  { bucket: "Afrobeats", keywords: ["afrobeat", "afrobeats", "afro-pop", "afropop", "afro-fusion", "naija", "highlife"] },
+  { bucket: "Gospel", keywords: ["gospel", "worship", "praise", "christian", "spiritual", "hymn"] },
+  { bucket: "Hip-Hop", keywords: ["hip-hop", "hip hop", "rap", "trap", "drill", "boom bap"] },
+  { bucket: "Reggae", keywords: ["reggae", "dancehall", "ragga", "dub", "ska"] },
+  { bucket: "Metal", keywords: ["metal", "doom", "sludge", "stoner", "hardcore"] },
+  { bucket: "House", keywords: ["house", "gqom", "kwaito", "afro house", "afro tech", "deep house", "soulful house"] },
+  { bucket: "Electronic", keywords: ["electronic", "techno", "idm", "ambient", "dance", "disco", "synth", "edm", "trance", "dubstep", "drum and bass", "dnb", "electro"] },
+  { bucket: "Soul / R&B", keywords: ["soul", "r&b", "rnb", "funk", "neo-soul", "motown"] },
+  { bucket: "Latin", keywords: ["latin", "reggaeton", "salsa", "bachata", "cumbia", "bossa", "samba", "tango", "merengue"] },
+  { bucket: "Blues", keywords: ["blues"] },
+  { bucket: "Jazz", keywords: ["jazz", "bebop", "swing", "fusion", "big band"] },
+  { bucket: "Classical", keywords: ["classical", "orchestra", "symphony", "opera", "baroque", "concerto", "chamber"] },
   { bucket: "Folk / Country", keywords: ["folk", "country", "americana", "singer-songwriter", "bluegrass"] },
   { bucket: "Rock", keywords: ["rock", "punk", "grunge", "shoegaze", "psychedel", "indie", "alternative", "new wave", "art rock"] },
-  { bucket: "Pop", keywords: ["pop"] },
+  { bucket: "Pop", keywords: ["pop", "k-pop", "j-pop"] },
 ];
 
 export function genreBucket(genre: string | null | undefined): GenreBucket | null {
@@ -90,13 +106,21 @@ export function genreBucket(genre: string | null | undefined): GenreBucket | nul
 // Color theming per bucket (reuses the neon palette).
 export const GENRE_COLORS: Record<GenreBucket, { text: string; bg: string }> = {
   "Hip-Hop":        { text: "text-neon-amber",  bg: "bg-neon-amber/10" },
+  "Afrobeats":      { text: "text-neon-amber",  bg: "bg-neon-amber/10" },
+  "Amapiano":       { text: "text-neon-green",  bg: "bg-neon-green/10" },
+  "House":          { text: "text-neon-blue",   bg: "bg-neon-blue/10" },
   "Electronic":     { text: "text-neon-blue",   bg: "bg-neon-blue/10" },
+  "Reggae":         { text: "text-neon-green",  bg: "bg-neon-green/10" },
+  "Soul / R&B":     { text: "text-neon-violet", bg: "bg-neon-violet/10" },
+  "Gospel":         { text: "text-neon-amber",  bg: "bg-neon-amber/10" },
+  "Pop":            { text: "text-neon-green",  bg: "bg-neon-green/10" },
   "Rock":           { text: "text-neon-pink",   bg: "bg-neon-pink/10" },
   "Metal":          { text: "text-neon-pink",   bg: "bg-neon-pink/10" },
-  "Soul / R&B":     { text: "text-neon-violet", bg: "bg-neon-violet/10" },
-  "Pop":            { text: "text-neon-green",   bg: "bg-neon-green/10" },
-  "Jazz":           { text: "text-neon-amber",   bg: "bg-neon-amber/10" },
-  "Folk / Country": { text: "text-star-white",   bg: "bg-star-white/5" },
+  "Jazz":           { text: "text-neon-amber",  bg: "bg-neon-amber/10" },
+  "Blues":          { text: "text-neon-blue",   bg: "bg-neon-blue/10" },
+  "Latin":          { text: "text-neon-pink",   bg: "bg-neon-pink/10" },
+  "Classical":      { text: "text-star-white",  bg: "bg-star-white/5" },
+  "Folk / Country": { text: "text-star-white",  bg: "bg-star-white/5" },
 };
 
 export const PLATFORM_META = {
