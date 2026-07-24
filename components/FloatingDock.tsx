@@ -20,12 +20,7 @@ import {
 import { PhysicalMedia } from "./PhysicalMedia";
 import { PLATFORMS } from "./platforms";
 import { usePlayer } from "./player/PlayerProvider";
-import {
-  exportCrateToSpotify,
-  handleSpotifyRedirect,
-  spotifyConfigured,
-  type BuildResult,
-} from "@/lib/spotify";
+import { exportCrate, handleDspRedirect, providerConfigured, type BuildResult } from "@/lib/dsp";
 
 interface FloatingDockProps {
   format: MediaFormat;
@@ -52,8 +47,10 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   // Crate → playlist export sheet.
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  // Live Spotify playlist build: progress + success card.
-  const [building, setBuilding] = useState<{ done: number; total: number } | null>(null);
+  // Live playlist build: progress + success card.
+  const [building, setBuilding] = useState<{ done: number; total: number; label: string; color: string } | null>(
+    null
+  );
   const [built, setBuilt] = useState<BuildResult | null>(null);
   // Hide the floating dock while the album/tracklist panel is open so it never
   // covers the tracklist's text/icons (especially on mobile).
@@ -74,22 +71,25 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
 
   const activeCrate = crates.find((c) => c.id === activeCrateId) ?? crates[0];
 
-  // Returning from Spotify's consent screen — finish auth and resume the
+  // Returning from a DSP's OAuth consent screen — finish auth and resume the
   // playlist build that was pending before we redirected.
   useEffect(() => {
     (async () => {
-      const pending = await handleSpotifyRedirect();
+      const pending = await handleDspRedirect();
       if (!pending) return;
-      setBuilding({ done: 0, total: pending.releases.length });
+      const plat = PLATFORMS.find((p) => p.key === pending.provider);
+      const label = plat?.label ?? "your DSP";
+      const color = plat?.color ?? "#1DB954";
+      setBuilding({ done: 0, total: pending.releases.length, label, color });
       try {
-        const result = await exportCrateToSpotify(pending.name, pending.releases, (done, total) =>
-          setBuilding({ done, total })
+        const result = await exportCrate(pending.provider, pending.name, pending.releases, (done, total) =>
+          setBuilding({ done, total, label, color })
         );
         setBuilding(null);
         if (result !== "redirecting") setBuilt(result);
       } catch (err) {
         setBuilding(null);
-        flash(err instanceof Error ? err.message : "Spotify export failed");
+        flash(err instanceof Error ? err.message : `${label} export failed`);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -176,32 +176,10 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
     youtube_music: "https://music.youtube.com/library/playlists",
   };
 
-  // Spotify: create the real playlist on the user's account (OAuth PKCE, no
-  // secret). Resolves each saved release to its album's tracks and adds them.
-  const buildSpotify = async (releases: Release[], name: string) => {
-    setExporting(false);
-    setBuilding({ done: 0, total: releases.length });
-    try {
-      const result = await exportCrateToSpotify(name, releases, (done, total) =>
-        setBuilding({ done, total })
-      );
-      setBuilding(null);
-      if (result === "redirecting") return; // navigating to Spotify consent
-      setBuilt(result);
-    } catch (err) {
-      setBuilding(null);
-      flash(err instanceof Error ? err.message : "Spotify export failed");
-    }
-  };
-
-  const exportTo = async (key: string, label: string) => {
-    // Spotify has an open API → build the actual playlist on the account.
-    if (key === "spotify" && spotifyConfigured()) {
-      await buildSpotify(items, crateName());
-      return;
-    }
-    // Everyone else (or Spotify without a client id): copy the tracklist + drop
-    // a CSV, then open the service's playlist area to paste / import it.
+  // Copy the tracklist + drop a CSV, then open the service's playlist area so
+  // the list can be pasted / imported. Used for DSPs without an open write API,
+  // or as a graceful fallback when real creation isn't possible.
+  const csvFallback = async (key: string, label: string) => {
     downloadCsv();
     try {
       await navigator.clipboard.writeText(asLines());
@@ -211,6 +189,35 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
     window.open(DSP_HOME[key] ?? "https://pulsar.app", "_blank", "noopener,noreferrer");
     setExporting(false);
     flash(`Crate copied + CSV ready for ${label}`);
+  };
+
+  // Create the real playlist on the chosen DSP (Spotify / YouTube / Apple).
+  const buildDsp = async (key: string, label: string, color: string, releases: Release[], name: string) => {
+    setExporting(false);
+    setBuilding({ done: 0, total: releases.length, label, color });
+    try {
+      const result = await exportCrate(key, name, releases, (done, total) =>
+        setBuilding({ done, total, label, color })
+      );
+      setBuilding(null);
+      if (result === "redirecting") return; // navigating to the DSP's consent screen
+      setBuilt(result);
+    } catch (err) {
+      setBuilding(null);
+      flash(err instanceof Error ? err.message : `Couldn't create on ${label} — using CSV`);
+      csvFallback(key, label); // degrade gracefully
+    }
+  };
+
+  const exportTo = async (key: string, label: string) => {
+    const plat = PLATFORMS.find((p) => p.key === key);
+    // DSPs with an open API build the playlist right on the account.
+    if (providerConfigured(key)) {
+      await buildDsp(key, label, plat?.color ?? "#1DB954", items, crateName());
+      return;
+    }
+    // Everyone else: copy the tracklist + CSV, then open their playlists.
+    csvFallback(key, label);
   };
 
   const dockBtn = (
@@ -463,10 +470,11 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                         Export {items.length} to a playlist
                       </p>
                       <p className="mt-1 text-[11px] leading-relaxed text-star-white/45">
-                        {spotifyConfigured() ? (
+                        {PLATFORMS.some((p) => providerConfigured(p.key)) ? (
                           <>
-                            Spotify builds the playlist right on your account. For the rest, Pulsar
-                            copies the tracklist &amp; downloads a CSV to import.
+                            Services marked <span className="text-[#1DB954]">Creates playlist</span>{" "}
+                            build it right on your account. The rest copy the tracklist &amp; a CSV to
+                            import.
                           </>
                         ) : (
                           <>
@@ -477,7 +485,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                       </p>
                       <div className="mt-3 grid grid-cols-1 gap-1.5">
                         {PLATFORMS.map((p) => {
-                          const live = p.key === "spotify" && spotifyConfigured();
+                          const live = providerConfigured(p.key);
                           return (
                             <button
                               key={p.key}
@@ -625,7 +633,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
         )}
       </AnimatePresence>
 
-      {/* live Spotify build progress */}
+      {/* live playlist build progress (any DSP) */}
       <AnimatePresence>
         {building && (
           <motion.div
@@ -634,22 +642,29 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[70] flex items-center justify-center bg-void/85 backdrop-blur-md"
           >
-            <div className="w-[min(88vw,340px)] rounded-2xl border border-[#1DB954]/30 bg-[#0d0d16]/95 p-6 text-center">
-              <span className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-[#1DB954]/15 text-[#1DB954]">
-                <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6 animate-pulse">
-                  <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
-                </svg>
+            <div
+              className="w-[min(88vw,340px)] rounded-2xl border bg-[#0d0d16]/95 p-6 text-center"
+              style={{ borderColor: `${building.color}4d` }}
+            >
+              <span
+                className="mx-auto mb-4 flex h-12 w-12 animate-pulse items-center justify-center rounded-full"
+                style={{ backgroundColor: `${building.color}26`, color: building.color }}
+              >
+                {PLATFORMS.find((p) => p.label === building.label)?.Icon?.() ?? null}
               </span>
               <p className="text-sm font-bold uppercase tracking-widest text-star-white">
                 Building your playlist
               </p>
               <p className="mt-1 text-[11px] text-star-white/50">
-                Matching {building.done} / {building.total} on Spotify…
+                Matching {building.done} / {building.total} on {building.label}…
               </p>
               <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
                 <div
-                  className="h-full rounded-full bg-[#1DB954] transition-all duration-300"
-                  style={{ width: `${building.total ? (building.done / building.total) * 100 : 0}%` }}
+                  className="h-full rounded-full transition-all duration-300"
+                  style={{
+                    width: `${building.total ? (building.done / building.total) * 100 : 0}%`,
+                    backgroundColor: building.color,
+                  }}
                 />
               </div>
             </div>
@@ -657,59 +672,66 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
         )}
       </AnimatePresence>
 
-      {/* Spotify playlist created — success card */}
+      {/* playlist created — success card (any DSP) */}
       <AnimatePresence>
-        {built && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setBuilt(null)}
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-void/85 backdrop-blur-md"
-          >
+        {built && (() => {
+          const plat = PLATFORMS.find((p) => p.key === built.provider);
+          const color = plat?.color ?? "#1DB954";
+          const label = plat?.label ?? "your DSP";
+          return (
             <motion.div
-              initial={{ scale: 0.9, y: 10 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-[min(88vw,360px)] rounded-2xl border border-[#1DB954]/40 bg-[#0d0d16]/97 p-6 text-center"
-              style={{ boxShadow: "0 24px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.15)" }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setBuilt(null)}
+              className="fixed inset-0 z-[70] flex items-center justify-center bg-void/85 backdrop-blur-md"
             >
-              <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#1DB954] text-void">
-                <svg viewBox="0 0 24 24" fill="currentColor" className="h-7 w-7">
-                  <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
-                </svg>
-              </span>
-              <p className="text-base font-bold uppercase tracking-wide text-star-white">
-                Playlist created 🎉
-              </p>
-              <p className="mt-1 text-[12px] leading-relaxed text-star-white/55">
-                “{built.name}” is now on your Spotify with{" "}
-                <span className="text-[#1DB954]">{built.trackCount} tracks</span>
-                {built.addedReleases < built.totalReleases && (
-                  <> ({built.totalReleases - built.addedReleases} not found)</>
-                )}
-                .
-              </p>
-              <div className="mt-4 flex gap-2">
-                <a
-                  href={built.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 rounded-full bg-[#1DB954] py-2.5 text-[11px] font-bold uppercase tracking-widest text-void transition-transform hover:scale-105"
+              <motion.div
+                initial={{ scale: 0.9, y: 10 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-[min(88vw,360px)] rounded-2xl border bg-[#0d0d16]/97 p-6 text-center"
+                style={{ borderColor: `${color}66`, boxShadow: "0 24px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.15)" }}
+              >
+                <span
+                  className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full text-void"
+                  style={{ backgroundColor: color }}
                 >
-                  Open in Spotify
-                </a>
-                <button
-                  onClick={() => setBuilt(null)}
-                  className="rounded-full border border-white/15 px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-star-white/60 hover:text-star-white"
-                >
-                  Done
-                </button>
-              </div>
+                  {plat?.Icon?.() ?? null}
+                </span>
+                <p className="text-base font-bold uppercase tracking-wide text-star-white">
+                  Playlist created 🎉
+                </p>
+                <p className="mt-1 text-[12px] leading-relaxed text-star-white/55">
+                  “{built.name}” is now on your {label} with{" "}
+                  <span style={{ color }}>{built.trackCount} tracks</span>
+                  {built.addedReleases < built.totalReleases && (
+                    <> ({built.totalReleases - built.addedReleases} not found)</>
+                  )}
+                  .
+                </p>
+                <div className="mt-4 flex gap-2">
+                  <a
+                    href={built.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 rounded-full py-2.5 text-[11px] font-bold uppercase tracking-widest text-void transition-transform hover:scale-105"
+                    style={{ backgroundColor: color }}
+                  >
+                    Open in {label}
+                  </a>
+                  <button
+                    onClick={() => setBuilt(null)}
+                    className="rounded-full border border-white/15 px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-star-white/60 hover:text-star-white"
+                  >
+                    Done
+                  </button>
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
+          );
+        })()}
       </AnimatePresence>
 
       {/* export toast */}
