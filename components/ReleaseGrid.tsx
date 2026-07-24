@@ -12,6 +12,7 @@ import { FloatingDock } from "./FloatingDock";
 import { Visualizer } from "./Visualizer";
 import { AiChat } from "./AiChat";
 import { CratePicker } from "./CratePicker";
+import { FeatureReel } from "./FeatureReel";
 import { usePlayer } from "./player/PlayerProvider";
 import { genreBucket, GENRE_BUCKETS, type GenreBucket } from "@/lib/utils";
 import { loadFormat, saveFormat, type MediaFormat } from "@/lib/format";
@@ -417,17 +418,35 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
             once they scroll. framer `layout` glides between the two. ── */}
         <motion.div
           layout
-          transition={{ type: "spring", stiffness: 260, damping: 30 }}
+          transition={{ type: "spring", stiffness: 220, damping: 32 }}
           className={`fixed left-0 right-0 z-40 flex flex-col-reverse items-center gap-2 px-4 ${
             detailOpen
               ? `opacity-0 pointer-events-none lg:right-[50vw] lg:opacity-100 lg:pointer-events-auto ${
                   player.current ? "bottom-[72px]" : "bottom-3"
                 }`
               : atTop
-                ? "top-[150px] opacity-100 md:top-[248px]"
+                ? "top-[178px] opacity-100 md:top-[258px]"
                 : `opacity-100 ${player.current ? "bottom-[72px]" : "bottom-3"}`
           }`}
         >
+          {/* feature reel — sits just BELOW the pill (first child in a
+              flex-col-reverse column) and only while resting at the top, so it
+              never collides with the letterhead. Fades away on scroll. */}
+          <AnimatePresence>
+            {atTop && !detailOpen && !searching && (
+              <motion.div
+                key="reel"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                className="overflow-hidden"
+              >
+                <FeatureReel />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* ONE compact, immersive control row: menu · search · genre · refine.
               Only as wide as its contents → maximal screen real estate. */}
           <div
