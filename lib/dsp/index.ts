@@ -61,24 +61,31 @@ export async function exportCrate(
  */
 export async function handleDspRedirect(): Promise<Pending | null> {
   if (typeof window === "undefined") return null;
-  const pending = readPending();
   const hasResponse =
     window.location.search.includes("code=") || window.location.hash.includes("access_token=");
-  if (!pending || !hasResponse) return null;
+  if (!hasResponse) return null;
 
-  const provider = PROVIDERS[pending.provider];
-  if (!provider?.completeRedirect) {
+  const pending = readPending();
+
+  // Complete the exchange even when the pending crate was lost (cleared
+  // storage, a different tab, ITP). Otherwise the authorisation code would be
+  // discarded, the token never saved, and every future export would bounce the
+  // user to Spotify again in a loop. Each provider checks the `state` parameter
+  // to decide whether the response belongs to it.
+  for (const provider of Object.values(PROVIDERS)) {
+    if (!provider.completeRedirect) continue;
+    const ok = await provider.completeRedirect();
+    if (!ok) continue;
+    // Authorised. Resume the build only if this is the crate we queued.
+    if (pending && pending.provider === provider.key) return pending;
     clearPending();
-    return null;
+    return null; // connected, but nothing to resume — the next click just works
   }
-  const ok = await provider.completeRedirect();
-  if (!ok) {
-    // Consent was denied or the exchange failed — drop the pending crate so it
-    // can't silently re-trigger an export on some later page load.
-    clearPending();
-    return null;
-  }
-  return pending; // caller re-runs exportCrate(pending.provider, …), now authorised
+
+  // Nobody claimed it: consent denied, or the exchange failed. Drop the pending
+  // crate so it can't silently re-trigger an export on a later page load.
+  if (pending) clearPending();
+  return null;
 }
 
 export type { BuildResult, Pending } from "./shared";

@@ -69,6 +69,9 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
     null
   );
   const [built, setBuilt] = useState<BuildResult | null>(null);
+  const [buildError, setBuildError] = useState<
+    { label: string; color: string; message: string; key: string } | null
+  >(null);
   // Hide the floating dock while the album/tracklist panel is open so it never
   // covers the tracklist's text/icons (especially on mobile).
   const [detailOpen, setDetailOpen] = useState(false);
@@ -221,8 +224,15 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       setBuilt(result);
     } catch (err) {
       setBuilding(null);
-      flash(err instanceof Error ? err.message : `Couldn't create on ${label} — using CSV`);
-      csvFallback(key, label); // degrade gracefully
+      // A 2.6s toast followed by a surprise CSV download reads as "export is
+      // broken". Show a card that says what went wrong and let the user choose
+      // the CSV fallback deliberately.
+      setBuildError({
+        label,
+        color,
+        message: err instanceof Error ? err.message : `Couldn't create the playlist on ${label}.`,
+        key,
+      });
     }
   };
 
@@ -754,6 +764,64 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
             </motion.div>
           );
         })()}
+      </AnimatePresence>
+
+      {/* export failed — explain, and offer the CSV route as a choice */}
+      <AnimatePresence>
+        {buildError && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setBuildError(null)}
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-void/85 p-4 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.92, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-[min(92vw,380px)] rounded-2xl border border-neon-pink/40 bg-[#0d0d16]/97 p-6 text-center"
+              style={{ boxShadow: "0 24px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.15)" }}
+            >
+              <p className="text-base font-bold uppercase tracking-wide text-star-white">
+                {buildError.label} export failed
+              </p>
+              <p className="mt-2 text-[12px] leading-relaxed text-star-white/60">
+                {buildError.message}
+              </p>
+              <div className="mt-5 flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    const e = buildError;
+                    setBuildError(null);
+                    buildDsp(e.key, e.label, e.color, items, crateName());
+                  }}
+                  className="min-h-[44px] rounded-full py-2.5 text-[11px] font-bold uppercase tracking-widest text-void transition-transform hover:scale-105"
+                  style={{ backgroundColor: buildError.color }}
+                >
+                  Try again
+                </button>
+                <button
+                  onClick={() => {
+                    const e = buildError;
+                    setBuildError(null);
+                    csvFallback(e.key, e.label);
+                  }}
+                  className="min-h-[44px] rounded-full border border-white/15 py-2.5 text-[11px] font-bold uppercase tracking-widest text-star-white/70 hover:text-star-white"
+                >
+                  Download CSV instead
+                </button>
+                <button
+                  onClick={() => setBuildError(null)}
+                  className="py-1 text-[10px] font-bold uppercase tracking-widest text-star-white/40 hover:text-star-white/70"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* export toast */}
