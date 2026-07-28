@@ -37,6 +37,9 @@ function beginAuth() {
   window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 }
 
+/** Fatal for the whole export — callers must stop rather than skip a track. */
+class YouTubeFatalError extends Error {}
+
 async function api(path: string, token: string, init?: RequestInit) {
   const res = await fetch(`https://www.googleapis.com/youtube/v3${path}`, {
     ...init,
@@ -44,7 +47,31 @@ async function api(path: string, token: string, init?: RequestInit) {
   });
   if (res.status === 401) {
     clearToken("youtube");
-    throw new Error("YouTube session expired — reconnect to continue.");
+    throw new YouTubeFatalError("YouTube session expired — reconnect to continue.");
+  }
+  if (res.status === 403) {
+    // The YouTube Data API is quota-metered, and a search costs 100 units
+    // against a 10,000/day default — so a big crate exhausts it quickly. That's
+    // by far the most common failure, and it needs saying plainly rather than
+    // being reported as a generic 403.
+    let reason = "";
+    try {
+      const body = await res.json();
+      reason = body?.error?.errors?.[0]?.reason ?? "";
+    } catch {
+      /* no body */
+    }
+    if (/quota/i.test(reason)) {
+      throw new YouTubeFatalError(
+        "YouTube's daily API quota is used up. Each track costs ~150 quota units " +
+          "against a 10,000/day default, so roughly 65 tracks a day. The quota resets " +
+          "at midnight Pacific — or request more in the Google Cloud console."
+      );
+    }
+    throw new YouTubeFatalError(
+      "YouTube refused the request. If the app isn't verified by Google yet, add this " +
+        "account as a test user on the OAuth consent screen."
+    );
   }
   if (!res.ok) throw new Error(`YouTube API ${res.status}`);
   return res.json();
@@ -55,7 +82,10 @@ async function videoIdFor(r: Release, token: string): Promise<string | null> {
     const q = encodeURIComponent(searchTerm(r));
     const found = await api(`/search?part=snippet&type=video&maxResults=1&q=${q}`, token);
     return found?.items?.[0]?.id?.videoId ?? null;
-  } catch {
+  } catch (e) {
+    // Quota/auth failures must abort the run — continuing would silently build a
+    // near-empty playlist and burn what quota is left.
+    if (e instanceof YouTubeFatalError) throw e;
     return null;
   }
 }
@@ -93,8 +123,11 @@ export const youtubeProvider: DspProvider = {
           });
           addedReleases++;
           trackCount++;
-        } catch {
-          /* skip a failed insert */
+        } catch (e) {
+          // A quota/auth failure will hit every remaining track too — stop
+          // rather than grinding through the rest for nothing.
+          if (e instanceof YouTubeFatalError) throw e;
+          /* otherwise skip just this one */
         }
       }
       onProgress?.(i + 1, releases.length);
