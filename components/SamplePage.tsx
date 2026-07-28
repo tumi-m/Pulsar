@@ -51,11 +51,11 @@ export interface SampleMark {
   inSource?: number;
 }
 
-function markKey(subject: string, sampleTitle: string) {
+export function markKey(subject: string, sampleTitle: string) {
   return `${subject}::${sampleTitle}`.toLowerCase();
 }
 
-function readMarks(): Record<string, SampleMark> {
+export function readMarks(): Record<string, SampleMark> {
   try {
     return JSON.parse(localStorage.getItem(MARK_KEY) || "{}");
   } catch {

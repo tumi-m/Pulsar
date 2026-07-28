@@ -17,11 +17,27 @@ import type { Release } from "@/lib/types";
  * full 3D visualizer.
  */
 export function NowPlayingBar() {
-  const { current, playing, loading, progress, hasAudio, toggle, stop, seek, ensureGraph } = usePlayer();
+  const { current, playing, loading, progress, elapsed, duration, hasAudio, toggle, stop, seek, ensureGraph } =
+    usePlayer();
   const [expanded, setExpanded] = useState<Release | null>(null);
   const [inCrate, setInCrate] = useState(false);
   // "Where do you want to go?" sheet, opened by tapping the track info.
   const [menuOpen, setMenuOpen] = useState(false);
+  // Scrub state — while dragging we show the dragged position, not the audio's,
+  // so the bar doesn't fight the user's finger.
+  const [scrubbing, setScrubbing] = useState(false);
+  const [scrubValue, setScrubValue] = useState<number | null>(null);
+  const shownProgress = scrubValue ?? progress;
+
+  const fractionFrom = (e: React.PointerEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    return Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  };
+
+  const fmt = (s: number) =>
+    Number.isFinite(s) && s > 0
+      ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`
+      : "0:00";
 
   // Close it whenever the track changes so it never describes the wrong song.
   useEffect(() => setMenuOpen(false), [current?.id]);
@@ -128,21 +144,56 @@ export function NowPlayingBar() {
               )}
             </AnimatePresence>
 
-            {/* scrub line */}
-            <button
-              className="group absolute -top-1 left-0 right-0 h-2 cursor-pointer"
+            {/* Scrubber — a real drag target. The old one was a 2px line with a
+                click handler: impossible to hit on a phone and impossible to
+                drag anywhere. */}
+            <div
+              role="slider"
+              tabIndex={0}
               aria-label="Seek"
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                seek((e.clientX - rect.left) / rect.width);
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(shownProgress * 100)}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowRight") seek(Math.min(1, progress + 0.05));
+                if (e.key === "ArrowLeft") seek(Math.max(0, progress - 0.05));
               }}
+              onPointerDown={(e) => {
+                (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                setScrubbing(true);
+                setScrubValue(fractionFrom(e));
+              }}
+              onPointerMove={(e) => {
+                if (scrubbing) setScrubValue(fractionFrom(e));
+              }}
+              onPointerUp={(e) => {
+                if (!scrubbing) return;
+                const f = fractionFrom(e);
+                seek(f);
+                setScrubbing(false);
+                setScrubValue(null);
+              }}
+              onPointerCancel={() => {
+                setScrubbing(false);
+                setScrubValue(null);
+              }}
+              className="group absolute -top-2 left-0 right-0 z-10 h-5 cursor-pointer touch-none"
             >
-              <div className="absolute top-1 left-0 right-0 h-0.5 bg-star-white/10" />
+              <div className="absolute top-2 left-0 right-0 h-1 rounded-full bg-star-white/12" />
               <div
-                className="absolute top-1 left-0 h-0.5 bg-gradient-to-r from-neon-violet to-neon-blue transition-[width]"
-                style={{ width: `${progress * 100}%` }}
+                className={`absolute top-2 left-0 h-1 rounded-full bg-gradient-to-r from-neon-violet to-neon-blue ${
+                  scrubbing ? "" : "transition-[width]"
+                }`}
+                style={{ width: `${shownProgress * 100}%` }}
               />
-            </button>
+              {/* thumb — appears on hover, always visible while dragging */}
+              <span
+                className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow transition-opacity ${
+                  scrubbing ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                }`}
+                style={{ left: `${shownProgress * 100}%` }}
+              />
+            </div>
 
             <div className="mx-auto flex max-w-screen-2xl items-center gap-3 px-4 py-2.5 md:px-8">
               {/* artwork + meta — tapping opens the "where to?" menu */}
@@ -166,9 +217,17 @@ export function NowPlayingBar() {
                 </span>
               </button>
 
+              {/* elapsed / total — previews are short, so knowing where you are
+                  actually matters */}
+              <span className="hidden flex-shrink-0 font-mono text-[11px] tabular-nums text-star-white/40 sm:block">
+                {fmt(scrubbing ? shownProgress * duration : elapsed)}
+                <span className="text-star-white/20"> / </span>
+                {fmt(duration)}
+              </span>
+
               {/* equalizer flourish while playing */}
-              {playing && (
-                <div className="hidden items-end gap-0.5 sm:flex" aria-hidden>
+              {playing && !scrubbing && (
+                <div className="hidden items-end gap-0.5 md:flex" aria-hidden>
                   {[0, 1, 2, 3].map((i) => (
                     <motion.span
                       key={i}
@@ -185,7 +244,7 @@ export function NowPlayingBar() {
                 onClick={() => current && window.dispatchEvent(new CustomEvent("pulsar-crate-picker", { detail: current }))}
                 aria-label="Add to a crate"
                 title={inCrate ? "In a crate" : "Add to a crate"}
-                className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
+                className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
                   inCrate ? "border-[#c08a4e]/60 bg-[#c08a4e]/15" : "border-white/25 bg-white/[0.06] hover:border-white/50"
                 }`}
               >
@@ -201,34 +260,40 @@ export function NowPlayingBar() {
                 onClick={toggle}
                 disabled={!hasAudio && !loading}
                 aria-label={playing ? "Pause" : "Play"}
-                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95 disabled:opacity-40"
-                style={{ background: "linear-gradient(160deg, #f0f0f4, #c4c4cc)" }}
+                className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95 disabled:opacity-40"
+                style={{
+                  background: "linear-gradient(160deg, #f0f0f4, #c4c4cc)",
+                  boxShadow: "0 4px 14px rgba(0,0,0,0.45)",
+                }}
               >
                 {loading ? (
-                  <Loader2 size={18} className="animate-spin text-void" />
+                  <Loader2 size={20} className="animate-spin text-void" />
                 ) : playing ? (
-                  <Pause size={18} className="text-void" fill="currentColor" />
+                  <Pause size={20} className="text-void" fill="currentColor" />
                 ) : (
-                  <Play size={18} className="ml-0.5 text-void" fill="currentColor" />
+                  <Play size={20} className="ml-0.5 text-void" fill="currentColor" />
                 )}
               </button>
 
-              {/* expand → visualizer */}
+              {/* expand → visualizer. Hidden on the narrowest screens: it's
+                  reachable from the track menu, and four buttons crush the
+                  title on a small phone. */}
               <button
                 onClick={openVisualizer}
                 aria-label="Open visualizer"
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-star-white/15 text-star-white/60 transition-colors hover:border-star-white/40 hover:text-star-white"
+                className="hidden h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-star-white/15 text-star-white/60 transition-colors hover:border-star-white/40 hover:text-star-white sm:flex"
               >
-                <Maximize2 size={15} />
+                <Maximize2 size={16} />
               </button>
 
-              {/* close */}
+              {/* close — kept last and visually quietest so it's never mistaken
+                  for a transport control */}
               <button
                 onClick={stop}
                 aria-label="Close player"
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-star-white/40 transition-colors hover:bg-star-white/10 hover:text-star-white"
+                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-star-white/35 transition-colors hover:bg-star-white/10 hover:text-star-white"
               >
-                <X size={16} />
+                <X size={17} />
               </button>
             </div>
 

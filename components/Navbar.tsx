@@ -2,7 +2,7 @@
 
 import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { Shuffle, Sparkles } from "lucide-react";
+import { Shuffle, Sparkles, AudioLines } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 import { usePlayer } from "./player/PlayerProvider";
 
@@ -93,6 +93,18 @@ export function Navbar() {
         >
           <Sparkles size={14} className="text-white" />
           <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white">Selector</span>
+        </button>
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent("pulsar-open-samples"))}
+          aria-label="Samples — songs built from other records"
+          title="Samples"
+          className="flex items-center gap-2 rounded-full border border-neon-violet/40 bg-neon-violet/15 px-4 py-2 transition-all hover:scale-105 hover:border-neon-violet/70 hover:bg-neon-violet/25 active:scale-95"
+          style={{ boxShadow: "0 0 16px rgba(155,93,229,0.28)" }}
+        >
+          <AudioLines size={15} className="text-neon-violet" />
+          <span className="hidden text-[11px] font-bold uppercase tracking-[0.2em] text-neon-violet sm:inline">
+            Samples
+          </span>
         </button>
         <button
           onClick={() => window.dispatchEvent(new CustomEvent("pulsar-open-crate", { detail: "playlist" }))}

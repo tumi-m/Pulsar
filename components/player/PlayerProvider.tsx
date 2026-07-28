@@ -22,6 +22,9 @@ interface PlayerCtx {
   playing: boolean;
   loading: boolean;
   progress: number; // 0..1
+  /** Seconds elapsed / total, so the transport can show real times. */
+  elapsed: number;
+  duration: number;
   hasAudio: boolean;
   shuffle: boolean;
   play: (release: Release) => void;
@@ -57,6 +60,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [hasAudio, setHasAudio] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const reqIdRef = useRef(0);
@@ -157,7 +162,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audioRef.current = audio;
 
     const onTime = () => {
-      if (audio.duration) setProgress(audio.currentTime / audio.duration);
+      setElapsed(audio.currentTime || 0);
+      if (audio.duration) {
+        setDuration(audio.duration);
+        setProgress(audio.currentTime / audio.duration);
+      }
     };
     const onEnd = () => {
       setPlaying(false);
@@ -313,7 +322,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider
       value={{
-        current, playing, loading, progress, hasAudio, shuffle,
+        current, playing, loading, progress, elapsed, duration, hasAudio, shuffle,
         play, playDirect, toggle, toggleShuffle, stop, seek, setNextProvider, ensureGraph, getAnalyser,
       }}
     >
