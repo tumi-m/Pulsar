@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useDragControls } from "framer-motion";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { Portal } from "./Portal";
 import { X, Check, Link as LinkIcon, Play, Pause, ChevronLeft, ChevronRight, Maximize2, Share2, Mic2, AudioLines } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
@@ -338,6 +339,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
   }
 
   return (
+    <Portal>
     <AnimatePresence>
       {release && (
         <>
@@ -505,7 +507,9 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
             </div>
 
             {/* scrollable body */}
-            <div className="flex-1 overflow-y-auto">
+            {/* pad past the now-playing bar (z-50) so the last rows are never
+                hidden underneath it */}
+            <div className={`flex-1 overflow-y-auto ${player.current ? "pb-[76px]" : ""}`}>
               {release.curator_note && (
                 <p className="border-b border-star-white/5 px-5 py-4 text-sm italic leading-relaxed text-star-white/60">
                   {release.curator_note}
@@ -848,5 +852,6 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
         </>
       )}
     </AnimatePresence>
+    </Portal>
   );
 }

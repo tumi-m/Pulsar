@@ -7,6 +7,7 @@ import type { Release } from "@/lib/types";
 import { getCrates, createCrate, toggleInCrate, inCrate, type Crate } from "@/lib/collection";
 import { CrateIcon } from "./CrateIcon";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { Portal } from "./Portal";
 
 /**
  * A global "add to crate" picker. Any crate button dispatches the
@@ -38,6 +39,7 @@ export function CratePicker() {
   };
 
   return (
+    <Portal>
     <AnimatePresence>
       {release && (
         <>
@@ -130,5 +132,6 @@ export function CratePicker() {
         </>
       )}
     </AnimatePresence>
+    </Portal>
   );
 }
