@@ -301,6 +301,14 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // The now-playing bar can ask us to jump straight to the discography.
+  useEffect(() => {
+    const show = () => openDiscography();
+    window.addEventListener("pulsar-show-discography", show);
+    return () => window.removeEventListener("pulsar-show-discography", show);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [release]);
+
   // Fetch the whole album's tracklist + original release date when selected.
   useEffect(() => {
     setTracks(null);
