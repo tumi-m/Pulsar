@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { pickBestMatch } from "@/lib/match";
 
 export const runtime = "nodejs";
 
@@ -23,7 +24,6 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const na = norm(artist);
     const nt = norm(title);
     const res = await fetch(
       `https://itunes.apple.com/search?term=${encodeURIComponent(`${artist} ${title}`)}&entity=song&limit=10`,
@@ -40,10 +40,12 @@ export async function GET(req: NextRequest) {
     }> = data.results ?? [];
 
     // The song by our artist whose title matches — read its parent collection.
-    const song =
-      results.find(
-        (r) => norm(r.artistName ?? "").includes(na.slice(0, 12)) && norm(r.trackName ?? "").includes(nt.slice(0, 12))
-      ) ?? results.find((r) => norm(r.artistName ?? "").includes(na.slice(0, 12)));
+    // No artist-only fallback: picking any track by the artist would send the
+    // user to an unrelated project.
+    const song = pickBestMatch(results, { artist, title }, (r) => ({
+      artist: r.artistName ?? "",
+      title: r.trackName ?? "",
+    }));
 
     const collection = song?.collectionName?.trim();
     const trackCount = song?.trackCount ?? 0;

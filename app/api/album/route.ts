@@ -10,8 +10,7 @@ export const runtime = "nodejs";
  * same-origin proxied 30s preview URL. Powers the album view.
  */
 
-const norm = (s: string) =>
-  s.toLowerCase().replace(/\(.*?\)|\[.*?\]/g, "").replace(/&/g, "and").replace(/[^a-z0-9]/g, "");
+import { pickBestMatch } from "@/lib/match";
 
 const proxied = (src: string) => `/api/preview/stream?src=${encodeURIComponent(src)}`;
 
@@ -29,20 +28,21 @@ interface AlbumResult {
 
 async function fromITunes(artist: string, title: string): Promise<AlbumResult | null> {
   try {
-    const na = norm(artist);
     const searchRes = await fetch(
-      `https://itunes.apple.com/search?term=${encodeURIComponent(`${artist} ${title}`)}&entity=album&limit=5`,
+      `https://itunes.apple.com/search?term=${encodeURIComponent(`${artist} ${title}`)}&entity=album&limit=10`,
       { signal: AbortSignal.timeout(8000), next: { revalidate: 86400 } }
     );
     if (!searchRes.ok) return null;
     const search = await searchRes.json();
     const albums: Array<{ collectionId?: number; artistName?: string; collectionName?: string; releaseDate?: string }> =
       search.results ?? [];
-    const nt = norm(title);
-    const album =
-      albums.find(
-        (a) => norm(a.artistName ?? "").includes(na.slice(0, 10)) && norm(a.collectionName ?? "").includes(nt)
-      ) ?? albums.find((a) => norm(a.artistName ?? "").includes(na.slice(0, 10)));
+    // Must match artist AND title. There is deliberately no "first album by
+    // this artist" fallback — that is what showed Kanye's "Bully" tracklist
+    // under "Donda". No match means no tracklist.
+    const album = pickBestMatch(albums, { artist, title }, (a) => ({
+      artist: a.artistName ?? "",
+      title: a.collectionName ?? "",
+    }));
     if (!album?.collectionId) return null;
     const releaseDate = album.releaseDate ? album.releaseDate.slice(0, 10) : null;
 
@@ -78,16 +78,19 @@ async function fromITunes(artist: string, title: string): Promise<AlbumResult | 
 async function fromDeezer(artist: string, title: string): Promise<AlbumResult | null> {
   try {
     const searchRes = await fetch(
-      `https://api.deezer.com/search/album?q=${encodeURIComponent(`${artist} ${title}`)}&limit=5`,
+      `https://api.deezer.com/search/album?q=${encodeURIComponent(`${artist} ${title}`)}&limit=10`,
       { signal: AbortSignal.timeout(8000), next: { revalidate: 86400 } }
     );
     if (!searchRes.ok) return null;
     const search = await searchRes.json();
-    const na = norm(artist);
-    const album = (search.data ?? []).find(
-      (a: { id?: number; artist?: { name?: string } }) =>
-        norm(a.artist?.name ?? "").includes(na.slice(0, 10))
-    );
+    // This path previously matched on ARTIST ONLY and never looked at the
+    // title, so it would happily return any record by the artist.
+    const candidates: Array<{ id?: number; title?: string; artist?: { name?: string } }> =
+      search.data ?? [];
+    const album = pickBestMatch(candidates, { artist, title }, (a) => ({
+      artist: a.artist?.name ?? "",
+      title: a.title ?? "",
+    }));
     if (!album?.id) return null;
     const albRes = await fetch(`https://api.deezer.com/album/${album.id}`, {
       signal: AbortSignal.timeout(8000),

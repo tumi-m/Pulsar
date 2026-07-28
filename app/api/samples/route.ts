@@ -45,27 +45,42 @@ export async function GET(req: NextRequest) {
   const headers = { "User-Agent": UA, Accept: "application/json" };
 
   try {
-    // 1) Find the best-matching recording.
+    // 1) Find matching recordings. A song exists in MusicBrainz as MANY
+    //    recordings (album cut, single edit, remaster, compilation appearance),
+    //    and sample relationships are attached per-recording — often to only
+    //    one of them. Checking just the top hit was the main reason coverage
+    //    looked so thin; we now merge relationships across several.
     const query = encodeURIComponent(`artist:"${artist}" AND recording:"${title}"`);
     const searchRes = await fetch(
-      `https://musicbrainz.org/ws/2/recording/?query=${query}&fmt=json&limit=3`,
+      `https://musicbrainz.org/ws/2/recording/?query=${query}&fmt=json&limit=12`,
       { headers, signal: AbortSignal.timeout(8000), next: { revalidate: 604800 } }
     );
     if (!searchRes.ok) throw new Error("mb search failed");
     const searchData = await searchRes.json();
-    const rec = (searchData.recordings ?? []).find((r: any) => (r.score ?? 0) >= 80) ?? searchData.recordings?.[0];
-    if (!rec?.id) return NextResponse.json({ samples: [] });
+    const recs: any[] = (searchData.recordings ?? []).filter((r: any) => (r.score ?? 0) >= 80);
+    const targets = (recs.length ? recs : (searchData.recordings ?? []).slice(0, 1)).slice(0, 5);
+    if (!targets.length) return NextResponse.json({ samples: [] });
 
-    // 2) Pull its sample relationships.
-    const relRes = await fetch(
-      `https://musicbrainz.org/ws/2/recording/${rec.id}?inc=recording-rels+work-rels+artist-credits&fmt=json`,
-      { headers, signal: AbortSignal.timeout(8000), next: { revalidate: 604800 } }
+    // 2) Pull sample relationships from each, in parallel.
+    const relLists = await Promise.all(
+      targets.map(async (rec: any) => {
+        try {
+          const relRes = await fetch(
+            `https://musicbrainz.org/ws/2/recording/${rec.id}?inc=recording-rels+work-rels+artist-credits&fmt=json`,
+            { headers, signal: AbortSignal.timeout(8000), next: { revalidate: 604800 } }
+          );
+          if (!relRes.ok) return [];
+          const d = await relRes.json();
+          return d.relations ?? [];
+        } catch {
+          return [];
+        }
+      })
     );
-    if (!relRes.ok) throw new Error("mb rels failed");
-    const relData = await relRes.json();
 
     const samples: SampleRef[] = [];
-    for (const rel of relData.relations ?? []) {
+    const seen = new Set<string>();
+    for (const rel of relLists.flat()) {
       if (!rel.type || !/sampl/i.test(rel.type)) continue;
       const target = rel.recording ?? rel.work;
       if (!target?.title) continue;
@@ -75,6 +90,12 @@ export async function GET(req: NextRequest) {
         (rel.recording?.["first-release-date"] || rel.begin || "")?.slice(0, 4) || null;
       const attrs: string[] = Array.isArray(rel.attributes) ? rel.attributes : [];
       const partial = attrs.some((a) => /partial/i.test(a));
+      // Merging across several recordings means the same connection can appear
+      // more than once — keep one entry per (role, title, artist).
+      const dedupeKey = `${role}|${target.title}|${tArtist ?? ""}`.toLowerCase();
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+
       const byline = tArtist ? ` by ${tArtist}` : "";
       const description =
         role === "samples"
@@ -86,6 +107,8 @@ export async function GET(req: NextRequest) {
         artist: tArtist,
         year,
         partial,
+        // MusicBrainz relationships carry no in-song timecodes. We never invent
+        // one — the UI lets a listener mark it instead.
         timestamp: null,
         description,
       });
