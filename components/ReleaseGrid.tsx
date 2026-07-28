@@ -378,7 +378,11 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [hasMore, filtered.length]);
+    // `visible` is in the deps so the observer is rebuilt after each page. An
+    // IntersectionObserver only fires on a *transition*, so if the sentinel is
+    // still inside the 800px band after loading (a short filtered list), it
+    // would otherwise never fire again and "Loading more" would stall forever.
+  }, [hasMore, filtered.length, visible]);
 
   // In the half-page detail (tracklist) mode the grid keeps a fixed, calmer
   // column count; in the main browse view columns come from pinch-zoom (`cols`).
@@ -474,6 +478,12 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 </svg>
                 <input
                   value={query}
+                  onFocus={() => {
+                    // While scrolled, the bar rests at the bottom where the
+                    // on-screen keyboard covers it. Return to the top so the
+                    // field (and results) stay visible while typing.
+                    if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
                   onChange={(e) => {
                     setQuery(e.target.value);
                     resetPage();

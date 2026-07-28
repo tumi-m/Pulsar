@@ -62,12 +62,19 @@ function moodFor(genre: string): MoodTag {
 }
 
 function stableId(artist: string, title: string): string {
-  let h = 0;
+  // Two independent hashes (different multipliers/seeds) plus the input length.
+  // A single 32-bit hash collides at a realistic rate once the catalogue runs to
+  // tens of thousands of releases, and a collision means two different albums
+  // share a React key — one tile silently disappears.
   const s = `${artist}::${title}`.toLowerCase();
+  let h1 = 0;
+  let h2 = 0x9e3779b9 | 0;
   for (let i = 0; i < s.length; i++) {
-    h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+    const c = s.charCodeAt(i);
+    h1 = (Math.imul(31, h1) + c) | 0;
+    h2 = (Math.imul(0x85ebca6b, h2 ^ c) + 1) | 0;
   }
-  return `feed-${(h >>> 0).toString(36)}`;
+  return `feed-${(h1 >>> 0).toString(36)}${(h2 >>> 0).toString(36)}${s.length.toString(36)}`;
 }
 
 function baseRelease(
@@ -454,14 +461,18 @@ function appleHiRes(url: string): string {
 }
 
 async function fromApple(): Promise<Release[]> {
-  const out: Release[] = [];
-  await Promise.all(
+  // Each feed is ranked independently. Deriving popularity from a shared array's
+  // length made the rank depend on which request happened to resolve first, so
+  // the albums and songs charts interleaved nondeterministically and "Most
+  // Streamed" ordering changed between builds. Rank within the feed instead.
+  const perFeed = await Promise.all(
     APPLE_FEEDS.map(async (url) => {
       const data = (await fetchJSON(url)) as { feed?: { results?: AppleFeedResult[] } } | null;
-      for (const r of data?.feed?.results ?? []) {
+      const rows: Release[] = [];
+      (data?.feed?.results ?? []).forEach((r, i) => {
         const artist = r.artistName?.trim();
         const title = r.name?.trim();
-        if (!artist || !title || !r.artworkUrl100) continue;
+        if (!artist || !title || !r.artworkUrl100) return;
         const type: ReleaseType = r.kind?.includes("song") ? "single" : "album";
         const genre =
           r.genres?.map((g) => g.name).find((n) => n && n !== "Music") ?? null;
@@ -472,13 +483,14 @@ async function fromApple(): Promise<Release[]> {
         const rel = baseRelease(
           artist, title, type, appleHiRes(r.artworkUrl100), date, genre, r.url ?? null
         );
-        // Feed order IS the most-played chart: rank 1 => 200, 2 => 199...
-        rel.popularity = 200 - out.length;
-        out.push(rel);
-      }
+        // Feed order IS the chart: position 1 => 200, 2 => 199, …
+        rel.popularity = 200 - i;
+        rows.push(rel);
+      });
+      return rows;
     })
   );
-  return out;
+  return perFeed.flat();
 }
 
 /**

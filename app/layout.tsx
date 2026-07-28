@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { ParticleField } from "@/components/ParticleField";
@@ -24,6 +24,19 @@ export const metadata: Metadata = {
     title: "PULSAR — Daily Music Discovery",
     description: "The best new music — every day.",
   },
+};
+
+/**
+ * `viewport-fit: cover` lets the page use the full screen on notched phones and
+ * — crucially — makes `env(safe-area-inset-*)` resolve to real values. Without
+ * it those insets are always 0, so the safe-area padding on the bottom-fixed
+ * elements (player bar, dock, sheets) would silently do nothing.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#04040a",
 };
 
 export default function RootLayout({

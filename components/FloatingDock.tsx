@@ -21,7 +21,9 @@ import { PhysicalMedia } from "./PhysicalMedia";
 import { PLATFORMS } from "./platforms";
 import { usePlayer } from "./player/PlayerProvider";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { useBackClose } from "@/lib/useBackClose";
 import { Portal } from "./Portal";
+import { useIsTouch } from "@/lib/useIsTouch";
 import { exportCrate, handleDspRedirect, providerConfigured, type BuildResult } from "@/lib/dsp";
 
 interface FloatingDockProps {
@@ -40,6 +42,11 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   const [panel, setPanel] = useState<Panel>(null);
   // Lock background scroll while the crate sheet is open (mobile).
   useScrollLock(Boolean(panel));
+  useBackClose(Boolean(panel), () => setPanel(null));
+  // Hover never fires on touch, so play / favourite / share / remove would be
+  // permanently hidden on a phone — reveal them instead.
+  const isTouch = useIsTouch();
+  const reveal = isTouch ? "opacity-100" : "opacity-0 group-hover:opacity-100";
 
   // Tell the navbar the crate sheet is open so its buttons move clear of the
   // panel's header (otherwise Crate/Selector sit on top of Export).
@@ -361,7 +368,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", stiffness: 340, damping: 36 }}
-              className="crate-weave fixed inset-x-0 bottom-0 z-[55] flex h-[55dvh] flex-col rounded-t-2xl border-t-2 border-[#5a3d24]/70 lg:inset-x-auto lg:right-0 lg:top-0 lg:h-full lg:w-1/2 lg:rounded-none lg:border-l-2 lg:border-t-0"
+              className="crate-weave fixed inset-x-0 bottom-0 z-[55] flex h-[55dvh] flex-col rounded-t-2xl border-t-2 border-[#5a3d24]/70 pb-[env(safe-area-inset-bottom)] lg:inset-x-auto lg:right-0 lg:top-0 lg:h-full lg:w-1/2 lg:rounded-none lg:border-l-2 lg:border-t-0 lg:pb-0"
             >
               <div className="border-b border-white/10 px-5 py-4">
                 <div className="flex items-center justify-between">
@@ -592,7 +599,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                           play(r);
                         }}
                         aria-label="Play"
-                        className="absolute left-1/2 top-[calc(50%-11px)] flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full opacity-0 ring-1 ring-white/45 transition-opacity group-hover:opacity-100"
+                        className={`absolute left-1/2 top-[calc(50%-11px)] flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full ring-1 ring-white/45 transition-opacity ${reveal}`}
                         style={{
                           background: "rgba(12,12,20,0.5)",
                           backdropFilter: "blur(10px) saturate(140%)",
@@ -604,16 +611,16 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                       </button>
 
                       {/* home-style actions: heart · share · remove */}
-                      <div className="absolute right-1 top-1 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      <div className={`absolute right-1 top-1 flex gap-1 transition-opacity ${reveal}`}>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleFavorite(r);
                           }}
                           aria-label="Favorite"
-                          className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-void/70 text-star-white/70 backdrop-blur hover:text-neon-pink"
+                          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-void/80 text-star-white/70 backdrop-blur hover:text-neon-pink"
                         >
-                          <Heart size={11} />
+                          <Heart size={13} />
                         </button>
                         <button
                           onClick={(e) => {
@@ -621,9 +628,9 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                             shareRelease(r);
                           }}
                           aria-label="Share"
-                          className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-void/70 text-star-white/70 backdrop-blur hover:text-star-white"
+                          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-void/80 text-star-white/70 backdrop-blur hover:text-star-white"
                         >
-                          <Share2 size={11} />
+                          <Share2 size={13} />
                         </button>
                         <button
                           onClick={(e) => {
@@ -632,9 +639,9 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                             else removeFromCrate(activeCrateId, r.id);
                           }}
                           aria-label="Remove"
-                          className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-void/70 text-star-white/60 backdrop-blur hover:text-neon-pink"
+                          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-void/80 text-star-white/60 backdrop-blur hover:text-neon-pink"
                         >
-                          <Trash2 size={11} />
+                          <Trash2 size={13} />
                         </button>
                       </div>
                     </div>

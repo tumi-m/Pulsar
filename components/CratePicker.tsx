@@ -7,6 +7,7 @@ import type { Release } from "@/lib/types";
 import { getCrates, createCrate, toggleInCrate, inCrate, type Crate } from "@/lib/collection";
 import { CrateIcon } from "./CrateIcon";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { useBackClose } from "@/lib/useBackClose";
 import { Portal } from "./Portal";
 
 /**
@@ -21,6 +22,7 @@ export function CratePicker() {
   const [newName, setNewName] = useState("");
   const [tick, setTick] = useState(0); // re-render after toggles
   useScrollLock(Boolean(release));
+  useBackClose(Boolean(release), () => setRelease(null));
 
   const refresh = () => setCrates(getCrates());
 
