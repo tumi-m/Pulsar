@@ -12,14 +12,20 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [crateOpen, setCrateOpen] = useState(false);
   const prevY = useRef(0);
 
   // Album mode (detail sheet) opens on the right half; confine the header to
   // the left half so the controls sit symmetrically over the grid below.
   useEffect(() => {
     const onDetail = (e: Event) => setDetailOpen((e as CustomEvent<boolean>).detail);
+    const onCrate = (e: Event) => setCrateOpen((e as CustomEvent<boolean>).detail);
     window.addEventListener("pulsar-detail-open", onDetail);
-    return () => window.removeEventListener("pulsar-detail-open", onDetail);
+    window.addEventListener("pulsar-crate-open", onCrate);
+    return () => {
+      window.removeEventListener("pulsar-detail-open", onDetail);
+      window.removeEventListener("pulsar-crate-open", onCrate);
+    };
   }, []);
 
   const setHiddenBroadcast = (h: boolean) => {
@@ -51,8 +57,12 @@ export function Navbar() {
       `}
     >
       <div
-        className={`mx-auto flex h-full max-w-screen-2xl items-center justify-between transition-[padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-          detailOpen ? "lg:pr-[50vw]" : ""
+        className={`mx-auto flex h-full max-w-screen-2xl items-center justify-between transition-[padding,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          detailOpen || crateOpen ? "lg:pr-[50vw]" : ""
+        } ${
+          // The crate sheet covers this area on phones — get out of its way so
+          // nothing sits on top of the panel's Export button.
+          crateOpen ? "pointer-events-none opacity-0 lg:pointer-events-auto lg:opacity-100" : ""
         }`}
       >
         {/* left spacer — the menu button now lives in the search block */}

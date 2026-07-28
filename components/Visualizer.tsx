@@ -14,7 +14,7 @@ interface VisualizerProps {
 
 export function Visualizer({ release, onClose }: VisualizerProps) {
   const player = usePlayer();
-  const [mode, setMode] = useState<VisualMode>("nebula");
+  const [mode, setMode] = useState<VisualMode>("bars");
   const [detailOpen, setDetailOpen] = useState(false);
   // Free-floating panel the user can drag & resize.
   const [size, setSize] = useState({ w: 560, h: 340 });

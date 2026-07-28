@@ -39,6 +39,12 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   const [panel, setPanel] = useState<Panel>(null);
   // Lock background scroll while the crate sheet is open (mobile).
   useScrollLock(Boolean(panel));
+
+  // Tell the navbar the crate sheet is open so its buttons move clear of the
+  // panel's header (otherwise Crate/Selector sit on top of Export).
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("pulsar-crate-open", { detail: Boolean(panel) }));
+  }, [panel]);
   const [favs, setFavs] = useState<Release[]>([]);
   const [list, setList] = useState<Release[]>([]);
   const [crates, setCrates] = useState<Crate[]>([]);

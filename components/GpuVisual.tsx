@@ -109,7 +109,9 @@ function compile(gl: WebGL2RenderingContext, type: number, src: string): WebGLSh
   return sh;
 }
 
-const MODE_MAP: Record<VisualMode, number> = {
+// Only the GPU-rendered modes appear here; the classic media-player modes
+// (bars / waves / ambience) are drawn by WmpVisual instead.
+const MODE_MAP: Partial<Record<VisualMode, number>> = {
   nebula: 0,
   aurora: 1,
   silhouette: 2,

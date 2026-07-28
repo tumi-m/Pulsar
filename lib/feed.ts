@@ -165,9 +165,9 @@ async function enrichRealDates(list: FeedRelease[]): Promise<void> {
   const need = list
     .filter((r) => r._noDate && r._dz)
     .sort((a, b) => (b.popularity ?? -1) - (a.popularity ?? -1));
-  const CAP = 1200;
+  const CAP = 2500;
   const targets = need.slice(0, CAP);
-  const CONC = 24;
+  const CONC = 32;
   let idx = 0;
   let filled = 0;
 
@@ -222,22 +222,72 @@ async function fromDeezerGenres(): Promise<Release[]> {
   } | null;
   const ids = (genres?.data ?? []).map((g) => g.id).filter((id) => id > 0).slice(0, 29);
   const out: Release[] = [];
+  // Deezer caps a page at 100, so walk several pages per genre. This is what
+  // takes the catalogue from hundreds into the thousands.
+  const PAGES = [0, 100, 200, 300];
   await Promise.all(
     ids.map(async (id) => {
-      const [chart, editorial] = await Promise.all([
+      const reqs: Promise<{ data?: DeezerAlbum[] } | null>[] = [
         fetchJSON(`https://api.deezer.com/chart/${id}/albums?limit=100`) as Promise<{ data?: DeezerAlbum[] } | null>,
-        fetchJSON(`https://api.deezer.com/editorial/${id}/releases?limit=100`) as Promise<{ data?: DeezerAlbum[] } | null>,
-      ]);
-      for (const a of chart?.data ?? []) {
-        const r = mapDeezer(a, null);
-        if (r) out.push(r);
+      ];
+      for (const index of PAGES) {
+        reqs.push(
+          fetchJSON(
+            `https://api.deezer.com/editorial/${id}/releases?limit=100&index=${index}`
+          ) as Promise<{ data?: DeezerAlbum[] } | null>
+        );
       }
-      for (const a of editorial?.data ?? []) {
-        const r = mapDeezer(a, null);
-        if (r) out.push(r);
+      const pages = await Promise.all(reqs);
+      for (const page of pages) {
+        for (const a of page?.data ?? []) {
+          const r = mapDeezer(a, null);
+          if (r) out.push(r);
+        }
       }
     })
   );
+  return out;
+}
+
+// ── Source 1e: top artists per genre → their catalogues ──────────────
+// Deezer exposes the leading artists in every genre; pulling each one's albums
+// adds thousands of real releases across the whole spectrum of music.
+async function fromGenreArtists(): Promise<Release[]> {
+  const genres = (await fetchJSON("https://api.deezer.com/genre")) as {
+    data?: { id: number; name: string }[];
+  } | null;
+  const ids = (genres?.data ?? []).map((g) => g.id).filter((id) => id > 0).slice(0, 29);
+
+  // Collect the top artists across every genre first.
+  const artistIds = new Set<number>();
+  await Promise.all(
+    ids.map(async (id) => {
+      const chart = (await fetchJSON(
+        `https://api.deezer.com/chart/${id}/artists?limit=50`
+      )) as { data?: { id?: number }[] } | null;
+      for (const a of chart?.data ?? []) if (a.id) artistIds.add(a.id);
+    })
+  );
+
+  // Then fan out over their discographies with a bounded worker pool so we
+  // never open hundreds of sockets at once.
+  const targets = [...artistIds];
+  const out: Release[] = [];
+  const CONC = 20;
+  let idx = 0;
+  const worker = async () => {
+    while (idx < targets.length) {
+      const artistId = targets[idx++];
+      const albums = (await fetchJSON(
+        `https://api.deezer.com/artist/${artistId}/albums?limit=50`
+      )) as { data?: DeezerAlbum[] } | null;
+      for (const a of albums?.data ?? []) {
+        const r = mapDeezer(a, null);
+        if (r) out.push(r);
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: CONC }, worker));
   return out;
 }
 
@@ -271,7 +321,7 @@ async function fromAfrica(): Promise<Release[]> {
     AFRICA_ARTISTS.map(async (name) => {
       const q = encodeURIComponent(`artist:"${name}"`);
       const data = (await fetchJSON(
-        `https://api.deezer.com/search/album?q=${q}&limit=10&order=RANKING`
+        `https://api.deezer.com/search/album?q=${q}&limit=40&order=RANKING`
       )) as { data?: DeezerAlbum[] } | null;
       for (const a of data?.data ?? []) {
         const r = mapDeezer(a, null);
@@ -307,7 +357,7 @@ async function fromGospel(): Promise<Release[]> {
     GOSPEL_ARTISTS.map(async (name) => {
       const q = encodeURIComponent(`artist:"${name}"`);
       const data = (await fetchJSON(
-        `https://api.deezer.com/search/album?q=${q}&limit=10&order=RANKING`
+        `https://api.deezer.com/search/album?q=${q}&limit=40&order=RANKING`
       )) as { data?: DeezerAlbum[] } | null;
       for (const a of data?.data ?? []) {
         const r = mapDeezer(a, null);
@@ -378,15 +428,16 @@ async function fromApple(): Promise<Release[]> {
  * Never throws — on total failure it returns an empty array.
  */
 export async function getLiveFeed(): Promise<Release[]> {
-  const [deezer, apple, genres, africa, gospel] = await Promise.all([
+  const [deezer, apple, genres, africa, gospel, genreArtists] = await Promise.all([
     fromDeezer(),
     fromApple(),
     fromDeezerGenres(),
     fromAfrica(),
     fromGospel(),
+    fromGenreArtists(),
   ]);
   console.log(
-    `[feed] deezer: ${deezer.length} · apple: ${apple.length} · genres: ${genres.length} · africa: ${africa.length} · gospel: ${gospel.length}`
+    `[feed] deezer: ${deezer.length} · apple: ${apple.length} · genres: ${genres.length} · africa: ${africa.length} · gospel: ${gospel.length} · genreArtists: ${genreArtists.length}`
   );
 
   const all: FeedRelease[] = [];
@@ -394,7 +445,14 @@ export async function getLiveFeed(): Promise<Release[]> {
   // Apple + deezer chart first (best popularity signal). Gospel comes before the
   // genre / African sweeps so its explicit "Gospel" tag wins the dedup for any
   // album that also appears in those broader sweeps.
-  for (const r of [...apple, ...deezer, ...gospel, ...genres, ...africa] as FeedRelease[]) {
+  for (const r of [
+    ...apple,
+    ...deezer,
+    ...gospel,
+    ...genres,
+    ...africa,
+    ...genreArtists,
+  ] as FeedRelease[]) {
     const key = `${r.artist.toLowerCase()}::${r.title.toLowerCase()}`;
     const existing = byKey.get(key);
     if (!existing) {
