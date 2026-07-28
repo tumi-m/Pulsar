@@ -21,6 +21,7 @@ import { PhysicalMedia } from "./PhysicalMedia";
 import { PLATFORMS } from "./platforms";
 import { usePlayer } from "./player/PlayerProvider";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { Portal } from "./Portal";
 import { exportCrate, handleDspRedirect, providerConfigured, type BuildResult } from "@/lib/dsp";
 
 interface FloatingDockProps {
@@ -342,7 +343,9 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
         )}
       </div>
 
-      {/* crate panel */}
+      {/* crate panel — portalled to <body> so it escapes `main`'s z-10
+          stacking context and genuinely sits above the navbar / player bar */}
+      <Portal>
       <AnimatePresence>
         {panel && (
           <>
@@ -642,8 +645,10 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
           </>
         )}
       </AnimatePresence>
+      </Portal>
 
       {/* live playlist build progress (any DSP) */}
+      <Portal>
       <AnimatePresence>
         {building && (
           <motion.div
@@ -757,6 +762,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
           </motion.div>
         )}
       </AnimatePresence>
+      </Portal>
     </>
   );
 }

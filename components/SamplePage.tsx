@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { X, Play, Disc3, ArrowDownRight, ArrowUpRight, Youtube } from "lucide-react";
 import { Artwork } from "./Artwork";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { Portal } from "./Portal";
 
 export interface SampleRef {
   role: "samples" | "sampledBy";
@@ -188,12 +189,13 @@ export function SamplePage({
   const sampledIn = samples.filter((s) => s.role === "sampledBy");
 
   return (
+    <Portal>
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
       transition={{ type: "spring", stiffness: 480, damping: 40 }}
-      className="fixed inset-0 z-[46] flex flex-col bg-[#07070d]/98 backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-14 lg:w-1/2"
+      className="fixed inset-0 z-[56] flex flex-col bg-[#07070d]/98 backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-14 lg:w-1/2"
     >
       {/* header */}
       <div className="relative flex items-center gap-3 border-b border-white/10 px-4 py-3">
@@ -273,5 +275,6 @@ export function SamplePage({
         </p>
       </div>
     </motion.div>
+    </Portal>
   );
 }

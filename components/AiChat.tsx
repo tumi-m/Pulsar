@@ -10,6 +10,7 @@ import { usePlayer } from "./player/PlayerProvider";
 import { togglePlaylist, inPlaylist } from "@/lib/collection";
 import { Artwork } from "./Artwork";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { Portal } from "./Portal";
 
 interface AiChatProps {
   releases: Release[];
@@ -142,6 +143,7 @@ export function AiChat({ releases }: AiChatProps) {
   ];
 
   return (
+    <Portal>
     <AnimatePresence>
       {view && (
         <>
@@ -391,6 +393,7 @@ export function AiChat({ releases }: AiChatProps) {
         </>
       )}
     </AnimatePresence>
+    </Portal>
   );
 }
 
