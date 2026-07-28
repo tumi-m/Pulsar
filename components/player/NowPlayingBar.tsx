@@ -43,7 +43,7 @@ export function NowPlayingBar() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 80, opacity: 0 }}
             transition={{ type: "spring", stiffness: 380, damping: 34 }}
-            className="fixed inset-x-0 bottom-0 z-50 border-t border-star-white/10 bg-[#08080f]/90 backdrop-blur-xl"
+            className="fixed inset-x-0 bottom-0 z-50 border-t border-star-white/10 bg-[#08080f]/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl"
           >
             {/* scrub line */}
             <button

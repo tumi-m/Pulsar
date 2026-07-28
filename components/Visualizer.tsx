@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useDragControls } from "framer-motion";
 import { X, Play, Pause, ChevronLeft, ChevronRight, Move } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { usePlayer } from "./player/PlayerProvider";
@@ -19,6 +19,25 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
   // Free-floating panel the user can drag & resize.
   const [size, setSize] = useState({ w: 560, h: 340 });
   const resizeStart = useRef({ x: 0, y: 0, w: 0, h: 0 });
+  // Drag only from the title bar. Without this a swipe on the mode carousel
+  // was captured as a panel drag (so the carousel couldn't be scrolled), and
+  // the panel could be flung off-screen taking its close button with it.
+  const dragControls = useDragControls();
+  // Computed on the client only (no `window` during SSR) and kept in step with
+  // resizes / orientation changes.
+  const [bounds, setBounds] = useState({ top: 0, left: 0, right: 0, bottom: 0 });
+  useEffect(() => {
+    const sync = () =>
+      setBounds({
+        top: -8,
+        left: -window.innerWidth * 0.35,
+        right: window.innerWidth * 0.35,
+        bottom: Math.max(0, window.innerHeight - 220),
+      });
+    sync();
+    window.addEventListener("resize", sync);
+    return () => window.removeEventListener("resize", sync);
+  }, []);
 
   const onResizeDown = (e: React.PointerEvent) => {
     e.stopPropagation();
@@ -64,8 +83,13 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
       {release && !detailOpen && (
         <motion.div
           drag
+          dragControls={dragControls}
+          dragListener={false}
           dragMomentum={false}
           dragElastic={0.04}
+          // Keep the panel inside the viewport so it can never be dragged out
+          // of reach (taking its close button with it).
+          dragConstraints={bounds}
           initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 30 }}
@@ -83,8 +107,10 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
 
           {/* title bar */}
           <div
+            onPointerDown={(e) => dragControls.start(e)}
             className="absolute inset-x-0 top-0 z-10 flex cursor-move items-center justify-between gap-3 border-b border-white/10 px-3 py-2"
             style={{
+              touchAction: "none",
               background: "rgba(255,255,255,0.08)",
               backdropFilter: "blur(12px) saturate(150%)",
               WebkitBackdropFilter: "blur(12px) saturate(150%)",
@@ -106,6 +132,7 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
             </div>
             <button
               onClick={handleClose}
+              onPointerDown={(e) => e.stopPropagation()}
               aria-label="Close visualizer"
               className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/25 text-star-white/80 transition-colors hover:border-white/60 hover:text-star-white"
               style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}

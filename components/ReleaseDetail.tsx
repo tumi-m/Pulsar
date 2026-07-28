@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useDragControls } from "framer-motion";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { useBackClose } from "@/lib/useBackClose";
 import { Portal } from "./Portal";
 import { X, Check, Link as LinkIcon, Play, Pause, ChevronLeft, ChevronRight, Maximize2, Share2, Mic2, AudioLines } from "lucide-react";
 import type { Release } from "@/lib/types";
@@ -184,9 +185,17 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
   const player = usePlayer();
   // Lock the page behind the sheet on mobile (no scroll-bleed / jump).
   useScrollLock(Boolean(release));
+  // Android Back / browser back closes the sheet instead of leaving the site.
+  useBackClose(Boolean(release), onClose);
   // Drag-to-dismiss only from the grab handle / title bar, so scrolling the
   // tracklist never accidentally dismisses the sheet.
   const dragControls = useDragControls();
+  // Which release is currently open — read by in-flight fetches so a late
+  // response can tell whether it's still relevant.
+  const releaseIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    releaseIdRef.current = release?.id ?? null;
+  }, [release]);
   const [copied, setCopied] = useState<string | null>(null);
   const [tracks, setTracks] = useState<Track[] | null>(null);
   const [tracksLoading, setTracksLoading] = useState(false);
@@ -232,16 +241,21 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
 
   async function openDiscography() {
     if (!release) return;
+    // Remember which release this request belongs to: if the user switches
+    // releases while it's in flight, a late response must not repopulate the
+    // overlay with the previous artist's discography under the new header.
+    const forId = release.id;
     setDiscogLoading(true);
     setDiscog([]);
     try {
       const res = await fetch(`/api/artist?name=${encodeURIComponent(release.artist)}`);
       const data = await res.json();
+      if (releaseIdRef.current !== forId) return; // stale — a different release is open
       setDiscog(Array.isArray(data.releases) ? data.releases : []);
     } catch {
-      setDiscog([]);
+      if (releaseIdRef.current === forId) setDiscog([]);
     } finally {
-      setDiscogLoading(false);
+      if (releaseIdRef.current === forId) setDiscogLoading(false);
     }
   }
 
@@ -249,12 +263,16 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
   const [parentLoading, setParentLoading] = useState(false);
   async function openParentProject() {
     if (!release || !onOpen) return;
+    // Same guard: a late response must not navigate to the parent project of a
+    // single the user has already moved on from.
+    const forId = release.id;
     setParentLoading(true);
     try {
       const res = await fetch(
         `/api/parent?artist=${encodeURIComponent(release.artist)}&title=${encodeURIComponent(release.title)}`
       );
       const data = await res.json();
+      if (releaseIdRef.current !== forId) return; // stale
       if (data.album?.title) {
         onOpen({
           ...release,
@@ -267,7 +285,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
     } catch {
       /* no parent found */
     } finally {
-      setParentLoading(false);
+      if (releaseIdRef.current === forId) setParentLoading(false);
     }
   }
 

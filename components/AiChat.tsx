@@ -10,6 +10,7 @@ import { usePlayer } from "./player/PlayerProvider";
 import { togglePlaylist, inPlaylist } from "@/lib/collection";
 import { Artwork } from "./Artwork";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { useBackClose } from "@/lib/useBackClose";
 import { Portal } from "./Portal";
 
 interface AiChatProps {
@@ -100,6 +101,7 @@ export function AiChat({ releases }: AiChatProps) {
   // on larger screens it's a centered card.
   const [isMobile, setIsMobile] = useState(false);
   useScrollLock(Boolean(view));
+  useBackClose(Boolean(view), () => setView(null));
   const dragControls = useDragControls();
 
   useEffect(() => {

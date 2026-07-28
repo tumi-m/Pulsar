@@ -12,6 +12,7 @@ import { Artwork } from "./Artwork";
 import { PLATFORMS } from "./platforms";
 import { isFavorite, toggleFavorite, inPlaylist } from "@/lib/collection";
 import { usePlayer } from "./player/PlayerProvider";
+import { useIsTouch } from "@/lib/useIsTouch";
 
 interface ReleaseCardProps {
   release: Release;
@@ -28,6 +29,10 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
   const isCurrent = player.current?.id === release.id;
   const isPlayingThis = isCurrent && player.playing;
   const [hovered, setHovered] = useState(false);
+  // Touch devices never fire hover, so the quick actions (share / favourite /
+  // crate) and the play triangle would be permanently invisible — show them.
+  const isTouch = useIsTouch();
+  const revealed = hovered || isTouch;
   // `armed` gates the physical-media animation: it only turns on after the
   // cursor has rested on the tile for 3 seconds, so the grid stays calm.
   const [armed, setArmed] = useState(false);
@@ -180,7 +185,7 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
         aria-label={isPlayingThis ? "Pause" : "Play preview"}
         className={`absolute left-1/2 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full ring-1 ring-white/40 transition-all duration-200 ${
           big ? "h-20 w-20" : "h-14 w-14"
-        } ${isCurrent || hovered ? "scale-100 opacity-100" : "scale-90 opacity-0"}`}
+        } ${isCurrent || revealed ? "scale-100 opacity-100" : "scale-90 opacity-0"}`}
         style={{
           background: "rgba(12,12,20,0.72)",
           boxShadow:
@@ -198,7 +203,7 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
           triangle): Share · Favorite · Crate, spanning the tile's width */}
       <div
         className={`absolute inset-x-2 top-2 z-20 flex items-stretch overflow-hidden rounded-full ring-1 ring-white/45 transition-all duration-200 ${
-          hovered ? "translate-y-0 opacity-100" : "-translate-y-1.5 opacity-0"
+          revealed ? "translate-y-0 opacity-100" : "-translate-y-1.5 opacity-0"
         }`}
         style={{
           background: "rgba(12,12,20,0.72)",
