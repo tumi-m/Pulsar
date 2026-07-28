@@ -24,7 +24,14 @@ import { useScrollLock } from "@/lib/useScrollLock";
 import { useBackClose } from "@/lib/useBackClose";
 import { Portal } from "./Portal";
 import { useIsTouch } from "@/lib/useIsTouch";
-import { exportCrate, handleDspRedirect, providerConfigured, type BuildResult } from "@/lib/dsp";
+import { PlaylistBuildOverlay } from "./PlaylistBuildOverlay";
+import {
+  exportCrate,
+  handleDspRedirect,
+  providerConfigured,
+  disconnectProvider,
+  type BuildResult,
+} from "@/lib/dsp";
 
 interface FloatingDockProps {
   format: MediaFormat;
@@ -65,9 +72,14 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   // Live playlist build: progress + success card.
-  const [building, setBuilding] = useState<{ done: number; total: number; label: string; color: string } | null>(
-    null
-  );
+  const [building, setBuilding] = useState<{
+    done: number;
+    total: number;
+    label: string;
+    color: string;
+    current?: Release | null;
+    recent?: Release[];
+  } | null>(null);
   const [built, setBuilt] = useState<BuildResult | null>(null);
   const [buildError, setBuildError] = useState<
     { label: string; color: string; message: string; key: string } | null
@@ -100,10 +112,18 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       const plat = PLATFORMS.find((p) => p.key === pending.provider);
       const label = plat?.label ?? "your DSP";
       const color = plat?.color ?? "#1DB954";
-      setBuilding({ done: 0, total: pending.releases.length, label, color });
+      const queued = pending.releases;
+      setBuilding({ done: 0, total: queued.length, label, color, current: queued[0] ?? null, recent: [] });
       try {
-        const result = await exportCrate(pending.provider, pending.name, pending.releases, (done, total) =>
-          setBuilding({ done, total, label, color })
+        const result = await exportCrate(pending.provider, pending.name, queued, (done, total) =>
+          setBuilding({
+            done,
+            total,
+            label,
+            color,
+            current: queued[done] ?? queued[done - 1] ?? null,
+            recent: queued.slice(Math.max(0, done - 6), done).reverse(),
+          })
         );
         setBuilding(null);
         if (result !== "redirecting") setBuilt(result);
@@ -214,10 +234,20 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   // Create the real playlist on the chosen DSP (Spotify / YouTube / Apple).
   const buildDsp = async (key: string, label: string, color: string, releases: Release[], name: string) => {
     setExporting(false);
-    setBuilding({ done: 0, total: releases.length, label, color });
+    setBuilding({ done: 0, total: releases.length, label, color, current: releases[0] ?? null, recent: [] });
     try {
       const result = await exportCrate(key, name, releases, (done, total) =>
-        setBuilding({ done, total, label, color })
+        setBuilding({
+          done,
+          total,
+          label,
+          color,
+          // The one just matched drives the record label; the next one is what
+          // we're about to work on.
+          current: releases[done] ?? releases[done - 1] ?? null,
+          // Newest first — the overlay stacks them as they land.
+          recent: releases.slice(Math.max(0, done - 6), done).reverse(),
+        })
       );
       setBuilding(null);
       if (result === "redirecting") return; // navigating to the DSP's consent screen
@@ -668,39 +698,15 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       <Portal>
       <AnimatePresence>
         {building && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-void/85 backdrop-blur-md"
-          >
-            <div
-              className="w-[min(88vw,340px)] rounded-2xl border bg-[#0d0d16]/95 p-6 text-center"
-              style={{ borderColor: `${building.color}4d` }}
-            >
-              <span
-                className="mx-auto mb-4 flex h-12 w-12 animate-pulse items-center justify-center rounded-full"
-                style={{ backgroundColor: `${building.color}26`, color: building.color }}
-              >
-                {PLATFORMS.find((p) => p.label === building.label)?.Icon?.() ?? null}
-              </span>
-              <p className="text-sm font-bold uppercase tracking-widest text-star-white">
-                Building your playlist
-              </p>
-              <p className="mt-1 text-[11px] text-star-white/50">
-                Matching {building.done} / {building.total} on {building.label}…
-              </p>
-              <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full transition-all duration-300"
-                  style={{
-                    width: `${building.total ? (building.done / building.total) * 100 : 0}%`,
-                    backgroundColor: building.color,
-                  }}
-                />
-              </div>
-            </div>
-          </motion.div>
+          <PlaylistBuildOverlay
+            done={building.done}
+            total={building.total}
+            label={building.label}
+            color={building.color}
+            current={building.current}
+            recent={building.recent}
+            Icon={PLATFORMS.find((p) => p.label === building.label)?.Icon}
+          />
         )}
       </AnimatePresence>
 
@@ -726,12 +732,36 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                 className="w-[min(88vw,360px)] rounded-2xl border bg-[#0d0d16]/97 p-6 text-center"
                 style={{ borderColor: `${color}66`, boxShadow: "0 24px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.15)" }}
               >
-                <span
-                  className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full text-void"
-                  style={{ backgroundColor: color }}
-                >
-                  {plat?.Icon?.() ?? null}
-                </span>
+                {/* celebratory burst behind the badge */}
+                <div className="relative mx-auto mb-3 h-12 w-12">
+                  {[...Array(10)].map((_, i) => {
+                    const a = (i / 10) * Math.PI * 2;
+                    return (
+                      <motion.span
+                        key={i}
+                        className="absolute left-1/2 top-1/2 h-1.5 w-1.5 rounded-full"
+                        style={{ backgroundColor: i % 2 ? color : "#ffffff" }}
+                        initial={{ x: -3, y: -3, opacity: 0, scale: 0 }}
+                        animate={{
+                          x: Math.cos(a) * 46 - 3,
+                          y: Math.sin(a) * 46 - 3,
+                          opacity: [0, 1, 0],
+                          scale: [0, 1, 0.4],
+                        }}
+                        transition={{ duration: 0.9, delay: 0.12 + i * 0.02, ease: "easeOut" }}
+                      />
+                    );
+                  })}
+                  <motion.span
+                    initial={{ scale: 0, rotate: -140 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 16, delay: 0.05 }}
+                    className="absolute inset-0 flex items-center justify-center rounded-full text-void"
+                    style={{ backgroundColor: color, boxShadow: `0 0 34px ${color}80` }}
+                  >
+                    {plat?.Icon?.() ?? null}
+                  </motion.span>
+                </div>
                 <p className="text-base font-bold uppercase tracking-wide text-star-white">
                   Playlist created 🎉
                 </p>
@@ -790,15 +820,43 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               <p className="mt-2 text-[12px] leading-relaxed text-star-white/60">
                 {buildError.message}
               </p>
+              {/* A permission/session failure can't be retried with the same
+                  token — reconnecting (possibly as a different account) is the
+                  action that actually resolves it, so lead with that. */}
+              {/403|refused|expired|sign-in|session/i.test(buildError.message) && (
+                <a
+                  href="https://developer.spotify.com/dashboard"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-block text-[11px] font-bold uppercase tracking-widest underline decoration-dotted underline-offset-4"
+                  style={{ color: buildError.color }}
+                >
+                  Open Spotify dashboard ↗
+                </a>
+              )}
               <div className="mt-5 flex flex-col gap-2">
+                {/403|refused|expired|sign-in|session/i.test(buildError.message) && (
+                  <button
+                    onClick={() => {
+                      const e = buildError;
+                      disconnectProvider(e.key); // force a fresh consent screen
+                      setBuildError(null);
+                      buildDsp(e.key, e.label, e.color, items, crateName());
+                    }}
+                    className="min-h-[44px] rounded-full py-2.5 text-[11px] font-bold uppercase tracking-widest text-void transition-transform hover:scale-105"
+                    style={{ backgroundColor: buildError.color }}
+                  >
+                    Reconnect to Spotify
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     const e = buildError;
                     setBuildError(null);
                     buildDsp(e.key, e.label, e.color, items, crateName());
                   }}
-                  className="min-h-[44px] rounded-full py-2.5 text-[11px] font-bold uppercase tracking-widest text-void transition-transform hover:scale-105"
-                  style={{ backgroundColor: buildError.color }}
+                  className="min-h-[44px] rounded-full border py-2.5 text-[11px] font-bold uppercase tracking-widest transition-colors hover:bg-white/[0.06]"
+                  style={{ borderColor: `${buildError.color}66`, color: buildError.color }}
                 >
                   Try again
                 </button>

@@ -117,8 +117,15 @@ async function api(path: string, token: string, init?: RequestInit, attempt = 0)
     throw new SpotifyAuthError("Spotify session expired — tap export again to reconnect.");
   }
   if (res.status === 403) {
+    // Almost always the Development-mode allow-list: a Spotify app that hasn't
+    // been through extension review only works for accounts explicitly listed
+    // under Users & Access. Retrying with the same token can never succeed, so
+    // the message points at the two things that actually resolve it.
     throw new SpotifyAuthError(
-      "Spotify refused the request. If your app is in Development mode, add this account under Users & Access."
+      "Spotify refused the request (403). Your app is most likely in Development mode, " +
+        "which only works for accounts you've allow-listed. Add the Spotify account you're " +
+        "signed in as under Users & Access in the developer dashboard — or reconnect below " +
+        "if you signed in with a different account."
     );
   }
   // Transient server errors: one quick retry before giving up.

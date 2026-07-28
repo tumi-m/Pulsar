@@ -10,6 +10,7 @@
 import type { Release } from "../types";
 import {
   clearPending,
+  clearToken,
   readPending,
   savePending,
   type BuildResult,
@@ -31,6 +32,17 @@ const PROVIDERS: Record<string, DspProvider> = {
 export function providerConfigured(key: string): boolean {
   const p = PROVIDERS[key];
   return !!p && p.configured();
+}
+
+/**
+ * Forget the stored token for a provider so the next export re-runs consent.
+ * The usual reason: the user authorised with a different account than the one
+ * allow-listed on the developer dashboard, so every call comes back 403 and
+ * retrying with the same token can only ever fail the same way.
+ */
+export function disconnectProvider(key: string) {
+  clearToken(key);
+  clearPending();
 }
 
 /**
