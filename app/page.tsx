@@ -53,14 +53,37 @@ async function getPageData(): Promise<{
   return { todaysReleases, dbReleases, liveFeed };
 }
 
+/**
+ * Hard ceiling on what gets serialised to the browser.
+ *
+ * Every release handed to <ReleaseGrid> is embedded in the RSC payload, so the
+ * page weight scales linearly with the catalogue. The Grammy / genre-artist /
+ * paginated-genre sweeps are cached and accumulate across revalidations, so the
+ * feed grows without bound — enough of them and the browser cannot parse and
+ * hydrate the payload, which surfaces as "a client-side exception has occurred"
+ * and a blank page.
+ *
+ * The grid pages 60 at a time via infinite scroll, so this is far more than any
+ * session actually consumes. Reaching the rest of the catalogue is a job for
+ * server-side search (see docs/IMPROVEMENT_PLAN.md, P4) rather than shipping it
+ * all up front.
+ */
+const MAX_CLIENT_RELEASES = 2000;
+
 export default async function HomePage() {
   const { todaysReleases, dbReleases, liveFeed } = await getPageData();
 
   // Priority: Supabase releases → live feed → built-in catalog.
   // The site always shows a large, fresh grid — with or without config.
-  const gridReleases = mergeReleases(dbReleases, liveFeed, CATALOG).filter(
+  const merged = mergeReleases(dbReleases, liveFeed, CATALOG).filter(
     (r) => r.artwork_url && r.artwork_url.trim().length > 0
   );
+  const gridReleases = merged.slice(0, MAX_CLIENT_RELEASES);
+  if (merged.length > MAX_CLIENT_RELEASES) {
+    console.log(
+      `[page] catalogue ${merged.length} → sending ${gridReleases.length} to the client`
+    );
+  }
 
   // "New today" counts genuine last-24h drops from DB + live feed.
   const today = new Date().toISOString().split("T")[0];
