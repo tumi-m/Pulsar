@@ -21,7 +21,14 @@ import {
 } from "./shared";
 
 const CLIENT_ID = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ?? "";
-const SCOPES = "playlist-modify-public playlist-modify-private";
+// `user-read-private` is REQUIRED: creating a playlist needs the user id from
+// GET /v1/me, and that endpoint answers 403 "Insufficient client scope" without
+// a user-read scope — even though the playlist scopes themselves are present.
+const SCOPES = "playlist-modify-public playlist-modify-private user-read-private";
+// Bumped whenever SCOPES changes. A token minted under an older scope set is
+// missing the new permission, so it must be discarded rather than left to fail
+// with a 403 the user can't diagnose.
+const SCOPE_KEY = "pulsar_spotify_scopes";
 // The PKCE verifier is mirrored into localStorage because some mobile browsers
 // (and in-app webviews) drop sessionStorage across the OAuth round-trip, which
 // otherwise strands the user in a redirect loop.
@@ -73,6 +80,23 @@ function safeSet(key: string, value: string) {
 function safeRemove(key: string) {
   try {
     sessionStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+}
+
+// The scope marker must outlive the tab, exactly like the token it describes —
+// sessionStorage would force a pointless re-consent every new session.
+function readScopes(): string | null {
+  try {
+    return localStorage.getItem(SCOPE_KEY);
+  } catch {
+    return null;
+  }
+}
+function writeScopes(v: string) {
+  try {
+    localStorage.setItem(SCOPE_KEY, v);
   } catch {
     /* ignore */
   }
@@ -204,7 +228,16 @@ export const spotifyProvider: DspProvider = {
   configured: () => CLIENT_ID.length > 0,
 
   async createPlaylist(name, releases, onProgress?: ProgressFn): Promise<BuildResult | "redirecting"> {
-    const token = readToken("spotify");
+    let token = readToken("spotify");
+
+    // A token granted before the scope list changed can't do what we now need.
+    // Discard it and re-consent silently rather than surfacing a 403 the user
+    // has no way to act on.
+    if (token && readScopes() !== SCOPES) {
+      clearToken("spotify");
+      token = null;
+    }
+
     if (!token) {
       // Guard against a redirect loop: if we *just* came back from consent and
       // still have no token, something is misconfigured — surface it instead of
@@ -223,16 +256,33 @@ export const spotifyProvider: DspProvider = {
     // attempt can't make the NEXT export throw spuriously.
     safeRemove(JUST_AUTHED);
 
-    // Creating a playlist is ONLY supported at POST /v1/users/{user_id}/playlists.
-    // /v1/me/playlists is a GET-only endpoint, so posting to it fails outright —
-    // the user id lookup is required, not optional.
-    const me = await api("/me", token.access_token);
-    if (!me?.id) throw new Error("Couldn't read your Spotify profile — try reconnecting.");
-
-    const playlist = await api(`/users/${encodeURIComponent(me.id)}/playlists`, token.access_token, {
-      method: "POST",
-      body: JSON.stringify({ name, public: false, description: "Made with Pulsar — music discovery." }),
+    const body = JSON.stringify({
+      name,
+      public: false,
+      description: "Made with Pulsar — music discovery.",
     });
+
+    // The documented way to create a playlist is POST /v1/users/{id}/playlists,
+    // which needs the id from GET /v1/me. If that profile read is refused for
+    // any reason, fall back to POST /v1/me/playlists rather than failing the
+    // whole export — Spotify accepts it and infers the user from the token.
+    let playlist: any = null;
+    try {
+      const me = await api("/me", token.access_token);
+      if (me?.id) {
+        playlist = await api(`/users/${encodeURIComponent(me.id)}/playlists`, token.access_token, {
+          method: "POST",
+          body,
+        });
+      }
+    } catch (e) {
+      if (e instanceof SpotifyAuthError && /expired/i.test(e.message)) throw e; // 401 is fatal
+      /* 403 on the profile read — try the token-inferred route below */
+    }
+
+    if (!playlist?.id) {
+      playlist = await api("/me/playlists", token.access_token, { method: "POST", body });
+    }
     if (!playlist?.id) throw new Error("Spotify didn't return a playlist.");
 
     const seen = new Set<string>();
@@ -303,6 +353,9 @@ export const spotifyProvider: DspProvider = {
       const data = await res.json();
       if (!data?.access_token) return false;
       saveToken("spotify", data.access_token, data.expires_in ?? 3600);
+      // Record what this token was actually granted, so a future scope change
+      // invalidates it automatically.
+      writeScopes(SCOPES);
       clearVerifier();
       safeRemove(JUST_AUTHED);
       return true;
