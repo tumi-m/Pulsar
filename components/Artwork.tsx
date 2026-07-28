@@ -61,6 +61,7 @@ export function Artwork({
         src={isProxySrc ? src : proxied}
         alt={`${artist} — ${title}`}
         loading={priority ? "eager" : "lazy"}
+        decoding="async"
         className={`absolute inset-0 h-full w-full ${className}`}
         onError={() => setStage(2)}
       />

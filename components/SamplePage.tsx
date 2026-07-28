@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { X, Play, Disc3, ArrowDownRight, ArrowUpRight, Youtube } from "lucide-react";
 import { Artwork } from "./Artwork";
+import { useScrollLock } from "@/lib/useScrollLock";
 
 export interface SampleRef {
   role: "samples" | "sampledBy";
@@ -181,6 +182,7 @@ export function SamplePage({
   samples: SampleRef[];
   onClose: () => void;
 }) {
+  useScrollLock(Boolean(subject));
   if (!subject) return null;
   const contains = samples.filter((s) => s.role === "samples");
   const sampledIn = samples.filter((s) => s.role === "sampledBy");

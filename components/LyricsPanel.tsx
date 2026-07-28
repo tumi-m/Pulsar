@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { X, Mic2 } from "lucide-react";
+import { useScrollLock } from "@/lib/useScrollLock";
 
 export interface LyricsSubject {
   artist: string;
@@ -16,6 +17,7 @@ export interface LyricsSubject {
 export function LyricsPanel({ subject, onClose }: { subject: LyricsSubject | null; onClose: () => void }) {
   const [lyrics, setLyrics] = useState<string | null>(null);
   const [state, setState] = useState<"loading" | "done" | "none">("loading");
+  useScrollLock(Boolean(subject));
 
   useEffect(() => {
     if (!subject) return;

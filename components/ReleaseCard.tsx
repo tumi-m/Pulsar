@@ -182,9 +182,7 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
           big ? "h-20 w-20" : "h-14 w-14"
         } ${isCurrent || hovered ? "scale-100 opacity-100" : "scale-90 opacity-0"}`}
         style={{
-          background: "rgba(12,12,20,0.5)",
-          backdropFilter: "blur(10px) saturate(140%)",
-          WebkitBackdropFilter: "blur(10px) saturate(140%)",
+          background: "rgba(12,12,20,0.72)",
           boxShadow:
             "0 8px 32px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 6px rgba(0,0,0,0.35)",
         }}
@@ -203,9 +201,7 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
           hovered ? "translate-y-0 opacity-100" : "-translate-y-1.5 opacity-0"
         }`}
         style={{
-          background: "rgba(12,12,20,0.5)",
-          backdropFilter: "blur(10px) saturate(140%)",
-          WebkitBackdropFilter: "blur(10px) saturate(140%)",
+          background: "rgba(12,12,20,0.72)",
           boxShadow:
             "0 8px 32px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 6px rgba(0,0,0,0.35)",
         }}
@@ -259,9 +255,7 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
             showDsp ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
           }`}
           style={{
-            background: "linear-gradient(0deg, rgba(4,4,10,0.92), rgba(4,4,10,0.55) 70%, transparent)",
-            backdropFilter: "blur(4px)",
-            WebkitBackdropFilter: "blur(4px)",
+            background: "linear-gradient(0deg, rgba(4,4,10,0.95), rgba(4,4,10,0.62) 70%, transparent)",
           }}
         >
           {dsps.map((p) => (

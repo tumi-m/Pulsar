@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 
 /**
  * Immersive drifting background — translucent 3D physical-media
@@ -19,18 +19,23 @@ const OBJECTS = [
 ];
 
 export function FloatingObjects() {
+  const reduce = useReducedMotion();
   return (
     <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
       {OBJECTS.map((o, i) => (
         <motion.div
           key={i}
-          className="absolute"
+          className="absolute transform-gpu"
           style={{ left: o.x, top: o.y, width: o.size, height: o.size }}
-          animate={{
-            y: [0, -28, 0],
-            x: [0, 14, 0],
-            rotate: o.kind === "square" ? [0, 8, -6, 0] : [0, 360],
-          }}
+          animate={
+            reduce
+              ? undefined
+              : {
+                  y: [0, -28, 0],
+                  x: [0, 14, 0],
+                  rotate: o.kind === "square" ? [0, 8, -6, 0] : [0, 360],
+                }
+          }
           transition={{
             duration: o.dur,
             repeat: Infinity,

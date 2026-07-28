@@ -115,9 +115,12 @@ body {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-6px); }
 }
-.tile-float {
-  animation: tileFloat 7s ease-in-out infinite;
-  will-change: transform;
+/* Only float when the device isn't touch/reduced-motion — avoids permanent
+   compositor layers on phones. `will-change` is intentionally omitted. */
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  .tile-float {
+    animation: tileFloat 7s ease-in-out infinite;
+  }
 }
 
 /* ─── Rainbow search outline (animated) ─────── */
@@ -144,4 +147,35 @@ body {
     linear-gradient(180deg, rgba(20, 12, 6, 0.35), rgba(10, 6, 3, 0.6));
   background-blend-mode: overlay, overlay, normal;
   box-shadow: inset 0 1px 0 rgba(255, 210, 150, 0.12), -20px 0 60px rgba(0, 0, 0, 0.5);
+}
+
+/* ─── Respect reduced-motion: calm everything down ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ─── Ambient background bubbles (subtle) ────── */
+@keyframes bubbleRise {
+  0%   { transform: translate3d(0, 0, 0) scale(0.85); opacity: 0; }
+  12%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: translate3d(var(--drift, 0px), -118vh, 0) scale(1.08); opacity: 0; }
+}
+.pulsar-bubble {
+  animation-name: bubbleRise;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  filter: blur(0.4px);
+  opacity: 0;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulsar-bubble { display: none; }
 }

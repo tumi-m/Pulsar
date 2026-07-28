@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useDragControls } from "framer-motion";
 import { Sparkles, X, Play, LayoutGrid, MessagesSquare } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";
@@ -9,6 +9,7 @@ import { genreBucket, type GenreBucket } from "@/lib/utils";
 import { usePlayer } from "./player/PlayerProvider";
 import { togglePlaylist, inPlaylist } from "@/lib/collection";
 import { Artwork } from "./Artwork";
+import { useScrollLock } from "@/lib/useScrollLock";
 
 interface AiChatProps {
   releases: Release[];
@@ -97,6 +98,8 @@ export function AiChat({ releases }: AiChatProps) {
   // On phones the panel is a bottom sheet (thumb-reachable, keyboard-safe);
   // on larger screens it's a centered card.
   const [isMobile, setIsMobile] = useState(false);
+  useScrollLock(Boolean(view));
+  const dragControls = useDragControls();
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 639px)");
@@ -155,16 +158,18 @@ export function AiChat({ releases }: AiChatProps) {
             exit={isMobile ? { y: "100%" } : { opacity: 0, y: 12, scale: 0.97 }}
             transition={{ type: "spring", stiffness: 480, damping: 42 }}
             drag={isMobile ? "y" : false}
+            dragControls={dragControls}
+            dragListener={false}
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 0.4 }}
             onDragEnd={(_, info) => {
               if (info.offset.y > 120) close();
             }}
             className="
-              fixed inset-x-0 bottom-0 z-[58] flex max-h-[88vh] w-full transform-gpu flex-col
+              fixed inset-x-0 bottom-0 z-[58] flex max-h-[88dvh] w-full transform-gpu flex-col
               overflow-hidden rounded-t-[26px] border border-white/15 border-b-0
               bg-[#0a0a14]/60 pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl
-              sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-h-[80vh]
+              sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-h-[80dvh]
               sm:w-[min(92vw,26rem)] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border-b
             "
             style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35), 0 -12px 60px rgba(0,0,0,0.6), 0 24px 70px rgba(0,0,0,0.6)" }}
@@ -177,8 +182,13 @@ export function AiChat({ releases }: AiChatProps) {
                   "radial-gradient(120% 90% at 50% 0%, rgba(155,93,229,0.35), rgba(255,95,162,0.18) 45%, transparent 72%)",
               }}
             />
-            {/* drag grabber — mobile only */}
-            <div className="relative z-10 flex justify-center pt-2.5 sm:hidden">
+            {/* drag grabber — mobile only; the sole drag-to-dismiss target so
+                scrolling the results never dismisses the sheet */}
+            <div
+              onPointerDown={(e) => isMobile && dragControls.start(e)}
+              className="relative z-10 flex justify-center py-3 sm:hidden"
+              style={{ touchAction: "none" }}
+            >
               <span className="h-1.5 w-11 rounded-full bg-white/25" />
             </div>
 
@@ -343,7 +353,7 @@ export function AiChat({ releases }: AiChatProps) {
 
                 {/* results — only when there are any (keeps the card compact) */}
                 {result && (
-                  <div className="relative z-10 max-h-[42vh] flex-1 overflow-y-auto border-t border-white/8 p-2">
+                  <div className="relative z-10 max-h-[42dvh] flex-1 overflow-y-auto overscroll-contain border-t border-white/8 p-2">
                     {result.length === 0 && (
                       <p className="p-6 text-center text-sm text-star-white/40">
                         Nothing matched that vibe — try different words or a genre.
