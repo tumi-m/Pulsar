@@ -14,6 +14,7 @@
  */
 
 import type { Release, ReleaseType, MoodTag } from "./types";
+import { GRAMMY_ARTISTS_UNIQUE } from "./grammy-artists";
 
 // ── platform deep links ──────────────────────
 const sp = (q: string) => `https://open.spotify.com/search/${encodeURIComponent(q)}`;
@@ -274,9 +275,11 @@ async function fromGenreArtists(): Promise<Release[]> {
   const targets = [...artistIds];
   const out: Release[] = [];
   const CONC = 20;
+  const DEADLINE = Date.now() + 15_000; // same wall-clock guard as the Grammy sweep
   let idx = 0;
   const worker = async () => {
     while (idx < targets.length) {
+      if (Date.now() > DEADLINE) return;
       const artistId = targets[idx++];
       const albums = (await fetchJSON(
         `https://api.deezer.com/artist/${artistId}/albums?limit=50`
@@ -375,6 +378,61 @@ async function fromGospel(): Promise<Release[]> {
   return out;
 }
 
+// ── Source 1f: Grammy winners' complete discographies ────────────────
+/**
+ * Every Grammy-winning artist (any category, last 59 years) → their WHOLE
+ * discography from Deezer.
+ *
+ * Two-step per artist: resolve the name to a Deezer artist id (so we get the
+ * real catalogue rather than fuzzy album-title matches), then page through
+ * /artist/{id}/albums until exhausted. Bounded by a worker pool so we never
+ * open hundreds of sockets, and every response is cached by the fetch layer.
+ */
+async function fromGrammyArtists(): Promise<Release[]> {
+  const names = GRAMMY_ARTISTS_UNIQUE;
+  const out: Release[] = [];
+  const CONC = 24;
+  const MAX_PAGES = 3; // 3 x 100 — deeper than all but the most prolific acts
+  // Hard wall-clock budget. Deezer responses are cached by the fetch layer, so
+  // each revalidation picks up where the last one left off and the catalogue
+  // fills in over successive runs rather than timing out the whole render.
+  const DEADLINE = Date.now() + 20_000;
+  let idx = 0;
+
+  const worker = async () => {
+    while (idx < names.length) {
+      if (Date.now() > DEADLINE) return;
+      const name = names[idx++];
+      // 1) resolve the artist
+      const search = (await fetchJSON(
+        `https://api.deezer.com/search/artist?q=${encodeURIComponent(name)}&limit=1`
+      )) as { data?: { id?: number; name?: string }[] } | null;
+      const hit = search?.data?.[0];
+      if (!hit?.id) continue;
+
+      // Guard against a loose match ("Queen" → "Queen Naija").
+      const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (norm(hit.name ?? "") !== norm(name)) continue;
+
+      // 2) walk the whole discography
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const albums = (await fetchJSON(
+          `https://api.deezer.com/artist/${hit.id}/albums?limit=100&index=${page * 100}`
+        )) as { data?: DeezerAlbum[] } | null;
+        const rows = albums?.data ?? [];
+        for (const a of rows) {
+          const r = mapDeezer(a, null);
+          if (r) out.push(r);
+        }
+        if (rows.length < 100) break; // last page
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: CONC }, worker));
+  return out;
+}
+
 // ── Source 2: Apple most-played albums + songs (current, popular) ────
 interface AppleFeedResult {
   artistName?: string;
@@ -428,16 +486,19 @@ async function fromApple(): Promise<Release[]> {
  * Never throws — on total failure it returns an empty array.
  */
 export async function getLiveFeed(): Promise<Release[]> {
-  const [deezer, apple, genres, africa, gospel, genreArtists] = await Promise.all([
+  const [deezer, apple, genres, africa, gospel, genreArtists, grammy] = await Promise.all([
     fromDeezer(),
     fromApple(),
     fromDeezerGenres(),
     fromAfrica(),
     fromGospel(),
     fromGenreArtists(),
+    fromGrammyArtists(),
   ]);
   console.log(
-    `[feed] deezer: ${deezer.length} · apple: ${apple.length} · genres: ${genres.length} · africa: ${africa.length} · gospel: ${gospel.length} · genreArtists: ${genreArtists.length}`
+    `[feed] deezer: ${deezer.length} · apple: ${apple.length} · genres: ${genres.length} · ` +
+      `africa: ${africa.length} · gospel: ${gospel.length} · genreArtists: ${genreArtists.length} · ` +
+      `grammy: ${grammy.length}`
   );
 
   const all: FeedRelease[] = [];
@@ -452,6 +513,7 @@ export async function getLiveFeed(): Promise<Release[]> {
     ...genres,
     ...africa,
     ...genreArtists,
+    ...grammy,
   ] as FeedRelease[]) {
     const key = `${r.artist.toLowerCase()}::${r.title.toLowerCase()}`;
     const existing = byKey.get(key);
