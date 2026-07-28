@@ -12,6 +12,7 @@ import { FloatingDock } from "./FloatingDock";
 import { Visualizer } from "./Visualizer";
 import { AiChat } from "./AiChat";
 import { CratePicker } from "./CratePicker";
+import { SamplesExplorer } from "./SamplesExplorer";
 import { FeatureReel } from "./FeatureReel";
 import { usePlayer } from "./player/PlayerProvider";
 import { genreBucket, formatDate, GENRE_BUCKETS, type GenreBucket } from "@/lib/utils";
@@ -932,6 +933,9 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
 
       {/* "add to which crate?" picker (event-driven, global) */}
       <CratePicker />
+
+      {/* Samples mode — opened from the navbar */}
+      <SamplesExplorer releases={releases} />
     </>
   );
 }
