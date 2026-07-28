@@ -54,6 +54,30 @@ function clearVerifier() {
   }
 }
 
+// sessionStorage throws in some privacy modes — never let bookkeeping break the
+// export itself.
+function safeGet(key: string): string | null {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function safeSet(key: string, value: string) {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    /* ignore */
+  }
+}
+function safeRemove(key: string) {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+}
+
 async function beginAuth() {
   const verifier = randomString(48);
   const challenge = base64url(await sha256(verifier));
@@ -178,18 +202,27 @@ export const spotifyProvider: DspProvider = {
       // Guard against a redirect loop: if we *just* came back from consent and
       // still have no token, something is misconfigured — surface it instead of
       // bouncing the user to Spotify again.
-      if (sessionStorage.getItem(JUST_AUTHED)) {
-        sessionStorage.removeItem(JUST_AUTHED);
+      if (safeGet(JUST_AUTHED)) {
+        safeRemove(JUST_AUTHED);
         throw new Error(
-          "Couldn't complete Spotify sign-in. Check the app's Redirect URI matches this site exactly."
+          "Couldn't complete Spotify sign-in. Check that the app's Redirect URI is exactly " +
+            `${redirectUri()} and that this account is listed under Users & Access if the app is in Development mode.`
         );
       }
       await beginAuth();
       return "redirecting";
     }
+    // We have a working token — make sure a leftover flag from an earlier failed
+    // attempt can't make the NEXT export throw spuriously.
+    safeRemove(JUST_AUTHED);
 
-    // POST /me/playlists needs no user-id lookup — one less call to fail on.
-    const playlist = await api("/me/playlists", token.access_token, {
+    // Creating a playlist is ONLY supported at POST /v1/users/{user_id}/playlists.
+    // /v1/me/playlists is a GET-only endpoint, so posting to it fails outright —
+    // the user id lookup is required, not optional.
+    const me = await api("/me", token.access_token);
+    if (!me?.id) throw new Error("Couldn't read your Spotify profile — try reconnecting.");
+
+    const playlist = await api(`/users/${encodeURIComponent(me.id)}/playlists`, token.access_token, {
       method: "POST",
       body: JSON.stringify({ name, public: false, description: "Made with Pulsar — music discovery." }),
     });
@@ -245,11 +278,7 @@ export const spotifyProvider: DspProvider = {
 
     // Mark that we just finished consent, so a still-missing token surfaces a
     // real error instead of bouncing back to Spotify forever.
-    try {
-      sessionStorage.setItem(JUST_AUTHED, "1");
-    } catch {
-      /* ignore */
-    }
+    safeSet(JUST_AUTHED, "1");
 
     try {
       const res = await fetch("https://accounts.spotify.com/api/token", {
@@ -268,11 +297,7 @@ export const spotifyProvider: DspProvider = {
       if (!data?.access_token) return false;
       saveToken("spotify", data.access_token, data.expires_in ?? 3600);
       clearVerifier();
-      try {
-        sessionStorage.removeItem(JUST_AUTHED);
-      } catch {
-        /* ignore */
-      }
+      safeRemove(JUST_AUTHED);
       return true;
     } catch {
       return false;
