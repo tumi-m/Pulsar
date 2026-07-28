@@ -115,12 +115,28 @@ export async function runIngest(): Promise<IngestResult> {
 }
 
 // CLI entry — only when run directly (not when imported by the API route).
-// A completed run is a SUCCESS (exit 0) even if it saved 0 (feed empty, all
-// duplicates, or unconfigured) — the scheduled job only errors on a genuine
-// crash, so it never emails you a "failed run" for a normal quiet day.
+// A quiet run (nothing new, or Supabase deliberately unconfigured) is a SUCCESS
+// so the schedule never emails a failure for a normal day. But a run where we
+// FOUND releases and every single write failed is a misconfiguration — almost
+// always a bad SUPABASE URL/key or a missing schema — so surface it loudly
+// instead of reporting a green tick that hides a broken pipeline.
 if (process.argv[1] && /ingest\.ts$/.test(process.argv[1])) {
   runIngest()
-    .then(() => process.exit(0))
+    .then((r) => {
+      if (!r.skipped && r.found > 0 && r.saved === 0) {
+        console.error(
+          `\n✗ Found ${r.found} releases but saved NONE (${r.failed} failed).\n` +
+            `  Check that:\n` +
+            `   • NEXT_PUBLIC_SUPABASE_URL is the bare project origin —\n` +
+            `     https://<project>.supabase.co  (NOT .../rest/v1/)\n` +
+            `   • SUPABASE_SERVICE_ROLE_KEY is the service-role (secret) key\n` +
+            `   • supabase/schema.sql has been applied (the upsert needs the\n` +
+            `     unique (artist, title) constraint)\n`
+        );
+        process.exit(1);
+      }
+      process.exit(0);
+    })
     .catch((err) => {
       console.error("Ingest fatal error:", err);
       process.exit(1);
