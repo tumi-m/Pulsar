@@ -14,7 +14,7 @@ import { AiChat } from "./AiChat";
 import { CratePicker } from "./CratePicker";
 import { FeatureReel } from "./FeatureReel";
 import { usePlayer } from "./player/PlayerProvider";
-import { genreBucket, GENRE_BUCKETS, type GenreBucket } from "@/lib/utils";
+import { genreBucket, formatDate, GENRE_BUCKETS, type GenreBucket } from "@/lib/utils";
 import { loadFormat, saveFormat, type MediaFormat } from "@/lib/format";
 import {
   loadProfile,
@@ -362,6 +362,63 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     [shown, recProfile, searching]
   );
   const hasMore = visible < filtered.length;
+
+  // ── iOS Photos-style date sections ───────────────────────────
+  // As you pinch toward maximum density the tiles get small enough that a flat
+  // wall of artwork loses all sense of time, so — exactly like the Photos
+  // library — the grid breaks into dated sections, and the grouping coarsens
+  // the further you zoom out: day → month → year.
+  //
+  // Only in the date-ordered "Latest" view: grouping a list sorted by
+  // popularity or relevance would emit a header on nearly every row.
+  const grouping: "none" | "day" | "month" | "year" =
+    searching || view !== "latest" || detailOpen
+      ? "none"
+      : cols >= 7
+        ? "year"
+        : cols >= 6
+          ? "month"
+          : cols >= 5
+            ? "day"
+            : "none";
+
+  const dateSections = useMemo(() => {
+    if (grouping === "none") return null;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+    const bucketOf = (d: string) => {
+      if (!d || d.startsWith("1900")) return "undated";
+      return grouping === "year" ? d.slice(0, 4) : grouping === "month" ? d.slice(0, 7) : d;
+    };
+
+    const labelOf = (d: string) => {
+      if (!d || d.startsWith("1900")) return "Release date unknown";
+      if (grouping === "day") {
+        if (d === today) return "Today";
+        if (d === yesterday) return "Yesterday";
+        return formatDate(d);
+      }
+      const dt = new Date(`${d.slice(0, 7)}-01T00:00:00Z`);
+      if (grouping === "month") {
+        return dt.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+      }
+      return d.slice(0, 4);
+    };
+
+    // Preserve the incoming (newest-first) order; start a new section whenever
+    // the bucket changes. `from` keeps each tile's global index so taste sizing
+    // and the entrance stagger stay consistent with the flat grid.
+    const out: { key: string; label: string; items: Release[]; from: number }[] = [];
+    shown.forEach((r, i) => {
+      const key = bucketOf(r.release_date);
+      const last = out[out.length - 1];
+      if (last && last.key === key) last.items.push(r);
+      else out.push({ key, label: labelOf(r.release_date), items: [r], from: i });
+    });
+    return out;
+  }, [shown, grouping]);
 
   const resetPage = () => setVisible(PAGE);
 
@@ -712,6 +769,53 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
           <div className="flex flex-col items-center justify-center px-6 py-32 text-center">
             <p className="font-mono text-sm tracking-widest text-star-white/30">NOTHING HERE YET</p>
           </div>
+        ) : dateSections ? (
+          /* Photos-style dated sections — pinched in far enough that a flat
+             wall of artwork would lose all sense of when things came out */
+          <motion.div ref={attachGrid} animate={gridControls} style={{ touchAction: "pan-y" }}>
+            {dateSections.map((section) => (
+              <section key={`${section.key}-${section.from}`}>
+                <div className="sticky top-14 z-[6] px-[13px] py-2 md:px-[21px]">
+                  <motion.h2
+                    layout
+                    className="inline-flex items-baseline gap-2 rounded-full border border-white/10 px-3 py-1"
+                    style={{
+                      background: "rgba(10,10,18,0.72)",
+                      backdropFilter: "blur(14px) saturate(160%)",
+                      WebkitBackdropFilter: "blur(14px) saturate(160%)",
+                    }}
+                  >
+                    <span className="text-[13px] font-bold tracking-tight text-star-white">
+                      {section.label}
+                    </span>
+                    <span className="text-[10px] font-mono text-star-white/40">
+                      {section.items.length}
+                    </span>
+                  </motion.h2>
+                </div>
+                <div
+                  className="grid grid-flow-dense gap-[13px] px-[13px] pb-4 md:gap-[21px] md:px-[21px]"
+                  style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+                >
+                  {section.items.map((release, j) => {
+                    const i = section.from + j; // global index → stable sizing
+                    return (
+                      <ReleaseCard
+                        key={release.id}
+                        release={release}
+                        index={i}
+                        size={(sizes[i] ?? 0) as 0 | 1 | 2}
+                        forYou={Boolean(recProfile) && (sizes[i] ?? 0) > 0}
+                        format={format}
+                        scrolling={scrolling}
+                        onOpen={setSelectedRelease}
+                      />
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+          </motion.div>
         ) : (
           <motion.div
             ref={attachGrid}
@@ -770,6 +874,13 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 <span className="text-[11px] font-bold uppercase tracking-[0.24em] text-star-white/70">
                   {colHud} across
                 </span>
+                {/* mirror the Photos library: tell the user the grid is now
+                    grouped, and by what */}
+                {grouping !== "none" && (
+                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-neon-blue/80">
+                    Grouped by {grouping}
+                  </span>
+                )}
               </div>
             </motion.div>
           )}
