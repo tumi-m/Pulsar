@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { X, Play, Disc3, ArrowDownRight, ArrowUpRight, Youtube } from "lucide-react";
+import { X, Play, Disc3, ArrowDownRight, ArrowUpRight, Youtube, Clock } from "lucide-react";
 import { Artwork } from "./Artwork";
 import { useScrollLock } from "@/lib/useScrollLock";
 import { Portal } from "./Portal";
@@ -30,11 +30,77 @@ function toSeconds(ts: string | null): number | null {
   return parts.reduce((acc, n) => acc * 60 + n, 0);
 }
 
+const fromSeconds = (s: number) =>
+  `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+/**
+ * Listener-marked sample timecodes.
+ *
+ * No openly-licensed source publishes where in a track a sample lands —
+ * WhoSampled's timings are hand-annotated proprietary data. Rather than
+ * fabricate them, we let the person listening mark both ends themselves:
+ * where it lands in the new song, and where it was lifted from in the original.
+ * Marks are keyed by the pair, so they persist per connection.
+ */
+const MARK_KEY = "pulsar_sample_marks_v1";
+
+export interface SampleMark {
+  /** seconds into the song that contains the sample */
+  inSong?: number;
+  /** seconds into the original that the sample is taken from */
+  inSource?: number;
+}
+
+function markKey(subject: string, sampleTitle: string) {
+  return `${subject}::${sampleTitle}`.toLowerCase();
+}
+
+function readMarks(): Record<string, SampleMark> {
+  try {
+    return JSON.parse(localStorage.getItem(MARK_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function writeMark(key: string, mark: SampleMark) {
+  try {
+    const all = readMarks();
+    all[key] = { ...all[key], ...mark };
+    localStorage.setItem(MARK_KEY, JSON.stringify(all));
+  } catch {
+    /* storage unavailable — the mark just won't persist */
+  }
+}
+
 /** One sample relationship: fetches its YouTube video, embeds on demand. */
-function SampleCard({ sample, index, baseArtist }: { sample: SampleRef; index: number; baseArtist: string }) {
+function SampleCard({
+  sample,
+  index,
+  baseArtist,
+  subjectTitle,
+}: {
+  sample: SampleRef;
+  index: number;
+  baseArtist: string;
+  subjectTitle: string;
+}) {
   const [videoId, setVideoId] = useState<string | null>(null);
   const [state, setState] = useState<"idle" | "loading" | "none">("idle");
   const [playing, setPlaying] = useState(false);
+
+  // Listener-marked timecodes for this specific connection.
+  const key = markKey(subjectTitle, sample.title);
+  const [mark, setMark] = useState<SampleMark>({});
+  const [marking, setMarking] = useState(false);
+  useEffect(() => {
+    setMark(readMarks()[key] ?? {});
+  }, [key]);
+
+  const saveMark = (patch: SampleMark) => {
+    writeMark(key, patch);
+    setMark((m) => ({ ...m, ...patch }));
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -130,6 +196,32 @@ function SampleCard({ sample, index, baseArtist }: { sample: SampleRef; index: n
             )}
             <p className="mt-1.5 text-[11px] leading-snug text-star-white/45">{sample.description}</p>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {/* Where it lands in THIS song, and where it came from in the
+                  original — both marked by the listener, since no free source
+                  publishes them. */}
+              {mark.inSong != null && (
+                <span
+                  className="rounded-full bg-neon-violet/20 px-2 py-0.5 font-mono text-[10px] text-neon-violet"
+                  title={`Sample appears at ${fromSeconds(mark.inSong)} in ${subjectTitle}`}
+                >
+                  in this song {fromSeconds(mark.inSong)}
+                </span>
+              )}
+              {mark.inSource != null && (
+                <a
+                  href={
+                    videoId
+                      ? `https://www.youtube.com/watch?v=${videoId}&t=${Math.floor(mark.inSource)}`
+                      : undefined
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full bg-neon-blue/20 px-2 py-0.5 font-mono text-[10px] text-neon-blue hover:bg-neon-blue/30"
+                  title={`Taken from ${fromSeconds(mark.inSource)} in ${sample.title}`}
+                >
+                  from original {fromSeconds(mark.inSource)}
+                </a>
+              )}
               {sample.timestamp && (
                 <span className="rounded-full bg-white/10 px-2 py-0.5 font-mono text-[10px] text-star-white/70">
                   ▶ {sample.timestamp}
@@ -148,9 +240,66 @@ function SampleCard({ sample, index, baseArtist }: { sample: SampleRef; index: n
               {state === "none" && (
                 <span className="text-[10px] text-star-white/30">No video found</span>
               )}
+              <button
+                onClick={() => setMarking((v) => !v)}
+                className="flex items-center gap-1 rounded-full border border-white/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-star-white/50 hover:border-white/40 hover:text-star-white"
+              >
+                <Clock size={10} />
+                {mark.inSong != null || mark.inSource != null ? "Edit times" : "Mark times"}
+              </button>
             </div>
           </div>
         </div>
+
+        {/* time marking — the honest alternative to inventing timecodes */}
+        {marking && (
+          <div className="mt-3 rounded-xl border border-white/10 bg-black/30 p-3">
+            <p className="text-[10px] leading-relaxed text-star-white/45">
+              No open database publishes sample timings, so mark them yourself while you
+              listen — they&rsquo;re saved on this device.
+            </p>
+            <div className="mt-2.5 grid grid-cols-2 gap-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-[9px] font-bold uppercase tracking-wide text-neon-violet">
+                  Appears in this song
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  defaultValue={mark.inSong != null ? fromSeconds(mark.inSong) : ""}
+                  placeholder="0:42"
+                  onBlur={(e) => {
+                    const s = toSeconds(e.target.value.trim());
+                    if (s != null) saveMark({ inSong: s });
+                  }}
+                  className="w-full rounded-lg border border-white/15 bg-white/[0.05] px-2 py-1.5 font-mono text-[12px] text-star-white placeholder:text-star-white/25 focus:border-neon-violet/60 focus:outline-none"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[9px] font-bold uppercase tracking-wide text-neon-blue">
+                  Taken from original at
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  defaultValue={mark.inSource != null ? fromSeconds(mark.inSource) : ""}
+                  placeholder="1:15"
+                  onBlur={(e) => {
+                    const s = toSeconds(e.target.value.trim());
+                    if (s != null) saveMark({ inSource: s });
+                  }}
+                  className="w-full rounded-lg border border-white/15 bg-white/[0.05] px-2 py-1.5 font-mono text-[12px] text-star-white placeholder:text-star-white/25 focus:border-neon-blue/60 focus:outline-none"
+                />
+              </label>
+            </div>
+            <button
+              onClick={() => setMarking(false)}
+              className="mt-2.5 w-full rounded-lg border border-white/15 py-1.5 text-[10px] font-bold uppercase tracking-widest text-star-white/60 hover:text-star-white"
+            >
+              Done
+            </button>
+          </div>
+        )}
 
         {/* inline embed once played */}
         {playing && videoId && (
@@ -249,7 +398,7 @@ export function SamplePage({
             </p>
             <div className="space-y-3">
               {contains.map((s, i) => (
-                <SampleCard key={`c-${i}`} sample={s} index={i} baseArtist={subject.artist} />
+                <SampleCard key={`c-${i}`} sample={s} index={i} baseArtist={subject.artist} subjectTitle={subject.title} />
               ))}
             </div>
           </>
@@ -262,7 +411,7 @@ export function SamplePage({
             </p>
             <div className="space-y-3">
               {sampledIn.map((s, i) => (
-                <SampleCard key={`s-${i}`} sample={s} index={i} baseArtist={subject.artist} />
+                <SampleCard key={`s-${i}`} sample={s} index={i} baseArtist={subject.artist} subjectTitle={subject.title} />
               ))}
             </div>
           </>
