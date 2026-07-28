@@ -67,9 +67,17 @@ export async function handleDspRedirect(): Promise<Pending | null> {
   if (!pending || !hasResponse) return null;
 
   const provider = PROVIDERS[pending.provider];
-  if (!provider?.completeRedirect) return null;
+  if (!provider?.completeRedirect) {
+    clearPending();
+    return null;
+  }
   const ok = await provider.completeRedirect();
-  if (!ok) return null;
+  if (!ok) {
+    // Consent was denied or the exchange failed — drop the pending crate so it
+    // can't silently re-trigger an export on some later page load.
+    clearPending();
+    return null;
+  }
   return pending; // caller re-runs exportCrate(pending.provider, …), now authorised
 }
 

@@ -4,16 +4,35 @@ import { useEffect, useState } from "react";
 import type { Release } from "@/lib/types";
 import { usePlayer } from "./player/PlayerProvider";
 import { GpuVisual } from "./GpuVisual";
+import { WmpVisual, type WmpMode } from "./WmpVisual";
 
-export type VisualMode = "nebula" | "silhouette" | "aurora" | "crowd" | "art" | "video";
+export type VisualMode =
+  | "bars"
+  | "waves"
+  | "ambience"
+  | "nebula"
+  | "silhouette"
+  | "aurora"
+  | "crowd"
+  | "art"
+  | "video";
 
+// Classic media-player visualisations first — each one looks clearly different.
 export const VISUAL_MODES: { id: VisualMode; label: string }[] = [
+  { id: "bars", label: "Bars" },
+  { id: "waves", label: "Waves" },
+  { id: "ambience", label: "Ambience" },
   { id: "nebula", label: "Nebula" },
   { id: "silhouette", label: "Silhouette" },
-  { id: "aurora", label: "Aurora" },
   { id: "art", label: "Cover" },
   { id: "video", label: "Video" },
 ];
+
+const WMP_MODES: Record<string, WmpMode> = {
+  bars: "bars",
+  waves: "waves",
+  ambience: "ambience",
+};
 
 /**
  * The visualiser surface. All generative modes are rendered on the GPU
@@ -80,7 +99,14 @@ export function VisualCanvas({
 
   return (
     <div className={`relative overflow-hidden ${className}`}>
-      {mode !== "video" && (
+      {WMP_MODES[mode] && (
+        <WmpVisual
+          release={release}
+          mode={WMP_MODES[mode]}
+          className="absolute inset-0 h-full w-full"
+        />
+      )}
+      {mode !== "video" && !WMP_MODES[mode] && (
         <GpuVisual release={release} mode={mode} className="absolute inset-0 h-full w-full" />
       )}
       {mode === "video" && (

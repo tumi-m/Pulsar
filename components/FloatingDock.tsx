@@ -20,6 +20,7 @@ import {
 import { PhysicalMedia } from "./PhysicalMedia";
 import { PLATFORMS } from "./platforms";
 import { usePlayer } from "./player/PlayerProvider";
+import { useScrollLock } from "@/lib/useScrollLock";
 import { exportCrate, handleDspRedirect, providerConfigured, type BuildResult } from "@/lib/dsp";
 
 interface FloatingDockProps {
@@ -36,6 +37,14 @@ type Panel = "favorites" | "playlist" | null;
 export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   const { current, shuffle, toggleShuffle, play } = usePlayer();
   const [panel, setPanel] = useState<Panel>(null);
+  // Lock background scroll while the crate sheet is open (mobile).
+  useScrollLock(Boolean(panel));
+
+  // Tell the navbar the crate sheet is open so its buttons move clear of the
+  // panel's header (otherwise Crate/Selector sit on top of Export).
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("pulsar-crate-open", { detail: Boolean(panel) }));
+  }, [panel]);
   const [favs, setFavs] = useState<Release[]>([]);
   const [list, setList] = useState<Release[]>([]);
   const [crates, setCrates] = useState<Crate[]>([]);
@@ -257,7 +266,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
           tracklist's text/icons */}
       <div
         className={`fixed right-4 z-40 flex flex-col items-end gap-2 transition-all duration-300 ${
-          detailOpen ? "pointer-events-none translate-x-6 opacity-0" : "opacity-100"
+          detailOpen || panel ? "pointer-events-none translate-x-6 opacity-0" : "opacity-100"
         } ${
           navHidden
             ? current
@@ -342,14 +351,14 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setPanel(null)}
-              className="fixed inset-0 z-40 bg-void/80 backdrop-blur-md"
+              className="fixed inset-0 z-[54] bg-void/80 backdrop-blur-md"
             />
             <motion.div
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", stiffness: 340, damping: 36 }}
-              className="crate-weave fixed inset-x-0 bottom-0 z-40 flex h-[55vh] flex-col rounded-t-2xl border-t-2 border-[#5a3d24]/70 lg:inset-x-auto lg:right-0 lg:top-0 lg:h-full lg:w-1/2 lg:rounded-none lg:border-l-2 lg:border-t-0"
+              className="crate-weave fixed inset-x-0 bottom-0 z-[55] flex h-[55dvh] flex-col rounded-t-2xl border-t-2 border-[#5a3d24]/70 lg:inset-x-auto lg:right-0 lg:top-0 lg:h-full lg:w-1/2 lg:rounded-none lg:border-l-2 lg:border-t-0"
             >
               <div className="border-b border-white/10 px-5 py-4">
                 <div className="flex items-center justify-between">
@@ -387,18 +396,19 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                     {items.length > 0 && (
                       <button
                         onClick={() => setExporting(true)}
-                        className="flex items-center gap-1.5 rounded-full border border-neon-green/40 bg-neon-green/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-neon-green transition-colors hover:bg-neon-green/20"
+                        aria-label={`Export ${items.length} to a playlist`}
+                        className="relative z-10 flex min-h-[44px] items-center gap-1.5 rounded-full border border-neon-green/50 bg-neon-green/15 px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-neon-green transition-colors hover:bg-neon-green/25 active:scale-95"
                       >
-                        <Upload size={13} />
+                        <Upload size={15} />
                         Export
                       </button>
                     )}
                     <button
                       onClick={() => setPanel(null)}
                       aria-label="Close"
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-star-white/50 hover:bg-white/10 hover:text-star-white"
+                      className="flex h-11 w-11 items-center justify-center rounded-full text-star-white/60 hover:bg-white/10 hover:text-star-white"
                     >
-                      <X size={16} />
+                      <X size={18} />
                     </button>
                   </div>
                 </div>
@@ -463,7 +473,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 16 }}
                       transition={{ type: "spring", stiffness: 460, damping: 34 }}
-                      className="absolute inset-x-4 top-20 z-20 rounded-2xl border border-white/15 bg-[#0d0d16]/95 p-4 backdrop-blur-2xl"
+                      className="absolute inset-x-3 bottom-3 top-16 z-20 overflow-y-auto overscroll-contain rounded-2xl border border-white/15 bg-[#0d0d16]/97 p-4 backdrop-blur-2xl sm:inset-x-4 sm:bottom-auto sm:top-20"
                       style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 24px 60px rgba(0,0,0,0.6)" }}
                     >
                       <p className="text-sm font-bold uppercase tracking-wide text-star-white">
@@ -490,7 +500,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                             <button
                               key={p.key}
                               onClick={() => exportTo(p.key, p.label)}
-                              className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors hover:bg-white/[0.06] ${
+                              className={`flex min-h-[52px] items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors hover:bg-white/[0.06] active:scale-[0.99] ${
                                 live ? "border-[#1DB954]/40 bg-[#1DB954]/[0.06]" : "border-white/10"
                               }`}
                             >

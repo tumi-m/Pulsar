@@ -6,6 +6,7 @@ import { X, Plus } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { getCrates, createCrate, toggleInCrate, inCrate, type Crate } from "@/lib/collection";
 import { CrateIcon } from "./CrateIcon";
+import { useScrollLock } from "@/lib/useScrollLock";
 
 /**
  * A global "add to crate" picker. Any crate button dispatches the
@@ -18,6 +19,7 @@ export function CratePicker() {
   const [crates, setCrates] = useState<Crate[]>([]);
   const [newName, setNewName] = useState("");
   const [tick, setTick] = useState(0); // re-render after toggles
+  useScrollLock(Boolean(release));
 
   const refresh = () => setCrates(getCrates());
 
@@ -51,7 +53,7 @@ export function CratePicker() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.97 }}
             transition={{ type: "spring", stiffness: 520, damping: 40 }}
-            className="fixed left-1/2 top-1/2 z-[60] flex max-h-[80vh] w-[min(90vw,22rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#0d0d16]/95 backdrop-blur-2xl"
+            className="fixed left-1/2 top-1/2 z-[60] flex max-h-[80dvh] w-[min(90vw,22rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#0d0d16]/95 backdrop-blur-2xl"
             style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35), 0 24px 70px rgba(0,0,0,0.6)" }}
           >
             <div className="flex items-center justify-between border-b border-white/8 p-4">

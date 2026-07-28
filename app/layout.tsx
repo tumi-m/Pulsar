@@ -3,6 +3,7 @@ import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { ParticleField } from "@/components/ParticleField";
 import { FloatingObjects } from "@/components/FloatingObjects";
+import { Bubbles } from "@/components/Bubbles";
 import { ThemedBackground } from "@/components/ThemedBackground";
 import { Sidebar } from "@/components/Sidebar";
 import { PlayerProvider } from "@/components/player/PlayerProvider";
@@ -45,6 +46,9 @@ export default function RootLayout({
 
         {/* Immersive drifting physical-media silhouettes */}
         <FloatingObjects />
+
+        {/* Quiet ambient bubbles drifting upward */}
+        <Bubbles />
 
         <PlayerProvider>
           {/* Navigation */}

@@ -92,13 +92,37 @@ export function clearToken(provider: string) {
 // ── Pending crate (survives the OAuth redirect) ─────────────────
 const PENDING_KEY = "pulsar_dsp_pending";
 
+/**
+ * Persist the crate across the OAuth redirect. Only the fields the providers
+ * actually need are stored — a full Release[] can blow the storage quota on a
+ * large crate, which used to make the whole export fail. Written to BOTH
+ * session and local storage because some mobile browsers drop sessionStorage
+ * across the round-trip.
+ */
 export function savePending(p: Pending) {
-  sessionStorage.setItem(PENDING_KEY, JSON.stringify(p));
+  const slim: Pending = {
+    provider: p.provider,
+    name: p.name,
+    releases: p.releases.map(
+      (r) => ({ id: r.id, artist: r.artist, title: r.title, type: r.type }) as Release
+    ),
+  };
+  const raw = JSON.stringify(slim);
+  try {
+    sessionStorage.setItem(PENDING_KEY, raw);
+  } catch {
+    /* quota / disabled — the localStorage copy below is the fallback */
+  }
+  try {
+    localStorage.setItem(PENDING_KEY, raw);
+  } catch {
+    /* ignore */
+  }
 }
 
 export function readPending(): Pending | null {
   try {
-    const raw = sessionStorage.getItem(PENDING_KEY);
+    const raw = sessionStorage.getItem(PENDING_KEY) ?? localStorage.getItem(PENDING_KEY);
     return raw ? (JSON.parse(raw) as Pending) : null;
   } catch {
     return null;
@@ -106,7 +130,12 @@ export function readPending(): Pending | null {
 }
 
 export function clearPending() {
-  sessionStorage.removeItem(PENDING_KEY);
+  try {
+    sessionStorage.removeItem(PENDING_KEY);
+    localStorage.removeItem(PENDING_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Strip an OAuth query/hash response from the URL bar. */

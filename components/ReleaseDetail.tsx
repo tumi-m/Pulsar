@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useDragControls } from "framer-motion";
+import { useScrollLock } from "@/lib/useScrollLock";
 import { X, Check, Link as LinkIcon, Play, Pause, ChevronLeft, ChevronRight, Maximize2, Share2, Mic2, AudioLines } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
@@ -180,12 +181,17 @@ function TrackRow({
  */
 export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: ReleaseDetailProps) {
   const player = usePlayer();
+  // Lock the page behind the sheet on mobile (no scroll-bleed / jump).
+  useScrollLock(Boolean(release));
+  // Drag-to-dismiss only from the grab handle / title bar, so scrolling the
+  // tracklist never accidentally dismisses the sheet.
+  const dragControls = useDragControls();
   const [copied, setCopied] = useState<string | null>(null);
   const [tracks, setTracks] = useState<Track[] | null>(null);
   const [tracksLoading, setTracksLoading] = useState(false);
   const [tracksOpen, setTracksOpen] = useState(true);
   const [origDate, setOrigDate] = useState<string | null>(null);
-  const [visualMode, setVisualMode] = useState<VisualMode>("nebula");
+  const [visualMode, setVisualMode] = useState<VisualMode>("bars");
   // The visualiser stays OFF until the user taps the Visualise button.
   const [showVisual, setShowVisual] = useState(false);
   useEffect(() => setShowVisual(false), [release]);
@@ -353,22 +359,33 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 520, damping: 42 }}
             drag="y"
+            dragControls={dragControls}
+            dragListener={false}
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 0.6 }}
             onDragEnd={(_e, info) => {
               if (info.offset.y > 120 || info.velocity.y > 700) onClose();
             }}
-            className="fixed inset-x-0 bottom-0 z-40 flex h-[72vh] transform-gpu touch-pan-y flex-col rounded-t-2xl border border-b-0 border-white/15 bg-[#0a0a14]/70 backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-16 lg:bottom-3 lg:h-auto lg:w-1/2 lg:rounded-l-2xl lg:border lg:border-r-0"
+            className="fixed inset-x-0 bottom-0 z-40 flex h-[72dvh] transform-gpu flex-col rounded-t-2xl border border-b-0 border-white/15 bg-[#0a0a14]/70 backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-16 lg:bottom-3 lg:h-auto lg:w-1/2 lg:rounded-l-2xl lg:border lg:border-r-0"
             style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35), 0 -20px 60px rgba(0,0,0,0.5)" }}
             role="dialog"
             aria-modal="false"
             aria-label={`${release.title} by ${release.artist}`}
           >
-            {/* mobile grab handle */}
-            <div className="mx-auto mt-2 h-1 w-10 flex-shrink-0 rounded-full bg-star-white/25 lg:hidden" />
-            {/* translucent liquid-glass title bar */}
+            {/* mobile grab handle — a generous drag target for pull-to-dismiss */}
             <div
-              className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2"
+              onPointerDown={(e) => dragControls.start(e)}
+              className="flex-shrink-0 cursor-grab touch-none py-2 lg:hidden"
+              style={{ touchAction: "none" }}
+            >
+              <div className="mx-auto h-1 w-10 rounded-full bg-star-white/25" />
+            </div>
+            {/* translucent liquid-glass title bar — also starts the drag */}
+            <div
+              onPointerDown={(e) => {
+                if (window.matchMedia("(max-width: 1023px)").matches) dragControls.start(e);
+              }}
+              className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2 lg:cursor-default"
               style={{
                 background: "rgba(255,255,255,0.08)",
                 backdropFilter: "blur(12px) saturate(150%)",
@@ -385,6 +402,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
               </span>
               <button
                 onClick={onClose}
+                onPointerDown={(e) => e.stopPropagation()}
                 aria-label="Close"
                 className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/25 text-star-white/80 transition-colors hover:border-white/60 hover:text-star-white"
                 style={{
