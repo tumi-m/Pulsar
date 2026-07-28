@@ -12,10 +12,26 @@ const buildTimeStub: unknown = new Proxy(resolved, {
   },
 });
 
-// Sanitize the project URL: trim whitespace/newlines and strip any trailing
-// slash. A trailing slash produces "//rest/v1/…" which Supabase rejects with
-// "Invalid path specified in request URL" — the cause of failed inserts.
-const cleanUrl = () => (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim().replace(/\/+$/, "");
+/**
+ * Sanitize the project URL down to its bare origin.
+ *
+ * supabase-js appends "/rest/v1/…" itself, so anything pasted beyond the origin
+ * breaks every request. Two very easy mistakes to make when copying out of the
+ * Supabase dashboard:
+ *   • a trailing slash        → "//rest/v1/…"  ("Invalid path specified")
+ *   • the full REST endpoint  → "/rest/v1/rest/v1/releases" (404 on every write)
+ * Both are silently corrected here rather than failing at runtime.
+ */
+const cleanUrl = () => {
+  const raw = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
+  if (!raw) return "";
+  try {
+    return new URL(raw).origin; // drops any path, query and trailing slash
+  } catch {
+    // Not a parseable URL — fall back to trimming the obvious mistakes.
+    return raw.replace(/\/rest\/v1\/?$/i, "").replace(/\/+$/, "");
+  }
+};
 
 // Lazy client — reads env vars at call time so agent/env.ts config() has already run
 let _supabase: ReturnType<typeof createClient> | null = null;

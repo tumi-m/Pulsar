@@ -1,0 +1,56 @@
+name: Pulsar — Refresh Grammy winners
+
+# `npm run grammy` REWRITES lib/grammy-artists.ts, so it has to run somewhere
+# the change can be committed back to the repo. Running it inside a deploy
+# container (Railway/Vercel) would rewrite a file in a container that is thrown
+# away moments later — the app would never see it.
+#
+# This workflow runs it on GitHub and commits the regenerated list, so you never
+# need a local checkout. Trigger it from the Actions tab (Run workflow), or let
+# the monthly schedule keep it current after each awards season.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 05:00 UTC on the 3rd of every month
+    - cron: '0 5 3 * *'
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    name: Harvest Grammy winners from Wikidata
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The script refuses to overwrite the seed list with a partial result, so
+      # a flaky Wikidata response fails the step instead of shrinking the list.
+      - name: Harvest winners
+        run: npm run grammy
+
+      - name: Commit the refreshed list
+        run: |
+          if git diff --quiet -- lib/grammy-artists.ts; then
+            echo "No change — the winner list is already up to date."
+            exit 0
+          fi
+          COUNT=$(grep -c '^  "' lib/grammy-artists.ts || echo "?")
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib/grammy-artists.ts
+          git commit -m "Refresh Grammy winners from Wikidata (${COUNT} artists)"
+          git push
