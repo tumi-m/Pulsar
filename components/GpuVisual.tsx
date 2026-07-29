@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import type { Release } from "@/lib/types";
 import { usePlayer } from "./player/PlayerProvider";
 import type { VisualMode } from "./VisualCanvas";
+import { AudioEngine } from "@/lib/audio-engine";
+import { extractPalette, FALLBACK_PALETTE, type Palette } from "@/lib/palette";
 
 /**
  * Full-GPU visualiser. A single fullscreen triangle drives a fragment shader
@@ -20,10 +22,12 @@ const FRAG = `#version 300 es
 precision highp float;
 out vec4 outColor;
 uniform vec2  uRes;
-uniform float uTime, uBass, uTreble, uLevel, uKick;
-uniform int   uMode;      // 0 nebula, 1 aurora, 2 silhouette, 3 cover
+uniform float uTime, uBass, uMid, uTreble, uLevel, uKick, uBeat;
+uniform int   uMode;      // 0 nebula, 1 aurora, 2 silhouette, 3 cover, 4 tunnel, 5 liquid
 uniform sampler2D uTex;
 uniform float uHasTex;
+// Palette lifted from the album artwork, so every release is coloured by itself.
+uniform vec3  uPrimary, uAccent;
 
 float hash(vec2 p){ p = fract(p*vec2(123.34,456.21)); p += dot(p,p+45.32); return fract(p.x*p.y); }
 float noise(vec2 p){
@@ -37,8 +41,13 @@ float fbm(vec2 p){
   for(int i=0;i<6;i++){ v+=a*noise(p); p=m*p; a*=0.5; }
   return v;
 }
+// Ramp between the cover's own two colours, with a cosine-palette shimmer laid
+// over the top so it stays iridescent rather than a flat two-stop gradient.
 vec3 palette(float t){
-  return 0.5 + 0.5*cos(6.28318*(vec3(1.0,0.75,0.45)*t + vec3(0.0,0.18,0.35)));
+  float m = 0.5 + 0.5*sin(6.28318*t);
+  vec3 base = mix(uPrimary, uAccent, m);
+  vec3 shimmer = 0.5 + 0.5*cos(6.28318*(vec3(1.0,0.75,0.45)*t + vec3(0.0,0.18,0.35)));
+  return mix(base, base*shimmer*1.6, 0.35);
 }
 
 void main(){
@@ -80,6 +89,39 @@ void main(){
     col = mix(col, palette(r + t), 0.3);
     col *= 1.0 + beat*0.4;
     col *= smoothstep(1.3, 0.2, r);
+  } else if(uMode == 4){              // ── TUNNEL (MilkDrop lineage) ──
+    // Polar remap: constant angular travel + 1/r depth reads as flying through
+    // a corridor. Rings are quantised so each beat lands on a visible band.
+    float r = length(uv);
+    float a = atan(uv.y, uv.x);
+    float depth = 0.55/max(r, 0.04) + uTime*0.55 + uBeat*0.22;
+    float rings = fract(depth);
+    float band  = smoothstep(0.5, 0.0, abs(rings - 0.5));
+    float ribs  = 0.5 + 0.5*sin(a*8.0 + depth*3.0 + uMid*5.0);
+    col  = palette(depth*0.35 + a*0.08) * band * (0.55 + uLevel*1.8 + uKick*1.4);
+    col *= 0.45 + 0.55*ribs;
+    // Horizon glow at the vanishing point, punched by the kick.
+    col += uAccent * exp(-r*4.5) * (0.35 + uKick*1.2);
+    col *= smoothstep(1.5, 0.15, r) + 0.15;
+  } else if(uMode == 5){              // ── LIQUID (ferrofluid sheen) ──
+    // Domain-warped height field shaded as a metal surface: cheap fake
+    // lighting from the gradient gives it real depth without raymarching.
+    vec2 q = uv*1.6;
+    float warp = 0.55 + uBass*0.9;
+    q += warp*vec2(fbm(q*1.3 + uTime*0.20), fbm(q*1.3 - uTime*0.16 + 3.7));
+    float h  = fbm(q*1.7 + uTime*0.10);
+    // Central gradient differences → surface normal.
+    float e = 0.012;
+    float hx = fbm(vec2(q.x+e, q.y)*1.7 + uTime*0.10) - h;
+    float hy = fbm(vec2(q.x, q.y+e)*1.7 + uTime*0.10) - h;
+    vec3 n = normalize(vec3(-hx, -hy, 0.035));
+    vec3 lightDir = normalize(vec3(0.55, 0.7, 0.65));
+    float diff = max(dot(n, lightDir), 0.0);
+    float spec = pow(diff, 26.0);
+    col  = palette(h*1.4 + uTime*0.05) * (0.22 + diff*1.15);
+    col += vec3(1.0) * spec * (0.55 + uTreble*2.2);          // sharp highlight
+    col += uAccent * pow(1.0 - abs(dot(n, vec3(0,0,1))), 3.0) * 0.55; // rim
+    col *= 1.0 + uKick*0.5;
   } else {                            // ── NEBULA (default) ──
     vec2 q = uv*1.4;
     q += 0.6*vec2(fbm(q + t), fbm(q + vec2(5.2,1.3) - t*0.8));
@@ -112,6 +154,8 @@ function compile(gl: WebGL2RenderingContext, type: number, src: string): WebGLSh
 // Only the GPU-rendered modes appear here; the classic media-player modes
 // (bars / waves / ambience) are drawn by WmpVisual instead.
 const MODE_MAP: Partial<Record<VisualMode, number>> = {
+  tunnel: 4,
+  liquid: 5,
   nebula: 0,
   aurora: 1,
   silhouette: 2,
@@ -146,6 +190,21 @@ export function GpuVisual({
   useEffect(() => {
     modeRef.current = mode;
   }, [mode]);
+
+  // Colours pulled from the album art. Held in a ref so the render loop reads
+  // the latest palette without the GL context being rebuilt when it resolves.
+  const paletteRef = useRef<Palette>(FALLBACK_PALETTE);
+  useEffect(() => {
+    let cancelled = false;
+    paletteRef.current = FALLBACK_PALETTE;
+    if (!release?.artwork_url) return;
+    extractPalette(release.artwork_url).then((p) => {
+      if (!cancelled) paletteRef.current = p;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [release?.artwork_url]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -187,6 +246,10 @@ export function GpuVisual({
       treble: gl.getUniformLocation(prog, "uTreble"),
       level: gl.getUniformLocation(prog, "uLevel"),
       kick: gl.getUniformLocation(prog, "uKick"),
+      mid: gl.getUniformLocation(prog, "uMid"),
+      beat: gl.getUniformLocation(prog, "uBeat"),
+      primary: gl.getUniformLocation(prog, "uPrimary"),
+      accent: gl.getUniformLocation(prog, "uAccent"),
       mode: gl.getUniformLocation(prog, "uMode"),
       tex: gl.getUniformLocation(prog, "uTex"),
       hasTex: gl.getUniformLocation(prog, "uHasTex"),
@@ -233,53 +296,46 @@ export function GpuVisual({
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
 
-    const freq = new Uint8Array(1024);
-    let prevBass = 0;
-    let kick = 0;
+    // Real analysis (log bands, onset detection, auto-gain) with synthesised
+    // motion when there's no analyser — which is every touch device, since the
+    // Web Audio graph is desktop-only.
+    const engine = new AudioEngine({ bands: 32 });
+    let last = performance.now();
     let raf = 0;
 
-    const render = () => {
-      resize();
-      const time = performance.now() / 1000;
-      let bass = 0.12, treble = 0.08, level = 0.1;
-      const analyser = getAnalyserRef.current();
-      if (analyser && playingRef.current) {
-        analyser.getByteFrequencyData(freq);
-        const n = analyser.frequencyBinCount;
-        const avg = (a: number, b: number) => {
-          let s = 0;
-          const lo = Math.floor(n * a), hi = Math.floor(n * b);
-          for (let i = lo; i < hi; i++) s += freq[i];
-          return s / Math.max(1, (hi - lo) * 255);
-        };
-        bass = avg(0, 0.06);
-        treble = avg(0.3, 1);
-        level = avg(0, 1);
-      } else {
-        // gentle idle motion when no live audio (e.g. mobile)
-        bass = 0.14 + Math.sin(time * 1.4) * 0.06;
-        treble = 0.1 + Math.sin(time * 2.7) * 0.04;
-        level = 0.14 + Math.sin(time * 0.9) * 0.05;
+    const render = (now: number) => {
+      raf = requestAnimationFrame(render);
+      // Skip entirely while hidden: a background tab shouldn't burn the GPU.
+      if (document.hidden) {
+        last = now;
+        return;
       }
-      const rise = bass - prevBass;
-      prevBass = bass;
-      kick = Math.max(kick * 0.82, rise > 0.035 ? Math.min(1, rise * 7) : 0);
+      const dt = (now - last) / 1000;
+      last = now;
+      resize();
+
+      const f = engine.update(getAnalyserRef.current(), dt, playingRef.current);
+      // Falls back to the house palette until the cover's colours resolve.
+      const pal = paletteRef.current;
 
       gl.uniform2f(u.res, canvas.width, canvas.height);
-      gl.uniform1f(u.time, time);
-      gl.uniform1f(u.bass, bass);
-      gl.uniform1f(u.treble, treble);
-      gl.uniform1f(u.level, level);
-      gl.uniform1f(u.kick, kick);
+      gl.uniform1f(u.time, f.time);
+      gl.uniform1f(u.bass, f.bass);
+      gl.uniform1f(u.mid, f.mid);
+      gl.uniform1f(u.treble, f.treble);
+      gl.uniform1f(u.level, f.level);
+      gl.uniform1f(u.kick, f.kick);
+      gl.uniform1f(u.beat, f.beatPhase);
+      gl.uniform3f(u.primary, pal.primary[0], pal.primary[1], pal.primary[2]);
+      gl.uniform3f(u.accent, pal.accent[0], pal.accent[1], pal.accent[2]);
       gl.uniform1i(u.mode, MODE_MAP[modeRef.current] ?? 0);
       gl.uniform1f(u.hasTex, hasTex);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, tex);
       gl.uniform1i(u.tex, 0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
-      raf = requestAnimationFrame(render);
     };
-    render();
+    raf = requestAnimationFrame(render);
 
     return () => {
       cancelAnimationFrame(raf);

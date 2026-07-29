@@ -3,8 +3,21 @@
 import { useEffect, useRef } from "react";
 import type { Release } from "@/lib/types";
 import { usePlayer } from "./player/PlayerProvider";
+import { AudioEngine } from "@/lib/audio-engine";
+import { extractPalette, FALLBACK_PALETTE, type Palette } from "@/lib/palette";
 
 export type WmpMode = "bars" | "waves" | "ambience";
+
+/** Linear blend of two normalised RGB triples. */
+const mixRgb = (
+  a: readonly [number, number, number],
+  b: readonly [number, number, number],
+  m: number
+): [number, number, number] => [
+  a[0] + (b[0] - a[0]) * m,
+  a[1] + (b[1] - a[1]) * m,
+  a[2] + (b[2] - a[2]) * m,
+];
 
 /**
  * Classic Windows-XP-era media-player visualiser — "Bars and Waves".
@@ -38,6 +51,21 @@ export function WmpVisual({
   useEffect(() => {
     modeRef.current = mode;
   }, [mode]);
+
+  // Album-art colours, so Bars/Waves/Ambience are tinted by the record itself
+  // rather than a fixed scheme.
+  const paletteRef = useRef<Palette>(FALLBACK_PALETTE);
+  useEffect(() => {
+    let cancelled = false;
+    paletteRef.current = FALLBACK_PALETTE;
+    if (!release?.artwork_url) return;
+    extractPalette(release.artwork_url).then((p) => {
+      if (!cancelled) paletteRef.current = p;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [release?.artwork_url]);
   useEffect(() => {
     getAnalyserRef.current = player.getAnalyser;
     playingRef.current = player.playing;
@@ -66,54 +94,26 @@ export function WmpVisual({
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
 
-    // ── analyser buffers ──────────────────────────────
+    // ── analysis ──────────────────────────────────────
+    // Shared engine: log-spaced bands, onset detection and auto-gain, plus
+    // synthesised motion on touch devices where there is no analyser at all.
     const BANDS = touch ? 32 : 48;
+    const engine = new AudioEngine({ bands: BANDS });
     const peaks = new Float32Array(BANDS); // falling peak caps
-    const levels = new Float32Array(BANDS); // smoothed bar heights
-    let freq: Uint8Array<ArrayBuffer> | null = null;
-    let wave: Uint8Array<ArrayBuffer> | null = null;
+    let af = engine.update(null, 0.016, false);
     let t = 0;
 
-    // Idle animation when nothing is playing, so it never looks broken.
-    const idleAt = (i: number, time: number) =>
-      0.10 + 0.09 * (Math.sin(time * 1.6 + i * 0.45) * 0.5 + 0.5);
-
-    const readAudio = () => {
-      const analyser = getAnalyserRef.current?.();
-      if (!analyser || !playingRef.current) return false;
-      if (!freq || freq.length !== analyser.frequencyBinCount) {
-        freq = new Uint8Array(analyser.frequencyBinCount);
-        wave = new Uint8Array(analyser.frequencyBinCount);
-      }
-      analyser.getByteFrequencyData(freq);
-      analyser.getByteTimeDomainData(wave!);
-      return true;
-    };
-
-    // Map FFT bins onto BANDS with a log-ish curve (bass gets fewer bins).
-    const bandValue = (i: number): number => {
-      if (!freq) return 0;
-      const n = freq.length;
-      const lo = Math.floor(Math.pow(i / BANDS, 1.65) * n * 0.72);
-      const hi = Math.max(lo + 1, Math.floor(Math.pow((i + 1) / BANDS, 1.65) * n * 0.72));
-      let sum = 0;
-      for (let k = lo; k < hi && k < n; k++) sum += freq[k];
-      return sum / (hi - lo) / 255;
-    };
-
     // ── drawing ───────────────────────────────────────
-    const drawBars = (live: boolean) => {
+    const drawBars = () => {
+      const pal = paletteRef.current;
       const floor = h * 0.68; // bars sit above a reflective "floor"
       const gap = Math.max(1, Math.round(w / BANDS / 7));
       const bw = (w - gap * (BANDS - 1)) / BANDS;
       const segH = Math.max(3, Math.round(h / 46)); // chunky XP-style segments
 
       for (let i = 0; i < BANDS; i++) {
-        const target = live ? bandValue(i) : idleAt(i, t);
-        // Fast attack, slow release — the classic analyser feel.
-        levels[i] += (target - levels[i]) * (target > levels[i] ? 0.55 : 0.13);
-        const v = Math.max(0, Math.min(1, levels[i]));
-
+        // The engine already applies fast-attack / slow-release smoothing.
+        const v = Math.max(0, Math.min(1, af.bands[i]));
         peaks[i] = Math.max(peaks[i] - 0.006, v);
 
         const x = i * (bw + gap);
@@ -123,9 +123,12 @@ export function WmpVisual({
         for (let s = 0; s < segs; s++) {
           const y = floor - (s + 1) * (segH + 2);
           const frac = s / Math.max(1, floor / (segH + 2));
-          // green → yellow → red, exactly like the old analysers
-          const hue = 120 - frac * 120;
-          ctx.fillStyle = `hsl(${hue}, 95%, ${52 + frac * 8}%)`;
+          // Ramp the album's own two colours up the column, going white-hot at
+          // the very top — the XP silhouette, re-coloured per record.
+          const c = frac < 0.75
+            ? mixRgb(pal.primary, pal.accent, frac / 0.75)
+            : mixRgb(pal.accent, [1, 1, 1], (frac - 0.75) / 0.25);
+          ctx.fillStyle = `rgb(${(c[0] * 255) | 0},${(c[1] * 255) | 0},${(c[2] * 255) | 0})`;
           ctx.fillRect(x, y, bw, segH);
           // reflection below the floor, fading out
           ctx.globalAlpha = 0.16 * (1 - frac);
@@ -140,7 +143,8 @@ export function WmpVisual({
       }
     };
 
-    const drawWaves = (live: boolean) => {
+    const drawWaves = () => {
+      const live = !af.isSynthetic;
       // faint grid, like an oscilloscope screen
       ctx.strokeStyle = "rgba(90,150,255,0.10)";
       ctx.lineWidth = 1;
@@ -156,10 +160,13 @@ export function WmpVisual({
       }
       ctx.stroke();
 
+      const pal = paletteRef.current;
+      const css = (c: [number, number, number]) =>
+        `rgb(${(c[0] * 255) | 0},${(c[1] * 255) | 0},${(c[2] * 255) | 0})`;
       const traces = [
-        { c: "#00e5ff", off: 0, amp: 1 },
-        { c: "#9b5de5", off: 0.14, amp: 0.72 },
-        { c: "#ff5fa2", off: 0.28, amp: 0.5 },
+        { c: css(pal.accent), off: 0, amp: 1 },
+        { c: css(pal.primary), off: 0.14, amp: 0.72 },
+        { c: css(mixRgb(pal.primary, pal.accent, 0.5)), off: 0.28, amp: 0.5 },
       ];
       const mid = h / 2;
 
@@ -173,9 +180,11 @@ export function WmpVisual({
         for (let i = 0; i <= N; i++) {
           const p = i / N;
           let v: number;
-          if (live && wave) {
-            const idx = Math.floor(p * (wave.length - 1));
-            v = (wave[idx] - 128) / 128;
+          if (live) {
+            // Reconstruct a plausible waveform from the band energies: the
+            // shared engine exposes spectrum, not time-domain samples.
+            const b = af.bands[Math.floor(p * (af.bands.length - 1))];
+            v = Math.sin(p * Math.PI * 12 + t * 6) * (0.25 + b * 1.5);
           } else {
             v = Math.sin(p * Math.PI * 4 + t * 2) * 0.25;
           }
@@ -190,20 +199,15 @@ export function WmpVisual({
       ctx.shadowBlur = 0;
     };
 
-    const drawAmbience = (live: boolean) => {
+    const drawAmbience = () => {
       // Low-end drives the pulse; flowing translucent bands.
-      let bass = 0;
-      if (live && freq) {
-        for (let i = 0; i < 12 && i < freq.length; i++) bass += freq[i];
-        bass = bass / 12 / 255;
-      } else {
-        bass = 0.25 + Math.sin(t * 1.5) * 0.12;
-      }
+      const bass = af.bass;
+      const pal = paletteRef.current;
       const bands = touch ? 5 : 8;
       for (let i = 0; i < bands; i++) {
         const p = i / bands;
-        const hue = (p * 300 + t * 22) % 360;
-        ctx.fillStyle = `hsla(${hue}, 90%, 58%, ${0.10 + bass * 0.16})`;
+        const c = mixRgb(pal.primary, pal.accent, (p + t * 0.06) % 1);
+        ctx.fillStyle = `rgba(${(c[0] * 255) | 0},${(c[1] * 255) | 0},${(c[2] * 255) | 0},${0.10 + bass * 0.18})`;
         ctx.beginPath();
         const amp = h * (0.10 + bass * 0.24);
         const yBase = h * (0.18 + p * 0.66);
@@ -223,6 +227,7 @@ export function WmpVisual({
 
     const minFrameMs = touch ? 33 : 0;
     let last = 0;
+    let lastFrame = 0;
     let running = false;
 
     const frame = (now?: number) => {
@@ -236,16 +241,18 @@ export function WmpVisual({
       last = ms;
       t += 0.016;
 
-      const live = readAudio();
+      af = engine.update(getAnalyserRef.current?.() ?? null, ms > 0 ? Math.min(0.1, (ms - lastFrame) / 1000) : 0.016, playingRef.current);
+      lastFrame = ms;
+      t = af.time;
 
       // Dark backdrop with a subtle vignette — the XP player look.
       ctx.fillStyle = "#05060d";
       ctx.fillRect(0, 0, w, h);
 
       const m = modeRef.current;
-      if (m === "bars") drawBars(live);
-      else if (m === "waves") drawWaves(live);
-      else drawAmbience(live);
+      if (m === "bars") drawBars();
+      else if (m === "waves") drawWaves();
+      else drawAmbience();
     };
 
     const start = () => {
