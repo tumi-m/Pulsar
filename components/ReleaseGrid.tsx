@@ -822,6 +822,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                         forYou={Boolean(recProfile) && (sizes[i] ?? 0) > 0}
                         format={format}
                         scrolling={scrolling}
+                        compact={!detailOpen && cols >= 5}
                         onOpen={setSelectedRelease}
                       />
                     );
@@ -852,6 +853,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 forYou={Boolean(recProfile) && (sizes[i] ?? 0) > 0}
                 format={format}
                 scrolling={scrolling}
+                compact={!detailOpen && cols >= 5}
                 onOpen={setSelectedRelease}
               />
             ))}
