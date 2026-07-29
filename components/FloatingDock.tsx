@@ -325,10 +325,13 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               : "bottom-5"
         }`}
       >
-        {/* Curator + Shuffle fly in above the three when the navbar hides */}
+        {/* Curator flies in when the navbar hides. Shuffle also lives here on
+            touch permanently — the navbar reveals it on a 2s hover, which a
+            phone can never perform. */}
         <AnimatePresence>
-          {navHidden && (
+          {(navHidden || isTouch) && (
             <>
+              {navHidden && (
               <motion.button
                 key="curator"
                 initial={{ opacity: 0, y: -18, scale: 0.6 }}
@@ -345,6 +348,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               >
                 <Sparkles size={22} className="text-white" />
               </motion.button>
+              )}
               <motion.button
                 key="shuffle"
                 initial={{ opacity: 0, y: -14, scale: 0.6 }}

@@ -15,6 +15,14 @@ export function Navbar() {
   const [crateOpen, setCrateOpen] = useState(false);
   const [samplesOpen, setSamplesOpen] = useState(false);
   const prevY = useRef(0);
+  // Only three buttons sit in the corner; the secondary control (Shuffle)
+  // appears after a 2s dwell, the same "rest to reveal more" idiom the release
+  // tiles use. On touch there's no hover, so it lives in the floating dock.
+  const [dwelled, setDwelled] = useState(false);
+  const dwellTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (dwellTimer.current) clearTimeout(dwellTimer.current);
+  }, []);
 
   // Album mode (detail sheet) opens on the right half; confine the header to
   // the left half so the controls sit symmetrically over the grid below.
@@ -72,19 +80,39 @@ export function Navbar() {
         {/* left spacer — the menu button now lives in the search block */}
         <div className="h-11 w-11" aria-hidden />
 
-        <div className="flex items-center gap-2">
+        <div
+          className="flex items-center gap-2"
+          onMouseEnter={() => {
+            if (dwellTimer.current) clearTimeout(dwellTimer.current);
+            dwellTimer.current = setTimeout(() => setDwelled(true), 2000);
+          }}
+          onMouseLeave={() => {
+            if (dwellTimer.current) clearTimeout(dwellTimer.current);
+            setDwelled(false);
+          }}
+        >
+        {/* Shuffle — secondary, so it stays out of the way until you rest here.
+            `aria-hidden` while collapsed keeps it out of the tab order too. */}
         <button
           onClick={() => player.toggleShuffle()}
           aria-label="Shuffle to your top picks"
           aria-pressed={player.shuffle}
+          aria-hidden={!dwelled && !player.shuffle}
+          tabIndex={dwelled || player.shuffle ? 0 : -1}
           title={player.shuffle ? "Shuffle on — plays your top-ranked picks" : "Shuffle off"}
-          className={`flex h-9 w-9 items-center justify-center rounded-full border transition-all active:scale-95 ${
+          className={`flex h-9 items-center justify-center overflow-hidden rounded-full border transition-all duration-300 active:scale-95 ${
+            // Stays visible whenever shuffle is ON, so an active mode is never
+            // hidden behind a hover.
+            dwelled || player.shuffle
+              ? "w-9 scale-100 opacity-100"
+              : "pointer-events-none -ml-2 w-0 border-0 opacity-0"
+          } ${
             player.shuffle
               ? "border-[#e8c66a] bg-[#d4af37]/25 text-[#f4d780] shadow-[0_0_16px_rgba(212,175,55,0.6)]"
               : "border-[#d4af37]/40 text-[#e8c66a]/70 hover:border-[#d4af37]/80 hover:text-[#f4d780]"
           }`}
         >
-          <Shuffle size={15} />
+          <Shuffle size={15} className="flex-shrink-0" />
         </button>
         <button
           onClick={() => window.dispatchEvent(new CustomEvent("pulsar-ai-activate"))}
