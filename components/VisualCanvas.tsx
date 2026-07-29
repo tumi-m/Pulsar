@@ -10,6 +10,8 @@ export type VisualMode =
   | "bars"
   | "waves"
   | "ambience"
+  | "tunnel"
+  | "liquid"
   | "nebula"
   | "silhouette"
   | "aurora"
@@ -21,9 +23,11 @@ export type VisualMode =
 export const VISUAL_MODES: { id: VisualMode; label: string }[] = [
   { id: "bars", label: "Bars" },
   { id: "waves", label: "Waves" },
-  { id: "ambience", label: "Ambience" },
+  { id: "tunnel", label: "Tunnel" },
+  { id: "liquid", label: "Liquid" },
   { id: "nebula", label: "Nebula" },
-  { id: "silhouette", label: "Silhouette" },
+  { id: "ambience", label: "Ambience" },
+  { id: "silhouette", label: "Kaleido" },
   { id: "art", label: "Cover" },
   { id: "video", label: "Video" },
 ];
