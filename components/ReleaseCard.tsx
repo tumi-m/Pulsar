@@ -21,10 +21,12 @@ interface ReleaseCardProps {
   forYou?: boolean;
   format: MediaFormat;
   scrolling?: boolean;
+  /** Tiles are too small for overlay controls (dense pinch-zoom). */
+  compact?: boolean;
   onOpen: (release: Release) => void;
 }
 
-export function ReleaseCard({ release, index, size = 0, forYou = false, format, scrolling = false, onOpen }: ReleaseCardProps) {
+export function ReleaseCard({ release, index, size = 0, forYou = false, format, scrolling = false, compact = false, onOpen }: ReleaseCardProps) {
   const player = usePlayer();
   const isCurrent = player.current?.id === release.id;
   const isPlayingThis = isCurrent && player.playing;
@@ -32,7 +34,39 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
   // Touch devices never fire hover, so the quick actions (share / favourite /
   // crate) and the play triangle would be permanently invisible — show them.
   const isTouch = useIsTouch();
-  const revealed = hovered || isTouch;
+  // Showing the action bar on every tile buried the artwork under a wall of
+  // controls on mobile. On touch it now reveals for ONE tile at a time, via a
+  // long press — and not at all once tiles get too small to aim at.
+  const [pressRevealed, setPressRevealed] = useState(false);
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressClick = useRef(false);
+
+  useEffect(() => {
+    if (!pressRevealed) return;
+    // Any tap elsewhere dismisses it, so only one tile is ever armed.
+    const dismiss = () => setPressRevealed(false);
+    window.addEventListener("pointerdown", dismiss, { capture: true });
+    return () => window.removeEventListener("pointerdown", dismiss, { capture: true });
+  }, [pressRevealed]);
+
+  useEffect(() => () => {
+    if (pressTimer.current) clearTimeout(pressTimer.current);
+  }, []);
+
+  const startPress = () => {
+    if (!isTouch || compact) return;
+    if (pressTimer.current) clearTimeout(pressTimer.current);
+    pressTimer.current = setTimeout(() => {
+      setPressRevealed(true);
+      suppressClick.current = true; // a long press must not also open the album
+    }, 450);
+  };
+  const endPress = () => {
+    if (pressTimer.current) clearTimeout(pressTimer.current);
+  };
+
+  // `compact` tiles (a dense pinch-zoom) are too small for overlay controls.
+  const revealed = compact ? false : hovered || pressRevealed;
   // `armed` gates the physical-media animation: it only turns on after the
   // cursor has rested on the tile for 3 seconds, so the grid stays calm.
   const [armed, setArmed] = useState(false);
@@ -93,12 +127,20 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
       }}
       onHoverStart={enter}
       onHoverEnd={leave}
+      onPointerDown={startPress}
+      onPointerUp={endPress}
+      onPointerCancel={endPress}
+      onPointerLeave={endPress}
       whileTap={scrolling ? undefined : { scale: 0.95 }}
       className={`group relative ${size === 2 ? "col-span-2 row-span-2" : size === 1 ? "col-span-2" : ""}`}
     >
       <button
         type="button"
         onClick={() => {
+          if (suppressClick.current) {
+            suppressClick.current = false;
+            return;
+          }
           // Tapping anywhere OUTSIDE the play triangle opens album mode and
           // plays — the visualiser only comes up via its own Visualise button.
           player.play(release);
