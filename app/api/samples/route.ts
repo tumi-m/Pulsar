@@ -15,6 +15,8 @@ export const runtime = "nodejs";
  * timestamps — the linked original lets the listener hear where it lands.
  */
 
+import { lookupCatalog } from "@/lib/samples-catalog";
+
 const UA = "Pulsar/1.0 ( https://pulsar-ten-sigma.vercel.app )";
 
 interface SampleRef {
@@ -44,6 +46,32 @@ export async function GET(req: NextRequest) {
 
   const headers = { "User-Agent": UA, Accept: "application/json" };
 
+  const samples: SampleRef[] = [];
+  const seen = new Set<string>();
+
+  // Seed with hand-checked connections first: MusicBrainz's sample graph misses
+  // a great many famous, exhaustively-documented samples, and these entries are
+  // richer (they say what was actually taken).
+  for (const hit of lookupCatalog(artist, title)) {
+    const key = `${hit.role}|${hit.title}|${hit.artist}`.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const byline = hit.artist ? ` by ${hit.artist}` : "";
+    samples.push({
+      role: hit.role,
+      title: hit.title,
+      artist: hit.artist,
+      year: hit.year,
+      partial: hit.partial,
+      timestamp: null,
+      description:
+        hit.note ??
+        (hit.role === "samples"
+          ? `Samples \u201C${hit.title}\u201D${byline}`
+          : `Sampled in \u201C${hit.title}\u201D${byline}`),
+    });
+  }
+
   try {
     // 1) Find matching recordings. A song exists in MusicBrainz as MANY
     //    recordings (album cut, single edit, remaster, compilation appearance),
@@ -59,7 +87,7 @@ export async function GET(req: NextRequest) {
     const searchData = await searchRes.json();
     const recs: any[] = (searchData.recordings ?? []).filter((r: any) => (r.score ?? 0) >= 80);
     const targets = (recs.length ? recs : (searchData.recordings ?? []).slice(0, 1)).slice(0, 5);
-    if (!targets.length) return NextResponse.json({ samples: [] });
+    if (!targets.length) return NextResponse.json({ samples }); // curated hits still stand
 
     // 2) Pull sample relationships from each, in parallel.
     const relLists = await Promise.all(
@@ -78,8 +106,6 @@ export async function GET(req: NextRequest) {
       })
     );
 
-    const samples: SampleRef[] = [];
-    const seen = new Set<string>();
     for (const rel of relLists.flat()) {
       if (!rel.type || !/sampl/i.test(rel.type)) continue;
       const target = rel.recording ?? rel.work;
@@ -122,6 +148,7 @@ export async function GET(req: NextRequest) {
       { headers: { "Netlify-Vary": "query", "Cache-Control": "public, max-age=604800" } }
     );
   } catch {
-    return NextResponse.json({ samples: [] }, { status: 200 });
+    // MusicBrainz unreachable — still return the curated hits.
+    return NextResponse.json({ samples }, { status: 200 });
   }
 }

@@ -13,6 +13,7 @@ export function Navbar() {
   const [hidden, setHidden] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [crateOpen, setCrateOpen] = useState(false);
+  const [samplesOpen, setSamplesOpen] = useState(false);
   const prevY = useRef(0);
 
   // Album mode (detail sheet) opens on the right half; confine the header to
@@ -20,11 +21,14 @@ export function Navbar() {
   useEffect(() => {
     const onDetail = (e: Event) => setDetailOpen((e as CustomEvent<boolean>).detail);
     const onCrate = (e: Event) => setCrateOpen((e as CustomEvent<boolean>).detail);
+    const onSamples = (e: Event) => setSamplesOpen((e as CustomEvent<boolean>).detail);
     window.addEventListener("pulsar-detail-open", onDetail);
     window.addEventListener("pulsar-crate-open", onCrate);
+    window.addEventListener("pulsar-samples-open", onSamples);
     return () => {
       window.removeEventListener("pulsar-detail-open", onDetail);
       window.removeEventListener("pulsar-crate-open", onCrate);
+      window.removeEventListener("pulsar-samples-open", onSamples);
     };
   }, []);
 
@@ -58,7 +62,7 @@ export function Navbar() {
     >
       <div
         className={`mx-auto flex h-full max-w-screen-2xl items-center justify-between transition-[padding,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-          detailOpen || crateOpen ? "lg:pr-[50vw]" : ""
+          detailOpen || crateOpen || samplesOpen ? "lg:pr-[50vw]" : ""
         } ${
           // The crate sheet covers this area on phones — get out of its way so
           // nothing sits on top of the panel's Export button.

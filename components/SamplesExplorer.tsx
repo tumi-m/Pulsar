@@ -38,6 +38,12 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
     return () => window.removeEventListener("pulsar-open-samples", activate);
   }, []);
 
+  // The panel covers the right half on desktop; broadcast so the Pulsar
+  // letterhead and navbar shift into the space that's still visible.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("pulsar-samples-open", { detail: open }));
+  }, [open]);
+
   // Surface everything the listener has already timestamped.
   useEffect(() => {
     if (!open) return;
@@ -98,7 +104,7 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[57] flex flex-col bg-[#07070d]/98 backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-14 lg:w-1/2"
+            className="fixed inset-0 z-[57] flex flex-col bg-[#07070d]/98 backdrop-blur-2xl lg:inset-x-auto lg:bottom-auto lg:right-4 lg:top-20 lg:max-h-[calc(100dvh-7rem)] lg:w-[min(44vw,560px)] lg:rounded-2xl lg:border lg:border-white/12"
           >
             {/* header */}
             <div className="relative flex items-center gap-3 border-b border-white/10 px-4 py-3">

@@ -19,10 +19,16 @@ export function HeroSection({ totalReleases, totalToday }: HeroSectionProps) {
   // When the album/tracklist panel opens (right half), re-center the Pulsar
   // letterhead over the visible left half.
   const [detailOpen, setDetailOpen] = useState(false);
+  const [samplesOpen, setSamplesOpen] = useState(false);
   useEffect(() => {
     const on = (e: Event) => setDetailOpen((e as CustomEvent<boolean>).detail);
+    const onSamples = (e: Event) => setSamplesOpen((e as CustomEvent<boolean>).detail);
     window.addEventListener("pulsar-detail-open", on);
-    return () => window.removeEventListener("pulsar-detail-open", on);
+    window.addEventListener("pulsar-samples-open", onSamples);
+    return () => {
+      window.removeEventListener("pulsar-detail-open", on);
+      window.removeEventListener("pulsar-samples-open", onSamples);
+    };
   }, []);
 
   // Fibonacci spacing above; the generous bottom padding reserves room for the
@@ -30,7 +36,7 @@ export function HeroSection({ totalReleases, totalToday }: HeroSectionProps) {
   return (
     <section
       className={`px-[21px] pb-[132px] pt-[89px] text-center transition-[padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:pb-[140px] md:pt-[120px] ${
-        detailOpen ? "lg:pr-[50vw]" : ""
+        detailOpen || samplesOpen ? "lg:pr-[50vw]" : ""
       }`}
     >
       <motion.h1
