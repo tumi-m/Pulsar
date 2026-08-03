@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, memo } from "react";
 import { motion } from "framer-motion";
 import { Heart, Play, Pause, Share2 } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
@@ -10,7 +10,8 @@ import type { MediaFormat } from "@/lib/format";
 import { PhysicalMedia } from "./PhysicalMedia";
 import { Artwork } from "./Artwork";
 import { PLATFORMS } from "./platforms";
-import { isFavorite, toggleFavorite, inPlaylist } from "@/lib/collection";
+import { toggleFavorite } from "@/lib/collection";
+import { useCollectionState } from "@/lib/useCollectionState";
 import { usePlayer } from "./player/PlayerProvider";
 import { useIsTouch } from "@/lib/useIsTouch";
 
@@ -26,7 +27,7 @@ interface ReleaseCardProps {
   onOpen: (release: Release) => void;
 }
 
-export function ReleaseCard({ release, index, size = 0, forYou = false, format, scrolling = false, compact = false, onOpen }: ReleaseCardProps) {
+function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scrolling = false, compact = false, onOpen }: ReleaseCardProps) {
   const player = usePlayer();
   const isCurrent = player.current?.id === release.id;
   const isPlayingThis = isCurrent && player.playing;
@@ -72,21 +73,11 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
   const [armed, setArmed] = useState(false);
   // DSP links reveal faster (1.5s) than the physical-media animation (3s).
   const [showDsp, setShowDsp] = useState(false);
-  const [fav, setFav] = useState(false);
-  const [inList, setInList] = useState(false);
   const [artHidden, setArtHidden] = useState(false); // hide if no art resolves
+  // One shared listener for the whole grid instead of one per tile.
+  const { fav, inList } = useCollectionState(release.id);
   const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dspTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    const sync = () => {
-      setFav(isFavorite(release.id));
-      setInList(inPlaylist(release.id));
-    };
-    sync();
-    window.addEventListener("pulsar-collection-change", sync);
-    return () => window.removeEventListener("pulsar-collection-change", sync);
-  }, [release.id]);
 
   useEffect(() => () => {
     if (armTimer.current) clearTimeout(armTimer.current);
@@ -121,8 +112,10 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{
-        duration: 0.5,
-        delay: Math.min((index % 12) * 0.04, 0.5),
+        duration: 0.45,
+        // Only the first screenful staggers. Beyond that a tile has scrolled
+        // into view and should simply be there.
+        delay: index < 12 ? index * 0.035 : 0,
         ease: [0.22, 1, 0.36, 1],
       }}
       onHoverStart={enter}
@@ -133,6 +126,12 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
       onPointerLeave={endPress}
       whileTap={scrolling ? undefined : { scale: 0.95 }}
       className={`group relative ${size === 2 ? "col-span-2 row-span-2" : size === 1 ? "col-span-2" : ""}`}
+      style={{
+        contentVisibility: "auto",
+        // Reserve the tile's box so skipping paint never collapses the grid or
+        // makes the scrollbar jump.
+        containIntrinsicSize: size === 1 ? "auto 180px" : "auto 320px",
+      }}
     >
       <button
         type="button"
@@ -274,7 +273,7 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
         <button
           onClick={(e) => {
             e.stopPropagation();
-            setFav(toggleFavorite(release));
+            toggleFavorite(release);
           }}
           aria-label={fav ? "Remove from favorites" : "Add to favorites"}
           className={`flex flex-1 items-center justify-center transition-colors hover:bg-neon-pink/15 ${big ? "h-12" : "h-10"}`}
@@ -329,3 +328,10 @@ export function ReleaseCard({ release, index, size = 0, forYou = false, format, 
     </motion.div>
   );
 }
+
+/**
+ * Memoised: ReleaseGrid re-renders on every scroll tick (it tracks `scrolling`
+ * and `atTop`), which previously re-rendered every mounted tile with it.
+ * Tiles only actually change when their own props do.
+ */
+export const ReleaseCard = memo(ReleaseCardBase);
