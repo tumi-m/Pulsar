@@ -2,24 +2,25 @@
 /**
  * Pulsar — Grammy winner harvester
  *
- * Rewrites lib/grammy-artists.ts with EVERY Grammy winner (any category) whose
- * award year falls in the last 59 years, straight from Wikidata's public SPARQL
- * endpoint. No API key required.
+ * Grows lib/grammy-artists.ts with Grammy winners (any category) whose award
+ * year falls in the last 59 years, from Wikidata's public SPARQL endpoint.
+ * No API key required.
+ *
+ * Results are MERGED into the existing list, never substituted for it: Wikidata's
+ * Grammy coverage is uneven, so a run can return fewer names than the curated
+ * list already holds. The union only ever grows, so a thin harvest still adds
+ * value and a bad one can't destroy anything.
  *
  *   npm run grammy
  *
  * Wikidata models this as: <person/group> wdt:P166 (award received) <award>,
- * where the award is the Grammy Award (Q1011547) or any of its ~100 category
- * subclasses (Best New Artist, Album of the Year, Best Rap Album, …). We match
- * the whole subclass tree so no category is missed, then keep only entities
- * that are humans or musical groups.
- *
  * The result is written back as a TypeScript module so the app keeps working
  * offline and needs no runtime dependency on Wikidata.
  */
 
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { GRAMMY_ARTISTS_UNIQUE } from "../lib/grammy-artists";
 
 const ENDPOINT = "https://query.wikidata.org/sparql";
 const UA = "Pulsar/1.0 (https://pulsar-ten-sigma.vercel.app; music discovery)";
@@ -27,14 +28,17 @@ const UA = "Pulsar/1.0 (https://pulsar-ten-sigma.vercel.app; music discovery)";
 const SINCE = new Date().getFullYear() - 59;
 
 /**
- * P166  = award received
- * Q1011547 = Grammy Award
- * P279* = subclass-of, transitive → every category award
- * Q5    = human, Q215380 = musical group, Q2088357 = musical ensemble
+ * Wikidata models the Grammys inconsistently: the parent award is Q41254, but
+ * individual categories ("Grammy Award for Best New Artist" and friends) are
+ * linked sometimes by `subclass of` (P279) and sometimes by `part of` (P361).
+ * Walking only P279* found barely a hundred winners because it missed most
+ * categories entirely — hence traversing BOTH.
+ *
+ * P166 = award received · Q5 human · Q215380/Q2088357 musical group/ensemble.
  */
 const QUERY = `
 SELECT DISTINCT ?artistLabel WHERE {
-  ?award wdt:P279* wd:Q1011547 .
+  ?award (wdt:P279*|wdt:P361*) wd:Q41254 .
   ?artist p:P166 ?statement .
   ?statement ps:P166 ?award .
   OPTIONAL { ?statement pq:P585 ?when . }
@@ -90,15 +94,32 @@ export const GRAMMY_ARTISTS_UNIQUE: string[] = [
 
 async function main() {
   console.log(`Querying Wikidata for Grammy winners since ${SINCE}…`);
-  const names = await fetchWinners();
-  if (names.length < 200) {
-    throw new Error(
-      `Only ${names.length} winners returned — refusing to overwrite the seed list with a partial result.`
-    );
+  const fetched = await fetchWinners();
+
+  // A harvest that returns nothing at all means the query or the endpoint is
+  // broken — that is worth failing on. Anything else is useful.
+  if (fetched.length === 0) {
+    throw new Error("Wikidata returned no winners — query or endpoint is broken.");
   }
+
+  // MERGE rather than replace. Wikidata's Grammy coverage is uneven and a run
+  // can legitimately return fewer names than the curated list already holds;
+  // treating that as failure (as this script previously did) threw away a
+  // perfectly good result and emailed a red build. Union-ing can only ever grow
+  // the list, so a partial harvest still contributes and nothing is ever lost.
+  const before = new Set(GRAMMY_ARTISTS_UNIQUE);
+  const merged = [...new Set([...GRAMMY_ARTISTS_UNIQUE, ...fetched])].sort((a, b) =>
+    a.localeCompare(b)
+  );
+  const added = merged.filter((n) => !before.has(n));
+
   const out = resolve(process.cwd(), "lib/grammy-artists.ts");
-  writeFileSync(out, render(names), "utf8");
-  console.log(`✓ Wrote ${names.length} Grammy winners to lib/grammy-artists.ts`);
+  writeFileSync(out, render(merged), "utf8");
+  console.log(
+    `✓ Wikidata returned ${fetched.length} · ${added.length} new · ` +
+      `${merged.length} total written to lib/grammy-artists.ts`
+  );
+  if (added.length === 0) console.log("  (nothing new this run — list already current)");
 }
 
 main().catch((err) => {
