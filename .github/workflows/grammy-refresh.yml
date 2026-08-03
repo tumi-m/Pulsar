@@ -37,8 +37,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # The script refuses to overwrite the seed list with a partial result, so
-      # a flaky Wikidata response fails the step instead of shrinking the list.
+      # Results are merged into the existing list, so a thin Wikidata response
+      # simply adds fewer names — it can never shrink or overwrite the list.
+      # Only a completely empty harvest (broken query/endpoint) fails the step.
       - name: Harvest winners
         run: npm run grammy
 
