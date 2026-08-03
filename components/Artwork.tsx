@@ -32,6 +32,10 @@ export function Artwork({
 }: ArtworkProps) {
   // 0 = original url, 1 = iTunes proxy, 2 = letter tile
   const [stage, setStage] = useState(0);
+  // Artwork used to pop in the instant it decoded, which reads as jumpy across
+  // a grid of hundreds. It now fades up from a shimmering placeholder.
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => setLoaded(false), [src, stage]);
 
   const proxied = `/api/artwork?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}`;
   const isProxySrc = src.startsWith("/api/");
@@ -56,27 +60,56 @@ export function Artwork({
 
   if (stage === 1 || isProxySrc) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={isProxySrc ? src : proxied}
-        alt={`${artist} — ${title}`}
-        loading={priority ? "eager" : "lazy"}
-        decoding="async"
-        className={`absolute inset-0 h-full w-full ${className}`}
-        onError={() => setStage(2)}
-      />
+      <>
+        <ArtworkPlaceholder show={!loaded} />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={isProxySrc ? src : proxied}
+          alt={`${artist} — ${title}`}
+          loading={priority ? "eager" : "lazy"}
+          decoding="async"
+          className={`absolute inset-0 h-full w-full transition-opacity duration-500 ${
+            loaded ? "opacity-100" : "opacity-0"
+          } ${className}`}
+          onLoad={() => setLoaded(true)}
+          onError={() => setStage(2)}
+        />
+      </>
     );
   }
 
   return (
-    <Image
-      src={src}
-      alt={`${artist} — ${title}`}
-      fill
-      sizes={sizes}
-      priority={priority}
-      className={className}
-      onError={() => setStage(1)}
-    />
+    <>
+      <ArtworkPlaceholder show={!loaded} />
+      <Image
+        src={src}
+        alt={`${artist} — ${title}`}
+        fill
+        sizes={sizes}
+        priority={priority}
+        className={`transition-opacity duration-500 ${loaded ? "opacity-100" : "opacity-0"} ${className}`}
+        onLoad={() => setLoaded(true)}
+        onError={() => setStage(1)}
+      />
+    </>
+  );
+}
+
+/**
+ * Placeholder shown until the cover decodes. A slow sheen rather than a static
+ * block, so a grid mid-load looks alive instead of broken — and it disappears
+ * under reduced-motion via the global animation guard.
+ */
+function ArtworkPlaceholder({ show }: { show: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={`pointer-events-none absolute inset-0 transition-opacity duration-500 ${
+        show ? "opacity-100" : "opacity-0"
+      }`}
+      style={{ background: "linear-gradient(135deg, #12121c 0%, #191926 50%, #12121c 100%)" }}
+    >
+      <span className="art-sheen absolute inset-0" />
+    </span>
   );
 }
