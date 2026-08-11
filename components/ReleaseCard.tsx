@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, memo } from "react";
 import { motion } from "framer-motion";
-import { Heart, Play, Pause, Share2 } from "lucide-react";
+import { Heart, Play, Pause, Share2, Sparkles } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";
 import { isToday, isYesterday } from "@/lib/utils";
@@ -200,10 +200,20 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
             </span>
           )}
 
-          {/* taste badge */}
+          {/* Taste badge — a small sparkle rather than a "FOR YOU" text block,
+              which covered too much artwork and read as clutter at any tile
+              size. The label survives as the accessible name. */}
           {forYou && size > 0 && !armed && (
-            <span className="absolute left-1 top-1 z-10 border border-white/50 bg-void/50 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.22em] text-white backdrop-blur-sm">
-              FOR YOU
+            <span
+              title="Picked for you"
+              aria-label="Picked for you"
+              className="absolute left-1.5 top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full"
+              style={{
+                background: "rgba(10,10,18,0.55)",
+                boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.28), 0 2px 8px rgba(0,0,0,0.5)",
+              }}
+            >
+              <Sparkles size={11} className="text-neon-violet" />
             </span>
           )}
 

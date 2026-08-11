@@ -94,6 +94,50 @@ export const WORLD_ARTISTS: Record<string, string[]> = {
     "Bessie Smith", "Ma Rainey", "Gary Clark Jr.", "Christone \"Kingfish\" Ingram",
   ],
 
+  // ── Rock, indie & alternative canon ───────────────────────
+  rock: [
+    "The Velvet Underground", "David Bowie", "Pink Floyd", "Led Zeppelin",
+    "The Clash", "Joy Division", "New Order", "The Smiths", "Talking Heads",
+    "Television", "Patti Smith", "The Stooges", "Sonic Youth", "Pixies",
+    "My Bloody Valentine", "Slowdive", "Cocteau Twins", "Portishead",
+    "Radiohead", "Blur", "Pulp", "The Strokes", "Arctic Monkeys",
+    "Interpol", "LCD Soundsystem", "Yeah Yeah Yeahs", "Fugazi",
+    "Fleet Foxes", "Big Thief", "Mitski", "Japanese Breakfast",
+    "black midi", "Black Country, New Road", "Alvvays", "Wet Leg",
+  ],
+
+  // ── Soul, funk & disco ────────────────────────────────────
+  soul: [
+    "Marvin Gaye", "Stevie Wonder", "Curtis Mayfield", "Al Green",
+    "Aretha Franklin", "Otis Redding", "Sam Cooke", "Donny Hathaway",
+    "Roberta Flack", "Bill Withers", "Isaac Hayes", "The Isley Brothers",
+    "Sly and the Family Stone", "Parliament", "Funkadelic", "James Brown",
+    "Earth, Wind & Fire", "Chic", "Donna Summer", "Chaka Khan",
+    "D'Angelo", "Erykah Badu", "Maxwell", "Jill Scott", "Sade",
+    "Frank Ocean", "Solange", "Leon Bridges", "Michael Kiwanuka",
+  ],
+
+  // ── Country, folk & Americana ─────────────────────────────
+  country: [
+    "Johnny Cash", "Willie Nelson", "Dolly Parton", "Loretta Lynn",
+    "Merle Haggard", "Waylon Jennings", "Emmylou Harris", "Gram Parsons",
+    "Townes Van Zandt", "John Prine", "Guy Clark", "Lucinda Williams",
+    "Bob Dylan", "Joni Mitchell", "Neil Young", "Leonard Cohen",
+    "Nick Drake", "Joan Baez", "Simon & Garfunkel", "Fairport Convention",
+    "Chris Stapleton", "Sturgill Simpson", "Jason Isbell", "Kacey Musgraves",
+    "Tyler Childers", "Zach Bryan", "Sierra Ferrell", "Billy Strings",
+  ],
+
+  // ── Classical & film score ────────────────────────────────
+  classical: [
+    "Ludwig van Beethoven", "Johann Sebastian Bach", "Wolfgang Amadeus Mozart",
+    "Frédéric Chopin", "Claude Debussy", "Erik Satie", "Maurice Ravel",
+    "Igor Stravinsky", "Dmitri Shostakovich", "Sergei Rachmaninoff",
+    "Philip Glass", "Steve Reich", "Arvo Pärt", "Max Richter",
+    "Ólafur Arnalds", "Nils Frahm", "Hildur Guðnadóttir", "Jóhann Jóhannsson",
+    "Ennio Morricone", "Hans Zimmer", "John Williams", "Ryuichi Sakamoto",
+  ],
+
   // ── Electronic & dance canon ──────────────────────────────
   electronic: [
     "Aphex Twin", "Boards of Canada", "Autechre", "Squarepusher",
