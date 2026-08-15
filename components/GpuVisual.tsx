@@ -263,10 +263,15 @@ export function GpuVisual({
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.MIRRORED_REPEAT);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.MIRRORED_REPEAT);
     let hasTex = 0;
+    // Guard the async Image.onload against the GL teardown: if the component
+    // unmounts (or release changes) before the cover image resolves, the
+    // texture/program would already be deleted — writing to it throws.
+    let disposed = false;
     if (release) {
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.onload = () => {
+        if (disposed) return;
         try {
           gl.bindTexture(gl.TEXTURE_2D, tex);
           gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
@@ -338,6 +343,7 @@ export function GpuVisual({
     raf = requestAnimationFrame(render);
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(raf);
       ro.disconnect();
       gl.deleteBuffer(buf);

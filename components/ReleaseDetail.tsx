@@ -98,18 +98,26 @@ function TrackRow({
     const el = rowRef.current;
     if (!el) return;
     let done = false;
+    let cancelled = false;
     const io = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting && !done) {
           done = true;
           io.disconnect();
-          fetchSamples(release.artist, track.title).then(setSamples);
+          // Guard the async resolve: the row can scroll away / unmount before
+          // the sample lookup returns, which would setState on a gone node.
+          fetchSamples(release.artist, track.title).then((s) => {
+            if (!cancelled) setSamples(s);
+          });
         }
       },
       { rootMargin: "150px" }
     );
     io.observe(el);
-    return () => io.disconnect();
+    return () => {
+      cancelled = true;
+      io.disconnect();
+    };
   }, [release.artist, track.title]);
 
   return (

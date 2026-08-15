@@ -17,7 +17,7 @@ import type { Release } from "@/lib/types";
  * full 3D visualizer.
  */
 export function NowPlayingBar() {
-  const { current, playing, loading, progress, elapsed, duration, hasAudio, toggle, stop, seek, ensureGraph } =
+  const { current, playing, loading, progress, elapsed, duration, hasAudio, error, toggle, stop, seek, ensureGraph, play } =
     usePlayer();
   const [expanded, setExpanded] = useState<Release | null>(null);
   const [inCrate, setInCrate] = useState(false);
@@ -297,7 +297,15 @@ export function NowPlayingBar() {
               </button>
             </div>
 
-            {!hasAudio && !loading && (
+            {error && !loading && (
+              <button
+                onClick={() => current && play(current)}
+                className="pb-1.5 text-center text-[9px] font-bold uppercase tracking-[0.25em] text-neon-amber/70 transition-colors hover:text-neon-amber"
+              >
+                {error} — tap to retry
+              </button>
+            )}
+            {!hasAudio && !loading && !error && (
               <p className="pb-1.5 text-center text-[9px] font-bold uppercase tracking-[0.25em] text-neon-amber/60">
                 No preview available for this release
               </p>

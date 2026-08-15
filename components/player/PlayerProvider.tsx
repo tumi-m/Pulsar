@@ -27,6 +27,8 @@ interface PlayerCtx {
   duration: number;
   hasAudio: boolean;
   shuffle: boolean;
+  /** Last playback error surfaced to the UI (null when healthy). */
+  error: string | null;
   play: (release: Release) => void;
   playDirect: (display: Release, previewUrl: string) => void;
   toggle: () => void;
@@ -64,6 +66,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [duration, setDuration] = useState(0);
   const [hasAudio, setHasAudio] = useState(false);
   const [shuffle, setShuffle] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const reqIdRef = useRef(0);
   const ctxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -179,17 +182,29 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
+    // Surface load/decode failures instead of failing silently. The audio
+    // element's `error` event fires when the (proxied) MP3 502s or is
+    // truncated — a top cause of "sometimes music doesn't play".
+    const onError = () => {
+      if (reqIdRef.current === 0) return;
+      setError("Couldn't load this preview — it may be unavailable.");
+      setHasAudio(false);
+      setPlaying(false);
+      setLoading(false);
+    };
 
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("ended", onEnd);
     audio.addEventListener("play", onPlay);
     audio.addEventListener("pause", onPause);
+    audio.addEventListener("error", onError);
     return () => {
       audio.pause();
       audio.removeEventListener("timeupdate", onTime);
       audio.removeEventListener("ended", onEnd);
       audio.removeEventListener("play", onPlay);
       audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("error", onError);
     };
   }, []);
 
@@ -203,8 +218,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       // graph is built lazily, on desktop, only when the visualiser opens.
       if (ctxRef.current?.state === "suspended") ctxRef.current.resume().catch(() => {});
 
-      // Same track → just toggle
-      if (current?.id === release.id && hasAudio) {
+      // Same track → just toggle. Compare id AND title so that an album track
+      // (which shares the album's id via playDirect) doesn't short-circuit a
+      // real album play into a mute pause toggle.
+      if (
+        current?.id === release.id &&
+        current?.title === release.title &&
+        current?.artist === release.artist &&
+        hasAudio
+      ) {
         if (audio.paused) audio.play().catch(() => {});
         else audio.pause();
         return;
@@ -215,6 +237,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setLoading(true);
       setHasAudio(false);
       setProgress(0);
+      setError(null);
       audio.pause();
 
       try {
@@ -225,6 +248,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (!res.ok) throw new Error("no preview");
         const data = await res.json();
         if (reqId !== reqIdRef.current) return;
+        if (!data.previewUrl) throw new Error("no preview");
         audio.src = data.previewUrl;
         audio.load();
         setHasAudio(true);
@@ -233,12 +257,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           await audio.play();
         } catch {
           await new Promise((r) => setTimeout(r, 140));
-          await audio.play().catch(() => {});
+          await audio.play().catch(() => {
+            if (reqId === reqIdRef.current) {
+              setError("Playback was blocked — tap play to retry.");
+              setPlaying(false);
+            }
+          });
         }
       } catch {
         if (reqId === reqIdRef.current) {
           setHasAudio(false);
           setPlaying(false);
+          setError("No preview available for this release.");
         }
       } finally {
         if (reqId === reqIdRef.current) setLoading(false);
@@ -258,11 +288,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
       setHasAudio(true);
       setProgress(0);
+      setError(null);
       audio.src = previewUrl;
       audio.load();
       audio.play().catch(async () => {
         await new Promise((r) => setTimeout(r, 140));
-        audio.play().catch(() => {});
+        audio.play().catch(() => {
+          setError("Playback was blocked — tap play to retry.");
+          setPlaying(false);
+        });
       });
     },
     []
@@ -310,6 +344,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setPlaying(false);
     setHasAudio(false);
     setProgress(0);
+    setError(null);
   }, []);
 
   const seek = useCallback((fraction: number) => {
@@ -322,7 +357,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider
       value={{
-        current, playing, loading, progress, elapsed, duration, hasAudio, shuffle,
+        current, playing, loading, progress, elapsed, duration, hasAudio, shuffle, error,
         play, playDirect, toggle, toggleShuffle, stop, seek, setNextProvider, ensureGraph, getAnalyser,
       }}
     >
