@@ -151,10 +151,17 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
         className="block w-full outline-none focus-visible:ring-2 focus-visible:ring-star-white/40"
       >
         <div
-          className={`relative w-full overflow-hidden rounded-2xl ring-1 ring-star-white/[0.06] ${
+          className={`relative w-full overflow-hidden rounded-2xl ring-1 ring-star-white/[0.06] transition-[transform,box-shadow,ring-color] duration-300 ${
             size === 1 ? "aspect-[2/1]" : "aspect-square"
-          } ${size > 0 ? "tile-float" : ""}`}
-          style={size > 0 ? { animationDelay: `${(index % 5) * 0.8}s` } : undefined}
+          } ${size > 0 ? "tile-float" : ""} ${
+            revealed ? "scale-[1.03] ring-2 ring-neon-violet/50" : ""
+          }`}
+          style={{
+            ...(size > 0 ? { animationDelay: `${(index % 5) * 0.8}s` } : {}),
+            boxShadow: revealed
+              ? "0 18px 50px -12px rgba(155,93,229,0.45), 0 0 0 1px rgba(155,93,229,0.25)"
+              : undefined,
+          }}
         >
           {/* default: plain album cover */}
           <Artwork
@@ -183,9 +190,14 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
             </motion.div>
           )}
 
-          {/* fresh-drop dot */}
+          {/* fresh-drop pill — more visible than a dot */}
           {isFresh && !armed && (
-            <span className="absolute right-1 top-1 z-10 h-2 w-2 rounded-full bg-star-white shadow-[0_0_10px_rgba(232,232,244,0.9)]" />
+            <span
+              className="absolute right-1.5 top-1.5 z-10 rounded-full border border-white/40 bg-void/55 px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.18em] text-white backdrop-blur-sm"
+              style={{ boxShadow: "0 0 12px rgba(232,232,244,0.35)" }}
+            >
+              Fresh
+            </span>
           )}
 
           {/* taste badge */}
