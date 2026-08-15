@@ -15,6 +15,7 @@ export const metadata: Metadata = {
   description:
     "The best new music — every day. Curated by AI across genres. One-click access to Spotify, Apple Music, Tidal, SoundCloud, and YouTube Music.",
   keywords: ["music discovery", "new music", "daily releases", "indie music", "electronic music"],
+  manifest: "/manifest.json",
   openGraph: {
     title: "PULSAR — Daily Music Discovery",
     description: "The best new music — every day.",
@@ -50,6 +51,8 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/icon.svg" />
       </head>
       <body className="noise-overlay vignette bg-void min-h-screen">
         {/* Themed nebula background (reacts to the chosen theme) */}

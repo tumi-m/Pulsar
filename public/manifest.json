@@ -1,0 +1,19 @@
+{
+  "name": "PULSAR — Daily Music Discovery",
+  "short_name": "PULSAR",
+  "description": "The best new music — every day. Curated by AI across genres.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#04040a",
+  "theme_color": "#04040a",
+  "orientation": "portrait-primary",
+  "categories": ["music", "entertainment", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

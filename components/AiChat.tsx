@@ -97,6 +97,7 @@ export function AiChat({ releases }: AiChatProps) {
   const [view, setView] = useState<"choose" | "chat" | null>(null);
   const [text, setText] = useState("");
   const [result, setResult] = useState<Release[] | null>(null);
+  const [thinking, setThinking] = useState(false);
   // On phones the panel is a bottom sheet (thumb-reachable, keyboard-safe);
   // on larger screens it's a centered card.
   const [isMobile, setIsMobile] = useState(false);
@@ -125,9 +126,35 @@ export function AiChat({ releases }: AiChatProps) {
     window.dispatchEvent(new CustomEvent("pulsar-retake-quiz"));
   };
 
-  const run = () => {
+  const run = async () => {
     if (!text.trim()) return;
-    setResult(buildList(releases, parse(text)));
+    // Agentic path: ask the model to extract structured signals from free
+    // text, then feed those into the scorer. Falls back to the keyless keyword
+    // matcher instantly if the model is unreachable or unconfigured.
+    setThinking(true);
+    let parsed = parse(text);
+    try {
+      const res = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: text }),
+        signal: AbortSignal.timeout(8000),
+      });
+      if (res.ok) {
+        const llm = await res.json();
+        // Merge LLM signals with the keyword parse (union) so the recommender
+        // gets the broadest, most accurate signal set.
+        const moods = Array.from(new Set([...parsed.moods, ...(llm.moods ?? [])]));
+        const genres = Array.from(new Set([...parsed.genres, ...(llm.genres ?? [])]));
+        const decades = Array.from(new Set([...parsed.decades, ...(llm.decades ?? [])]));
+        const freeText = `${parsed.freeText} ${llm.freeText ?? ""}`.trim();
+        parsed = { moods, genres, decades, freeText };
+      }
+    } catch {
+      /* timeout / network — use the keyword parse as-is */
+    }
+    setResult(buildList(releases, parsed));
+    setThinking(false);
   };
 
   // add the whole generated list to the crate
@@ -336,13 +363,14 @@ export function AiChat({ releases }: AiChatProps) {
                   <div className="mt-3 flex items-center gap-2">
                     <button
                       onClick={run}
-                      className="flex-1 rounded-lg py-2.5 text-[11px] font-bold uppercase tracking-widest text-white transition-transform active:scale-[0.98]"
+                      disabled={thinking}
+                      className="flex-1 rounded-lg py-2.5 text-[11px] font-bold uppercase tracking-widest text-white transition-transform active:scale-[0.98] disabled:opacity-60"
                       style={{
                         background: "linear-gradient(120deg, #9b5de5, #ff5fa2 60%, #ffb347)",
                         boxShadow: "0 6px 18px rgba(155,93,229,0.4)",
                       }}
                     >
-                      Build my list
+                      {thinking ? "Curating…" : "Build my list"}
                     </button>
                     {result && result.length > 0 && (
                       <button
