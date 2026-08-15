@@ -8,10 +8,18 @@ import { test, expect } from "@playwright/test";
  * on first visit and intercepts grid clicks. Dismiss it first.
  */
 async function dismissQuiz(page: import("@playwright/test").Page) {
-  const skip = page.getByRole("button", { name: /skip/i }).first();
-  if (await skip.isVisible().catch(() => false)) {
+  const skip = page.getByRole("button", { name: /^skip/i }).first();
+  // The quiz mounts client-side AFTER hydration, so an immediate isVisible()
+  // races it: the check runs before the quiz exists, the quiz then mounts and
+  // its fixed overlay intercepts every later click. Wait for the button to
+  // actually appear (or time out when the quiz was already completed).
+  try {
+    await skip.waitFor({ state: "visible", timeout: 6000 });
     await skip.click();
-    await page.waitForTimeout(300);
+    // Give the exit animation time to unmount the overlay.
+    await page.waitForTimeout(500);
+  } catch {
+    /* quiz not shown (localStorage already set from a prior test) */
   }
 }
 

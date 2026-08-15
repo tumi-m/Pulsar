@@ -130,6 +130,25 @@ export const SAMPLE_CATALOG: CatalogSample[] = [
   { artist: "The Pharcyde", title: "Passin' Me By", sourceArtist: "Quincy Jones", sourceTitle: "Summer in the City", sourceYear: "1973" },
   { artist: "Pete Rock & CL Smooth", title: "They Reminisce Over You", sourceArtist: "Tom Scott", sourceTitle: "Today", sourceYear: "1967", note: "The sax riff" },
   { artist: "Lauryn Hill", title: "Lost Ones", sourceArtist: "Willie 'Mighty Diamonds' Hutchinson", sourceTitle: "Soul Makossa", sourceYear: "1973", partial: true },
+
+  // ── Golden era expansion: more of the records people actually dig ──
+  { artist: "Ice Cube", title: "It Was a Good Day", sourceArtist: "The Isley Brothers", sourceTitle: "Footsteps in the Dark", sourceYear: "1977", note: "The mellow guitar loop" },
+  { artist: "Dr. Dre & 2Pac", title: "California Love", sourceArtist: "Joe Cocker", sourceTitle: "Woman to Woman", sourceYear: "1972", note: "The riff that defined West Coast G-funk" },
+  { artist: "2Pac", title: "Changes", sourceArtist: "Bruce Hornsby and the Range", sourceTitle: "The Way It Is", sourceYear: "1986", note: "Piano loop, re-sung hook", partial: true },
+  { artist: "Vanilla Ice", title: "Ice Ice Baby", sourceArtist: "Queen & David Bowie", sourceTitle: "Under Pressure", sourceYear: "1981", note: "The famous bass-and-piano underdub" },
+  { artist: "House of Pain", title: "Jump Around", sourceArtist: "Junior Walker & the All Stars", sourceTitle: "Shoot Your Shot", sourceYear: "1966", note: "The squeal horn" },
+  { artist: "Tone-Loc", title: "Wild Thing", sourceArtist: "Van Halen", sourceTitle: "Jamie's Cryin'", sourceYear: "1978", note: "The repeated guitar riff" },
+  { artist: "Will Smith", title: "Men in Black", sourceArtist: "Patrice Rushen", sourceTitle: "Forget Me Nots", sourceYear: "1982", note: "The bass groove and 'here come the men in black' hook" },
+  { artist: "Dr. Dre", title: "Nuthin' but a 'G' Thang", sourceArtist: "Leon Haywood", sourceTitle: "I Wanna Do Somethin' Freaky to You", sourceYear: "1975", note: "The sine-wave lead and groove" },
+  { artist: "Snoop Dogg", title: "Who Am I (What's My Name)?", sourceArtist: "Funkadelic", sourceTitle: "Atomic Dog", sourceYear: "1982", note: "The barking funk" },
+  { artist: "De La Soul", title: "Eye Know", sourceArtist: "Steely Dan", sourceTitle: "Peg", sourceYear: "1977", note: "The guitar lick" },
+  { artist: "Busta Rhymes", title: "Gimme Some More", sourceArtist: "Bernard Herrmann", sourceTitle: "Psycho (theme)", sourceYear: "1960", note: "The shrieking strings" },
+  { artist: "Puff Daddy & Faith Evans", title: "I'll Be Missing You", sourceArtist: "The Police", sourceTitle: "Every Breath You Take", sourceYear: "1983", note: "Replayed riff and re-sung hook", partial: true },
+  { artist: "Blackstreet", title: "No Diggity", sourceArtist: "Bill Withers", sourceTitle: "Grandma's Hands", sourceYear: "1971", note: "The chunky guitar break" },
+  { artist: "The Fugees", title: "Ready or Not", sourceArtist: "Enya", sourceTitle: "Boadicea", sourceYear: "1987", note: "The spectral synth bed" },
+  { artist: "Modjo", title: "Lady (Hear Me Tonight)", sourceArtist: "Chic", sourceTitle: "Soup for One", sourceYear: "1979", note: "The Nile Rodgers guitar loop" },
+  { artist: "The Prodigy", title: "Firestarter", sourceArtist: "Art of Noise", sourceTitle: "Close (to the Edit)", sourceYear: "1984", note: "The 'hey, hey' vocal stabs" },
+  { artist: "The Pharcyde", title: "Runnin'", sourceArtist: "Stan Getz", sourceTitle: "Saudade Vem Correndo", sourceYear: "1963", note: "The Brazilian jazz guitar" },
 ];
 
 const norm = (s: string) =>
