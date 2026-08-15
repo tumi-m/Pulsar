@@ -165,7 +165,7 @@ const normalise = (s: string) =>
   s.toLowerCase().replace(/\(.*?\)|\[.*?\]/g, "").replace(/[^a-z0-9]/g, "");
 
 /** Does a Spotify result actually belong to the artist we asked for? */
-function artistMatches(want: string, credits: { name?: string }[] | undefined): boolean {
+export function artistMatches(want: string, credits: { name?: string }[] | undefined): boolean {
   const w = normalise(want);
   return (credits ?? []).some((a) => {
     const got = normalise(a.name ?? "");
@@ -180,7 +180,7 @@ function artistMatches(want: string, credits: { name?: string }[] | undefined): 
  * Auth errors propagate — silently skipping them would build a half-empty
  * playlist with no explanation.
  */
-async function urisForRelease(r: Release, token: string): Promise<string[]> {
+export async function urisForRelease(r: Release, token: string): Promise<string[]> {
   const term = searchTerm(r);
   const wantAlbum = r.type === "album" || r.type === "ep";
 

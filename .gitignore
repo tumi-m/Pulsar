@@ -9,6 +9,12 @@ out/
 dist/
 build/
 
+# test artifacts
+coverage/
+playwright-report/
+test-results/
+.playwright/
+
 # env files — NEVER commit secrets
 .env
 .env.local

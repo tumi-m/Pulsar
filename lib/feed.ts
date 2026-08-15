@@ -61,7 +61,7 @@ function moodFor(genre: string): MoodTag {
   return "cinematic";
 }
 
-function stableId(artist: string, title: string): string {
+export function stableId(artist: string, title: string): string {
   // Two independent hashes (different multipliers/seeds) plus the input length.
   // A single 32-bit hash collides at a realistic rate once the catalogue runs to
   // tens of thousands of releases, and a collision means two different albums
@@ -137,7 +137,7 @@ interface DeezerAlbum {
   artist?: { name?: string };
 }
 
-function mapDeezer(a: DeezerAlbum, popularity: number | null): FeedRelease | null {
+export function mapDeezer(a: DeezerAlbum, popularity: number | null): FeedRelease | null {
   const artist = a.artist?.name?.trim();
   const title = a.title?.trim();
   const art = a.cover_xl ?? a.cover_big;
