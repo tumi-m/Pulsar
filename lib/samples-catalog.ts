@@ -106,6 +106,30 @@ export const SAMPLE_CATALOG: CatalogSample[] = [
   { artist: "Rihanna", title: "Man Down", sourceArtist: "Sister Nancy", sourceTitle: "Bam Bam", sourceYear: "1982", partial: true },
   { artist: "Kanye West", title: "Ni**as in Paris", sourceArtist: "Reverend W.A. Donaldson", sourceTitle: "Baptizing Scene", sourceYear: "1960" },
   { artist: "Major Lazer", title: "Lean On", sourceArtist: "DJ Snake", sourceTitle: "original composition", sourceYear: null, partial: true, note: "Original — listed to correct a common misattribution" },
+
+  // ── Classic breaks — the building blocks ──────────────────
+  { artist: "N.W.A", title: "Straight Outta Compton", sourceArtist: "The Winstons", sourceTitle: "Amen, Brother", sourceYear: "1969", note: "The Amen break — the most-sampled drum loop in history" },
+  { artist: "Kanye West", title: "Diamonds from Sierra Leone", sourceArtist: "Shirley Bassey", sourceTitle: "Diamonds Are Forever", sourceYear: "1971" },
+  { artist: "Kanye West", title: "New Slaves", sourceArtist: "Omega", sourceTitle: "Gyöngyhajú lány", sourceYear: "1969", partial: true, note: "Hungarian psych-rock chorus, licensed" },
+
+  // ── Funk / soul / golden-age foundations ──────────────────
+  { artist: "De La Soul", title: "The Magic Number", sourceArtist: "Schoolhouse Rock", sourceTitle: "Three Is a Magic Number", sourceYear: "1973" },
+  { artist: "Busta Rhymes", title: "Woo Hah!! Got You All in Check", sourceArtist: "Galt MacDermot", sourceTitle: "Space", sourceYear: "1969" },
+  { artist: "J Dilla", title: "Workinonit", sourceArtist: "10cc", sourceTitle: "The Worst Band in the World", sourceYear: "1974" },
+  { artist: "J Dilla", title: "Don't Cry", sourceArtist: "The Escorts", sourceTitle: "I Can't Stand (To See You Cry)", sourceYear: "1976" },
+
+  // ── Soul / R&B classics ───────────────────────────────────
+  { artist: "Mariah Carey", title: "Fantasy", sourceArtist: "Tom Tom Club", sourceTitle: "Genius of Love", sourceYear: "1981" },
+  { artist: "Alicia Keys", title: "Fallin'", sourceArtist: "James Brown", sourceTitle: "Get Up, Get into It, Get Involved", sourceYear: "1970", partial: true },
+
+  // ── Electronic / house / rave ─────────────────────────────
+  { artist: "The Prodigy", title: "Smack My Bitch Up", sourceArtist: "Ultramagnetic MCs", sourceTitle: "Give the Drummer Some", sourceYear: "1988" },
+  { artist: "Skrillex", title: "Scary Monsters and Nice Sprites", sourceArtist: "SpeedStackingGirl", sourceTitle: "Stacking cups video", sourceYear: "2011", note: "The 'yes oh my gosh' vocal" },
+  { artist: "Jamie xx", title: "I Know There's Gonna Be (Good Times)", sourceArtist: "Persuasions", sourceTitle: "Good Times", sourceYear: "1972" },
+  { artist: "Mobb Deep", title: "Shook Ones, Pt. II", sourceArtist: "Herbie Hancock", sourceTitle: "Jessica", sourceYear: "1963", note: "The piano, slowed and pitched into menace" },
+  { artist: "The Pharcyde", title: "Passin' Me By", sourceArtist: "Quincy Jones", sourceTitle: "Summer in the City", sourceYear: "1973" },
+  { artist: "Pete Rock & CL Smooth", title: "They Reminisce Over You", sourceArtist: "Tom Scott", sourceTitle: "Today", sourceYear: "1967", note: "The sax riff" },
+  { artist: "Lauryn Hill", title: "Lost Ones", sourceArtist: "Willie 'Mighty Diamonds' Hutchinson", sourceTitle: "Soul Makossa", sourceYear: "1973", partial: true },
 ];
 
 const norm = (s: string) =>
