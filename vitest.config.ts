@@ -33,6 +33,12 @@ export default defineConfig({
         "lib/audio-engine.ts",
         "lib/capabilities.ts",
         "lib/sync.ts",
+        // DSP API clients — OAuth flows and live fetch calls to Spotify /
+        // Apple / YouTube. Only their shared pure helpers (lib/dsp/shared.ts)
+        // are unit-testable; see test/dsp/shared.test.ts.
+        "lib/dsp/apple.ts",
+        "lib/dsp/spotify.ts",
+        "lib/dsp/youtube.ts",
       ],
       reporter: ["text", "text-summary", "html"],
       thresholds: { statements: 60, lines: 60, branches: 40, functions: 40 },
