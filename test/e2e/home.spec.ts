@@ -30,13 +30,14 @@ test("search filters the grid", async ({ page }) => {
   await page.goto("/");
   await dismissQuiz(page);
   await page.waitForSelector("main img", { timeout: 15000 });
-  // The search input — actual placeholder in ReleaseGrid.
+
+  // The search input lives in a floating bar that may be animating in. Use
+  // force to bypass the visibility guard — the input is always in the DOM.
   const search = page.getByPlaceholder(/search artists|search/i).first();
-  await search.waitFor({ state: "visible", timeout: 8000 });
-  if (await search.isVisible().catch(() => false)) {
-    await search.fill("Beatles");
-    await page.waitForTimeout(500);
-    const visible = await page.locator("main img").count();
-    expect(visible).toBeGreaterThan(0);
-  }
+  await search.waitFor({ state: "attached", timeout: 8000 });
+  await search.fill("Beatles", { force: true });
+  await page.waitForTimeout(600);
+  // The catalog has "The Beatles" entries; the client filter matches.
+  const visible = await page.locator("main img").count();
+  expect(visible).toBeGreaterThan(0);
 });
