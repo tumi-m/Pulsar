@@ -9,6 +9,7 @@ import {
   useEffect,
 } from "react";
 import type { Release } from "@/lib/types";
+import { currentUserId, recordListen } from "@/lib/sync";
 
 /**
  * Global preview player — the shared audio surface behind the
@@ -252,6 +253,13 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         audio.src = data.previewUrl;
         audio.load();
         setHasAudio(true);
+        // Log the listen (signed-in users only) so history feeds the taste
+        // engine and the daily-mix feature. Best-effort, fire-and-forget.
+        currentUserId()
+          .then((uid) => {
+            if (uid) void recordListen(uid, release);
+          })
+          .catch(() => {});
         // Play; retry once — the first mobile play can race the unlock.
         try {
           await audio.play();
@@ -291,6 +299,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setError(null);
       audio.src = previewUrl;
       audio.load();
+      currentUserId()
+        .then((uid) => {
+          if (uid) void recordListen(uid, display);
+        })
+        .catch(() => {});
       audio.play().catch(async () => {
         await new Promise((r) => setTimeout(r, 140));
         audio.play().catch(() => {

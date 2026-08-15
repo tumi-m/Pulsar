@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Heart, Sparkles } from "lucide-react";
+import { X, Heart, Sparkles, CloudUpload, Check } from "lucide-react";
 import { CalabiYau } from "./CalabiYau";
 import { CrateIcon } from "./CrateIcon";
 import { FORMATS, loadFormat, saveFormat, type MediaFormat } from "@/lib/format";
 import { THEMES, loadTheme, saveTheme } from "@/lib/theme";
 import { getFavorites, getPlaylist } from "@/lib/collection";
+import { currentUserId, onAuthChange, signInWithEmail, signOut, syncConfigured } from "@/lib/sync";
 import {
   loadAiMode,
   saveAiMode,
@@ -30,6 +31,9 @@ export function Sidebar() {
   const [aiMode, setAiMode] = useState<AiMode>("chat");
   const [showType, setShowType] = useState<ShowType>("all");
   const [counts, setCounts] = useState({ fav: 0, crate: 0 });
+  const [syncUser, setSyncUser] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [emailState, setEmailState] = useState<"idle" | "sending" | "sent" | "error">("idle");
 
   const refresh = () => setCounts({ fav: getFavorites().length, crate: getPlaylist().length });
 
@@ -43,11 +47,23 @@ export function Sidebar() {
     const change = () => refresh();
     window.addEventListener("pulsar-toggle-sidebar", toggle);
     window.addEventListener("pulsar-collection-change", change);
+    // Sync auth state (only when Supabase is configured).
+    if (syncConfigured()) {
+      currentUserId().then(setSyncUser);
+      onAuthChange(setSyncUser);
+    }
     return () => {
       window.removeEventListener("pulsar-toggle-sidebar", toggle);
       window.removeEventListener("pulsar-collection-change", change);
     };
   }, []);
+
+  const sendLink = async () => {
+    if (!email.trim() || !email.includes("@")) return;
+    setEmailState("sending");
+    const ok = await signInWithEmail(email.trim());
+    setEmailState(ok ? "sent" : "error");
+  };
 
   const openCrate = (which: "favorites" | "playlist") => {
     window.dispatchEvent(new CustomEvent("pulsar-open-crate", { detail: which }));
@@ -126,6 +142,67 @@ export function Sidebar() {
                 </button>
               </div>
             </Section>
+
+            {/* Sync — cross-device collection (only when Supabase auth is on) */}
+            {syncConfigured() && (
+              <Section label="Sync">
+                {syncUser ? (
+                  <div className="rounded-xl border border-neon-blue/30 bg-neon-blue/[0.08] p-3">
+                    <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-star-white">
+                      <Check size={14} className="text-neon-blue" />
+                      Synced across devices
+                    </p>
+                    <p className="mt-1 text-[10px] leading-relaxed text-star-white/40">
+                      Your crates &amp; favorites mirror to your account.
+                    </p>
+                    <button
+                      onClick={() => signOut()}
+                      className="mt-2.5 flex min-h-[36px] w-full items-center justify-center rounded-lg border border-star-white/15 text-[10px] font-bold uppercase tracking-wide text-star-white/60 transition-colors hover:border-star-white/40 hover:text-star-white"
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-star-white/10 bg-star-white/[0.03] p-3">
+                    <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-star-white">
+                      <CloudUpload size={14} className="text-neon-violet" />
+                      Keep my collection
+                    </p>
+                    <p className="mt-1 text-[10px] leading-relaxed text-star-white/40">
+                      Enter your email — we&apos;ll send a magic link to sync crates &amp; favorites
+                      across devices.
+                    </p>
+                    {emailState === "sent" ? (
+                      <p className="mt-2.5 rounded-lg border border-neon-blue/30 bg-neon-blue/10 px-3 py-2 text-[11px] text-neon-blue">
+                        Check your email for the sign-in link.
+                      </p>
+                    ) : (
+                      <div className="mt-2.5 flex gap-1.5">
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && sendLink()}
+                          placeholder="you@email.com"
+                          aria-label="Email for magic link"
+                          className="min-h-[40px] flex-1 rounded-lg border border-star-white/15 bg-void/60 px-3 text-[12px] text-star-white outline-none placeholder:text-star-white/25 focus:border-neon-violet/50"
+                        />
+                        <button
+                          onClick={sendLink}
+                          disabled={emailState === "sending"}
+                          className="min-h-[40px] flex-shrink-0 rounded-lg bg-neon-violet px-3 text-[11px] font-bold uppercase tracking-wide text-void transition-opacity disabled:opacity-50"
+                        >
+                          {emailState === "sending" ? "…" : "Link"}
+                        </button>
+                      </div>
+                    )}
+                    {emailState === "error" && (
+                      <p className="mt-2 text-[10px] text-neon-amber">Couldn&apos;t send — try again.</p>
+                    )}
+                  </div>
+                )}
+              </Section>
+            )}
 
             {/* Look & feel — media format */}
             <Section label="Look &amp; Feel">

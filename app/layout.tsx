@@ -8,6 +8,7 @@ import { ThemedBackground } from "@/components/ThemedBackground";
 import { Sidebar } from "@/components/Sidebar";
 import { PlayerProvider } from "@/components/player/PlayerProvider";
 import { NowPlayingBar } from "@/components/player/NowPlayingBar";
+import { SyncBridge } from "@/components/SyncBridge";
 
 export const metadata: Metadata = {
   title: "PULSAR — Daily Music Discovery",
@@ -77,6 +78,9 @@ export default function RootLayout({
 
           {/* Persistent now-playing transport */}
           <NowPlayingBar />
+
+          {/* Cross-device collection sync (inert unless signed in) */}
+          <SyncBridge />
         </PlayerProvider>
       </body>
     </html>
