@@ -205,20 +205,20 @@ export function OnboardingQuiz({ onComplete, onSkip }: OnboardingQuizProps) {
       className="fixed inset-0 z-[60] flex flex-col bg-void"
     >
       {/* industrial header */}
-      <div className="flex items-center justify-between px-6 pt-6 md:px-10">
+      <div className="flex items-center justify-between px-6 pt-4 md:px-10 md:pt-6">
         <span className="text-xs font-bold uppercase tracking-[0.3em] text-star-white">
           PULSAR
         </span>
         <button
           onClick={onSkip}
-          className="text-[10px] font-bold uppercase tracking-[0.25em] text-star-white/40 transition-colors hover:text-star-white"
+          className="flex min-h-[44px] items-center px-2 text-[10px] font-bold uppercase tracking-[0.25em] text-star-white/40 transition-colors hover:text-star-white"
         >
           SKIP →
         </button>
       </div>
 
       {/* question counter — Off-White industrial numbering */}
-      <div className="px-6 pt-10 text-center md:px-10">
+      <div className="px-6 pt-5 text-center md:px-10 md:pt-10">
         <motion.p
           key={`q-${step}`}
           initial={{ opacity: 0, y: 8 }}
@@ -241,8 +241,9 @@ export function OnboardingQuiz({ onComplete, onSkip }: OnboardingQuizProps) {
         </p>
       </div>
 
-      {/* the two graphic options */}
-      <div className="flex flex-1 items-center justify-center px-5 pb-10 pt-8">
+      {/* the two graphic options — scrollable + height-capped so a short
+          phone (375×667) never pushes the progress bar or choices offscreen */}
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-5 pb-6 pt-6">
         <AnimatePresence mode="wait">
           <motion.div
             key={question.id}
@@ -250,7 +251,7 @@ export function OnboardingQuiz({ onComplete, onSkip }: OnboardingQuizProps) {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.97 }}
             transition={{ duration: 0.3 }}
-            className="grid w-full max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2"
+            className="grid w-full max-w-3xl grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4"
           >
             {question.options.map((opt, i) => (
               <motion.button
@@ -259,7 +260,7 @@ export function OnboardingQuiz({ onComplete, onSkip }: OnboardingQuizProps) {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 aria-label={opt.label}
-                className="group relative aspect-[4/3] overflow-hidden rounded-none border border-star-white/25 outline-none transition-colors hover:border-star-white focus-visible:border-star-white sm:aspect-square"
+                className="group relative aspect-[4/3] max-h-[30vh] min-h-[120px] overflow-hidden rounded-none border border-star-white/25 outline-none transition-colors hover:border-star-white focus-visible:border-star-white sm:aspect-square sm:max-h-none"
               >
                 <Visual kind={opt.visual} />
                 {/* Off-White corner marks */}

@@ -421,11 +421,9 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
               onPointerDown={(e) => {
                 if (window.matchMedia("(max-width: 1023px)").matches) dragControls.start(e);
               }}
-              className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2 lg:cursor-default"
+              className="glass flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2 lg:cursor-default"
               style={{
                 background: "rgba(255,255,255,0.08)",
-                backdropFilter: "blur(12px) saturate(150%)",
-                WebkitBackdropFilter: "blur(12px) saturate(150%)",
                 boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35)",
               }}
             >
@@ -654,11 +652,9 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                         <VisualCanvas release={release} mode={visualMode} className="absolute inset-0 h-full w-full" />
                         <div className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-center gap-1 p-2">
                           <div
-                            className="flex items-center gap-1 rounded-full border border-white/15 p-1"
+                            className="glass flex items-center gap-1 rounded-full border border-white/15 p-1"
                             style={{
                               background: "rgba(255,255,255,0.1)",
-                              backdropFilter: "blur(12px) saturate(150%)",
-                              WebkitBackdropFilter: "blur(12px) saturate(150%)",
                             }}
                           >
                             <button

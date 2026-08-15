@@ -289,11 +289,9 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       key={key}
       onClick={onClick}
       aria-label={label}
-      className="group relative flex h-14 w-14 items-center justify-center rounded-full ring-1 ring-white/45 transition-transform hover:scale-110 active:scale-95"
+      className="glass group relative flex h-14 w-14 items-center justify-center rounded-full ring-1 ring-white/45 transition-transform hover:scale-110 active:scale-95"
       style={{
         background: active ? "rgba(255,255,255,0.92)" : "rgba(24,24,34,0.78)",
-        backdropFilter: "blur(12px) saturate(150%)",
-        WebkitBackdropFilter: "blur(12px) saturate(150%)",
         boxShadow:
           "0 8px 24px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 6px rgba(0,0,0,0.3)",
       }}

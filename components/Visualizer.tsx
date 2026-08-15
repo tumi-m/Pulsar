@@ -108,12 +108,10 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
           {/* title bar */}
           <div
             onPointerDown={(e) => dragControls.start(e)}
-            className="absolute inset-x-0 top-0 z-10 flex cursor-move items-center justify-between gap-3 border-b border-white/10 px-3 py-2"
+            className="glass absolute inset-x-0 top-0 z-10 flex cursor-move items-center justify-between gap-3 border-b border-white/10 px-3 py-2"
             style={{
               touchAction: "none",
               background: "rgba(255,255,255,0.08)",
-              backdropFilter: "blur(12px) saturate(150%)",
-              WebkitBackdropFilter: "blur(12px) saturate(150%)",
               boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35)",
             }}
           >

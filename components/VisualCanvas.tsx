@@ -12,6 +12,7 @@ export type VisualMode =
   | "ambience"
   | "tunnel"
   | "liquid"
+  | "pulse"
   | "nebula"
   | "silhouette"
   | "aurora"
@@ -25,6 +26,7 @@ export const VISUAL_MODES: { id: VisualMode; label: string }[] = [
   { id: "waves", label: "Waves" },
   { id: "tunnel", label: "Tunnel" },
   { id: "liquid", label: "Liquid" },
+  { id: "pulse", label: "Pulse" },
   { id: "nebula", label: "Nebula" },
   { id: "ambience", label: "Ambience" },
   { id: "silhouette", label: "Kaleido" },
@@ -145,11 +147,9 @@ export function VisualCanvas({
           {/* Official ↔ Live performance toggle */}
           <div className="absolute left-1/2 top-2 z-10 -translate-x-1/2">
             <div
-              className="flex items-center gap-0.5 rounded-full border border-white/15 p-0.5"
+              className="glass flex items-center gap-0.5 rounded-full border border-white/15 p-0.5"
               style={{
                 background: "rgba(10,10,18,0.66)",
-                backdropFilter: "blur(12px) saturate(150%)",
-                WebkitBackdropFilter: "blur(12px) saturate(150%)",
               }}
             >
               {(["video", "live"] as const).map((k) => (

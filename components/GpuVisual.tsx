@@ -23,7 +23,7 @@ precision highp float;
 out vec4 outColor;
 uniform vec2  uRes;
 uniform float uTime, uBass, uMid, uTreble, uLevel, uKick, uBeat;
-uniform int   uMode;      // 0 nebula, 1 aurora, 2 silhouette, 3 cover, 4 tunnel, 5 liquid
+uniform int   uMode;      // 0 nebula, 1 aurora, 2 silhouette, 3 cover, 4 tunnel, 5 liquid, 6 pulse
 uniform sampler2D uTex;
 uniform float uHasTex;
 // Palette lifted from the album artwork, so every release is coloured by itself.
@@ -122,6 +122,18 @@ void main(){
     col += vec3(1.0) * spec * (0.55 + uTreble*2.2);          // sharp highlight
     col += uAccent * pow(1.0 - abs(dot(n, vec3(0,0,1))), 3.0) * 0.55; // rim
     col *= 1.0 + uKick*0.5;
+  } else if(uMode == 6){              // ── PULSE (reactive ring shockwaves) ──
+    // Concentric rings ride the beat: each kick launches a bright wavefront
+    // that expands and fades; bass thickens the centre, treble shimmers the rim.
+    float r = length(uv);
+    float a = atan(uv.y, uv.x);
+    float ring = sin(r*22.0 - uTime*3.2 - uBeat*1.2);
+    float waves = pow(0.5 + 0.5*ring, 6.0);
+    // Radial spokes shimmer with treble, warped slightly by fbm for texture.
+    float spokes = 0.5 + 0.5*sin(a*10.0 + fbm(vec2(a*2.0, r - t)) + uTreble*6.0);
+    col = palette(r*0.5 + t*0.3) * waves * (0.35 + uLevel*1.6 + uKick*2.0);
+    col += palette(a*0.159 + t*0.1) * spokes * exp(-r*1.6) * (0.2 + uTreble*1.4);
+    col += uAccent * exp(-r*3.0) * (0.4 + uBass*1.6 + uKick*2.2); // hot core
   } else {                            // ── NEBULA (default) ──
     vec2 q = uv*1.4;
     q += 0.6*vec2(fbm(q + t), fbm(q + vec2(5.2,1.3) - t*0.8));
@@ -156,6 +168,7 @@ function compile(gl: WebGL2RenderingContext, type: number, src: string): WebGLSh
 const MODE_MAP: Partial<Record<VisualMode, number>> = {
   tunnel: 4,
   liquid: 5,
+  pulse: 6,
   nebula: 0,
   aurora: 1,
   silhouette: 2,
