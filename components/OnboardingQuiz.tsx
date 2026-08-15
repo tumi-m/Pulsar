@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { QUIZ, buildProfile, saveProfile, type TasteProfile } from "@/lib/taste";
 import { saveTheme } from "@/lib/theme";
+import { Portal } from "./Portal";
 
 // Each vibe choice leans toward a theme; the majority wins.
 const OPTION_THEME: Record<string, string> = {
@@ -198,12 +199,16 @@ export function OnboardingQuiz({ onComplete, onSkip }: OnboardingQuizProps) {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[60] flex flex-col bg-void"
-    >
+    <Portal>
+      {/* Portalled to <body> so the quiz escapes <main>'s z-10 stacking
+          context — otherwise the Navbar (z-40) paints over the quiz header and
+          the SKIP button is unclickable. */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[60] flex flex-col bg-void"
+      >
       {/* industrial header */}
       <div className="flex items-center justify-between px-6 pt-4 md:px-10 md:pt-6">
         <span className="text-xs font-bold uppercase tracking-[0.3em] text-star-white">
@@ -293,6 +298,7 @@ export function OnboardingQuiz({ onComplete, onSkip }: OnboardingQuizProps) {
           ))}
         </div>
       </div>
-    </motion.div>
+      </motion.div>
+    </Portal>
   );
 }

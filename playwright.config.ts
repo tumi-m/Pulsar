@@ -16,6 +16,11 @@ export default defineConfig({
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
+    // Devcontainers/CI images often mount a tiny 64MB /dev/shm, which makes
+    // Chromium tabs crash ("Target crashed"). Force off-heap temp storage.
+    launchOptions: {
+      args: ["--disable-dev-shm-usage"],
+    },
   },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
