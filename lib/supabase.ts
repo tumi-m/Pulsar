@@ -22,7 +22,7 @@ const buildTimeStub: unknown = new Proxy(resolved, {
  *   • the full REST endpoint  → "/rest/v1/rest/v1/releases" (404 on every write)
  * Both are silently corrected here rather than failing at runtime.
  */
-const cleanUrl = () => {
+export const cleanUrl = () => {
   const raw = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
   if (!raw) return "";
   try {

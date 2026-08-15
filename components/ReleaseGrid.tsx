@@ -14,7 +14,15 @@ import { AiChat } from "./AiChat";
 import { CratePicker } from "./CratePicker";
 import { FeatureReel } from "./FeatureReel";
 import { usePlayer } from "./player/PlayerProvider";
-import { genreBucket, formatDate, GENRE_BUCKETS, type GenreBucket } from "@/lib/utils";
+import { genreBucket, GENRE_BUCKETS, type GenreBucket } from "@/lib/utils";
+import {
+  clampCols,
+  computeCols,
+  gridGrouping,
+  buildDateSections,
+  GRID_MIN,
+  GRID_MAX,
+} from "@/lib/grid";
 import { loadFormat, saveFormat, type MediaFormat } from "@/lib/format";
 import {
   loadProfile,
@@ -56,8 +64,6 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   // delta from the width-derived default so the choice survives orientation /
   // window resizes. Trackpad pinch (wheel + ctrl) works too. Min 2 cols keeps
   // the taste-driven span-2 tiles from ever overflowing a row.
-  const GRID_MIN = 2;
-  const GRID_MAX = 8;
   const [zoom, setZoom] = useState(0);
   const [baseCols, setBaseCols] = useState(3);
   const [colHud, setColHud] = useState<number | null>(null);
@@ -68,8 +74,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   const pinchRef = useRef<number | null>(null);
   const gridCleanup = useRef<(() => void) | null>(null);
 
-  const clampCols = (n: number) => Math.max(GRID_MIN, Math.min(GRID_MAX, n));
-  const cols = clampCols(baseCols + zoom);
+  const cols = computeCols(baseCols, zoom);
 
   useEffect(() => {
     zoomRef.current = zoom;
@@ -384,54 +389,12 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   //
   // Only in the date-ordered "Latest" view: grouping a list sorted by
   // popularity or relevance would emit a header on nearly every row.
-  const grouping: "none" | "day" | "month" | "year" =
-    searching || view !== "latest" || detailOpen
-      ? "none"
-      : cols >= 7
-        ? "year"
-        : cols >= 6
-          ? "month"
-          : cols >= 5
-            ? "day"
-            : "none";
+  const grouping = gridGrouping({ cols, view, searching, detailOpen });
 
-  const dateSections = useMemo(() => {
-    if (grouping === "none") return null;
-
-    const today = new Date().toISOString().slice(0, 10);
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-
-    const bucketOf = (d: string) => {
-      if (!d || d.startsWith("1900")) return "undated";
-      return grouping === "year" ? d.slice(0, 4) : grouping === "month" ? d.slice(0, 7) : d;
-    };
-
-    const labelOf = (d: string) => {
-      if (!d || d.startsWith("1900")) return "Release date unknown";
-      if (grouping === "day") {
-        if (d === today) return "Today";
-        if (d === yesterday) return "Yesterday";
-        return formatDate(d);
-      }
-      const dt = new Date(`${d.slice(0, 7)}-01T00:00:00Z`);
-      if (grouping === "month") {
-        return dt.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
-      }
-      return d.slice(0, 4);
-    };
-
-    // Preserve the incoming (newest-first) order; start a new section whenever
-    // the bucket changes. `from` keeps each tile's global index so taste sizing
-    // and the entrance stagger stay consistent with the flat grid.
-    const out: { key: string; label: string; items: Release[]; from: number }[] = [];
-    shown.forEach((r, i) => {
-      const key = bucketOf(r.release_date);
-      const last = out[out.length - 1];
-      if (last && last.key === key) last.items.push(r);
-      else out.push({ key, label: labelOf(r.release_date), items: [r], from: i });
-    });
-    return out;
-  }, [shown, grouping]);
+  const dateSections = useMemo(
+    () => (grouping === "none" ? null : buildDateSections(shown, grouping)),
+    [shown, grouping],
+  );
 
   const resetPage = () => setVisible(PAGE);
 
