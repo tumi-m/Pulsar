@@ -28,7 +28,7 @@ const MOODS: MoodTag[] = [
 ];
 
 const BASE_URL = (process.env.OLLAMA_BASE_URL ?? "http://localhost:11434").replace(/\/$/, "");
-const MODEL = process.env.OLLAMA_MODEL ?? "llama3.1";
+const MODEL = process.env.OLLAMA_MODEL ?? "deepseek-v4-flash:0731-cloud";
 const API_KEY = process.env.OLLAMA_API_KEY;
 const ENRICH_LIMIT = parseInt(process.env.ENRICH_LIMIT ?? "30", 10);
 const CONCURRENCY = parseInt(process.env.ENRICH_CONCURRENCY ?? "3", 10);

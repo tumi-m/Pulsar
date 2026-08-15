@@ -16,7 +16,7 @@ export const runtime = "nodejs";
  */
 
 const BASE_URL = (process.env.OLLAMA_BASE_URL ?? "").replace(/\/$/, "");
-const MODEL = process.env.OLLAMA_MODEL ?? "kol";
+const MODEL = process.env.OLLAMA_MODEL ?? "deepseek-v4-flash:0731-cloud";
 const API_KEY = process.env.OLLAMA_API_KEY;
 
 const MOODS = [
