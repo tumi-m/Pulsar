@@ -5,12 +5,13 @@ export const runtime = "nodejs";
 /**
  * GET /api/samples?artist=...&title=...
  *
- * WhoSampled-style sample data, keyless, via MusicBrainz "samples material"
- * relationships (the only openly-licensed source — WhoSampled has no free API).
- * Returns { samples: SampleRef[] } describing what this recording samples and
- * what samples it. Empty array when nothing is documented.
+ * WhoSampled-style sample data, keyless, via MusicBrainz relationships (the
+ * only openly-licensed source — WhoSampled has no free API). Returns a rich
+ * connection graph: what this recording SAMPLES, what SAMPLED it, what it
+ * COVERS, what COVERED it, and any REMIX relationships. Empty arrays when
+ * nothing is documented.
  *
- * Note: MusicBrainz does not carry in-song timecodes, so `timestamp` is only
+ * MusicBrainz does not carry in-song timecodes, so `timestamp` is only
  * populated when the relationship itself provides one (rare). We never invent
  * timestamps — the linked original lets the listener hear where it lands.
  */
@@ -19,14 +20,18 @@ import { lookupCatalog } from "@/lib/samples-catalog";
 
 const UA = "Pulsar/1.0 ( https://pulsar-ten-sigma.vercel.app )";
 
-interface SampleRef {
-  role: "samples" | "sampledBy";
+export type RelationRole = "samples" | "sampledBy" | "covers" | "coveredBy" | "remixOf" | "remixedBy";
+
+export interface SampleRef {
+  role: RelationRole;
   title: string;
   artist: string | null;
   year: string | null;
   partial: boolean;
   timestamp: string | null;
   description: string;
+  /** MusicBrainz recording id — used by /api/samples/chain to traverse DNA. */
+  mbid?: string | null;
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -34,6 +39,28 @@ function creditToName(credit: any[]): string | null {
   if (!Array.isArray(credit)) return null;
   const name = credit.map((c) => `${c.name ?? c.artist?.name ?? ""}${c.joinphrase ?? ""}`).join("");
   return name.trim() || null;
+}
+
+/** Map a MusicBrainz relation type + direction to one of our graph roles. */
+function classifyRel(type: string, direction: string): RelationRole | null {
+  const t = type.toLowerCase();
+  if (/sampl/.test(t)) return direction === "backward" ? "sampledBy" : "samples";
+  if (/cover/.test(t)) return direction === "backward" ? "coveredBy" : "covers";
+  if (/remix/.test(t)) return direction === "backward" ? "remixedBy" : "remixOf";
+  // Some MB entries use "compilation" or "other version" loosely — skip those.
+  return null;
+}
+
+function describe(role: RelationRole, title: string, artist: string | null): string {
+  const by = artist ? ` by ${artist}` : "";
+  switch (role) {
+    case "samples":    return `Samples \u201C${title}\u201D${by}`;
+    case "sampledBy":  return `Sampled in \u201C${title}\u201D${by}`;
+    case "covers":     return `Covers \u201C${title}\u201D${by}`;
+    case "coveredBy":  return `Covered by \u201C${title}\u201D${by}`;
+    case "remixOf":    return `Remix of \u201C${title}\u201D${by}`;
+    case "remixedBy":  return `Remixed in \u201C${title}\u201D${by}`;
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -75,9 +102,9 @@ export async function GET(req: NextRequest) {
   try {
     // 1) Find matching recordings. A song exists in MusicBrainz as MANY
     //    recordings (album cut, single edit, remaster, compilation appearance),
-    //    and sample relationships are attached per-recording — often to only
-    //    one of them. Checking just the top hit was the main reason coverage
-    //    looked so thin; we now merge relationships across several.
+    //    and relationships are attached per-recording — often to only one.
+    //    Checking just the top hit was the main reason coverage looked thin;
+    //    we now merge relationships across several.
     const query = encodeURIComponent(`artist:"${artist}" AND recording:"${title}"`);
     const searchRes = await fetch(
       `https://musicbrainz.org/ws/2/recording/?query=${query}&fmt=json&limit=12`,
@@ -89,7 +116,7 @@ export async function GET(req: NextRequest) {
     const targets = (recs.length ? recs : (searchData.recordings ?? []).slice(0, 1)).slice(0, 5);
     if (!targets.length) return NextResponse.json({ samples }); // curated hits still stand
 
-    // 2) Pull sample relationships from each, in parallel.
+    // 2) Pull sample/cover/remix relationships from each, in parallel.
     const relLists = await Promise.all(
       targets.map(async (rec: any) => {
         try {
@@ -107,11 +134,12 @@ export async function GET(req: NextRequest) {
     );
 
     for (const rel of relLists.flat()) {
-      if (!rel.type || !/sampl/i.test(rel.type)) continue;
+      if (!rel.type) continue;
+      const role = classifyRel(rel.type, rel.direction ?? "forward");
+      if (!role) continue;
       const target = rel.recording ?? rel.work;
       if (!target?.title) continue;
-      const role: SampleRef["role"] = rel.direction === "backward" ? "sampledBy" : "samples";
-      const tArtist = creditToName(rel.recording?.["artist-credit"]);
+      const tArtist = creditToName(rel.recording?.["artist-credit"] ?? rel.work?.["artist-credit"]);
       const year =
         (rel.recording?.["first-release-date"] || rel.begin || "")?.slice(0, 4) || null;
       const attrs: string[] = Array.isArray(rel.attributes) ? rel.attributes : [];
@@ -122,26 +150,24 @@ export async function GET(req: NextRequest) {
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
 
-      const byline = tArtist ? ` by ${tArtist}` : "";
-      const description =
-        role === "samples"
-          ? `Samples “${target.title}”${byline}`
-          : `Sampled in “${target.title}”${byline}`;
       samples.push({
         role,
         title: target.title,
         artist: tArtist,
         year,
         partial,
-        // MusicBrainz relationships carry no in-song timecodes. We never invent
-        // one — the UI lets a listener mark it instead.
         timestamp: null,
-        description,
+        description: describe(role, target.title, tArtist),
+        mbid: target.id ?? null,
       });
     }
 
-    // Songs this one samples first (the classic "what's the sample?" question).
-    samples.sort((a, b) => (a.role === b.role ? 0 : a.role === "samples" ? -1 : 1));
+    // "What it samples" first (the classic question), then sampled-in, then the
+    // cover/remix families grouped after.
+    const order: Record<RelationRole, number> = {
+      samples: 0, sampledBy: 1, covers: 2, coveredBy: 3, remixOf: 4, remixedBy: 5,
+    };
+    samples.sort((a, b) => order[a.role] - order[b.role]);
 
     return NextResponse.json(
       { samples },

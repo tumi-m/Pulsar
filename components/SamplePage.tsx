@@ -2,19 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { X, Play, Disc3, ArrowDownRight, ArrowUpRight, Youtube, Clock } from "lucide-react";
+import { X, Play, Disc3, ArrowDownRight, ArrowUpRight, Youtube, Clock, GitFork } from "lucide-react";
 import { Artwork } from "./Artwork";
 import { useScrollLock } from "@/lib/useScrollLock";
 import { Portal } from "./Portal";
+import { SampleGraph } from "./SampleGraph";
+
+export type RelationRole = "samples" | "sampledBy" | "covers" | "coveredBy" | "remixOf" | "remixedBy";
 
 export interface SampleRef {
-  role: "samples" | "sampledBy";
+  role: RelationRole;
   title: string;
   artist: string | null;
   year: string | null;
   partial: boolean;
   timestamp: string | null; // "m:ss" if a real one is ever known; else null
   description: string;
+  /** MusicBrainz recording id — used by the chain traversal. */
+  mbid?: string | null;
 }
 
 export interface SampleSubject {
@@ -124,6 +129,24 @@ function SampleCard({
   }, [sample.artist, sample.title, baseArtist]);
 
   const isSamples = sample.role === "samples";
+  const isCovers = sample.role === "covers" || sample.role === "coveredBy";
+  const isRemix = sample.role === "remixOf" || sample.role === "remixedBy";
+  const badgeColor = isSamples
+    ? "bg-neon-violet/20 text-neon-violet"
+    : isCovers
+      ? "bg-neon-green/20 text-neon-green"
+      : isRemix
+        ? "bg-neon-pink/20 text-neon-pink"
+        : "bg-neon-blue/20 text-neon-blue";
+  const badgeLabel =
+    sample.role === "samples" ? "Contains sample"
+      : sample.role === "sampledBy" ? "Sampled in"
+      : sample.role === "covers" ? "Covers"
+      : sample.role === "coveredBy" ? "Covered by"
+      : sample.role === "remixOf" ? "Remix of"
+      : "Remixed in";
+  const BadgeIcon = isSamples || sample.role === "covers" || sample.role === "remixOf"
+    ? ArrowDownRight : ArrowUpRight;
   const start = toSeconds(sample.timestamp);
   const thumb = videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null;
 
@@ -141,18 +164,20 @@ function SampleCard({
         style={{
           background: isSamples
             ? "radial-gradient(40% 40% at 15% 0%, rgba(155,93,229,0.5), transparent 70%)"
-            : "radial-gradient(40% 40% at 15% 0%, rgba(0,212,255,0.45), transparent 70%)",
+            : isCovers
+              ? "radial-gradient(40% 40% at 15% 0%, rgba(69,240,160,0.45), transparent 70%)"
+              : isRemix
+                ? "radial-gradient(40% 40% at 15% 0%, rgba(255,95,162,0.45), transparent 70%)"
+                : "radial-gradient(40% 40% at 15% 0%, rgba(0,212,255,0.45), transparent 70%)",
         }}
       />
       <div className="relative p-3.5">
         <div className="flex items-center gap-2">
           <span
-            className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.18em] ${
-              isSamples ? "bg-neon-violet/20 text-neon-violet" : "bg-neon-blue/20 text-neon-blue"
-            }`}
+            className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.18em] ${badgeColor}`}
           >
-            {isSamples ? <ArrowDownRight size={11} /> : <ArrowUpRight size={11} />}
-            {isSamples ? "Contains sample" : "Sampled in"}
+            <BadgeIcon size={11} />
+            {badgeLabel}
           </span>
           {sample.partial && (
             <span className="rounded-full bg-white/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-star-white/55">
@@ -332,10 +357,21 @@ export function SamplePage({
   samples: SampleRef[];
   onClose: () => void;
 }) {
+  const [graphOpen, setGraphOpen] = useState(true);
   useScrollLock(Boolean(subject));
   if (!subject) return null;
   const contains = samples.filter((s) => s.role === "samples");
   const sampledIn = samples.filter((s) => s.role === "sampledBy");
+  const covers = samples.filter((s) => s.role === "covers");
+  const coveredBy = samples.filter((s) => s.role === "coveredBy");
+  const remixOf = samples.filter((s) => s.role === "remixOf");
+  const remixedBy = samples.filter((s) => s.role === "remixedBy");
+
+  const playNode = (artist: string, title: string) => {
+    // Open a YouTube tab for the node — quickest "hear the source" path.
+    const q = encodeURIComponent(`${artist} ${title}`);
+    window.open(`https://www.youtube.com/results?search_query=${q}`, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <Portal>
@@ -360,11 +396,20 @@ export function SamplePage({
           <span className="text-lg leading-none">‹</span>
         </button>
         <div className="relative min-w-0 flex-1">
-          <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-neon-violet/80">Sample breakdown</p>
+          <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-neon-violet/80">Sample DNA</p>
           <h3 className="truncate text-base font-bold uppercase tracking-tight text-star-white">
             {subject.title}
           </h3>
         </div>
+        <button
+          onClick={() => setGraphOpen((v) => !v)}
+          aria-label="Toggle graph"
+          className={`relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-colors ${
+            graphOpen ? "bg-neon-violet/20 text-neon-violet" : "text-star-white/50 hover:bg-white/10 hover:text-star-white"
+          }`}
+        >
+          <GitFork size={15} />
+        </button>
         <button
           onClick={onClose}
           aria-label="Close"
@@ -387,9 +432,25 @@ export function SamplePage({
               {contains.length > 0 && `${contains.length} sample${contains.length > 1 ? "s" : ""}`}
               {contains.length > 0 && sampledIn.length > 0 && " · "}
               {sampledIn.length > 0 && `sampled in ${sampledIn.length}`}
+              {(covers.length > 0 || coveredBy.length > 0) && " · covers"}
+              {(remixOf.length > 0 || remixedBy.length > 0) && " · remixes"}
             </p>
           </div>
         </div>
+
+        {/* ── Force-directed sample DNA graph ── */}
+        {graphOpen && (
+          <div className="mb-5">
+            <p className="mb-2 flex items-center gap-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-star-white/40">
+              <GitFork size={11} /> Sample lineage graph
+            </p>
+            <SampleGraph
+              artist={subject.artist}
+              title={subject.title}
+              onPlayNode={playNode}
+            />
+          </div>
+        )}
 
         {contains.length > 0 && (
           <>
@@ -407,7 +468,7 @@ export function SamplePage({
         {sampledIn.length > 0 && (
           <>
             <p className="mb-2 mt-5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-star-white/40">
-              Where it's sampled
+              Where it&rsquo;s sampled
             </p>
             <div className="space-y-3">
               {sampledIn.map((s, i) => (
@@ -417,10 +478,52 @@ export function SamplePage({
           </>
         )}
 
+        {covers.length > 0 && (
+          <>
+            <p className="mb-2 mt-5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-star-white/40">
+              Covers
+            </p>
+            <div className="space-y-3">
+              {covers.map((s, i) => (
+                <SampleCard key={`cv-${i}`} sample={s} index={i} baseArtist={subject.artist} subjectTitle={subject.title} />
+              ))}
+            </div>
+          </>
+        )}
+
+        {coveredBy.length > 0 && (
+          <>
+            <p className="mb-2 mt-5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-star-white/40">
+              Covered by
+            </p>
+            <div className="space-y-3">
+              {coveredBy.map((s, i) => (
+                <SampleCard key={`cb-${i}`} sample={s} index={i} baseArtist={subject.artist} subjectTitle={subject.title} />
+              ))}
+            </div>
+          </>
+        )}
+
+        {(remixOf.length > 0 || remixedBy.length > 0) && (
+          <>
+            <p className="mb-2 mt-5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-star-white/40">
+              Remixes
+            </p>
+            <div className="space-y-3">
+              {remixOf.map((s, i) => (
+                <SampleCard key={`rx-${i}`} sample={s} index={i} baseArtist={subject.artist} subjectTitle={subject.title} />
+              ))}
+              {remixedBy.map((s, i) => (
+                <SampleCard key={`rb-${i}`} sample={s} index={i} baseArtist={subject.artist} subjectTitle={subject.title} />
+              ))}
+            </div>
+          </>
+        )}
+
         <p className="mt-6 text-center text-[10px] leading-relaxed text-star-white/30">
           Sample connections via MusicBrainz · originals played from YouTube.
           <br />
-          Tap a video to hear exactly where the sample lands.
+          Drag the graph nodes · expand any node to trace its own sample DNA.
         </p>
       </div>
     </motion.div>

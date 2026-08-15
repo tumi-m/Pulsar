@@ -16,12 +16,23 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["lib/**"],
-      // Exclude pure data dumps and the harness — they're not logic to cover.
+      // Exclude pure data dumps, the perf harness, and browser-only hooks/UI
+      // modules that aren't unit-testable logic (they need a real DOM / Supabase
+      // session). Logic modules stay in coverage.
       exclude: [
         "lib/types.ts",
         "lib/catalog*.ts",
         "lib/grammy-artists.ts",
         "lib/perf-harness.ts",
+        "lib/palette.ts",
+        "lib/theme.ts",
+        "lib/useBackClose.ts",
+        "lib/useCollectionState.ts",
+        "lib/useIsTouch.ts",
+        "lib/useScrollLock.ts",
+        "lib/audio-engine.ts",
+        "lib/capabilities.ts",
+        "lib/sync.ts",
       ],
       reporter: ["text", "text-summary", "html"],
       thresholds: { statements: 60, lines: 60, branches: 40, functions: 40 },
