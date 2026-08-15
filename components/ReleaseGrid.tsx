@@ -59,6 +59,11 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   const [showRefine, setShowRefine] = useState(false);
   const [showGenres, setShowGenres] = useState(false);
   const [query, setQuery] = useState("");
+  // Server-side search results reach beyond the homepage's ~2000-release
+  // payload into the full Supabase archive (which grows daily). Only fetched
+  // when the local query is too thin to be useful.
+  const [serverResults, setServerResults] = useState<Release[]>([]);
+  const [serverSearching, setServerSearching] = useState(false);
 
   // ── iOS Photos-style pinch-to-zoom grid density ──────────────
   // Pinch OUT → fewer, bigger tiles; pinch IN → more tiles per row. `zoom` is a
@@ -83,6 +88,27 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   useEffect(() => {
     baseColsRef.current = baseCols;
   }, [baseCols]);
+
+  // Debounced server-side search: when the local query is thin (< 24 results
+  // in the shipped payload), ask the archive so deep-catalogue matches still
+  // surface. Merged + deduped with local results below.
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setServerResults([]);
+      setServerSearching(false);
+      return;
+    }
+    setServerSearching(true);
+    const handle = setTimeout(() => {
+      fetch(`/api/search?q=${encodeURIComponent(q)}`)
+        .then((r) => (r.ok ? r.json() : { releases: [] }))
+        .then((d) => setServerResults((d.releases ?? []) as Release[]))
+        .catch(() => setServerResults([]))
+        .finally(() => setServerSearching(false));
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [query]);
 
   // Restore the saved density delta once.
   useEffect(() => {
@@ -361,16 +387,26 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     if (activeLabel) list = list.filter((r) => r.label === activeLabel);
     const q = query.trim().toLowerCase();
     if (q) {
-      list = list.filter(
+      // Local results first…
+      const local = list.filter(
         (r) =>
           r.artist.toLowerCase().includes(q) ||
           r.title.toLowerCase().includes(q) ||
           (r.genre ?? "").toLowerCase().includes(q) ||
           (r.label ?? "").toLowerCase().includes(q)
       );
+      // …then merge in server-only matches (deduped by id) so the deep
+      // catalogue — beyond the homepage payload — is reachable.
+      if (serverResults.length) {
+        const have = new Set(local.map((r) => r.id));
+        const extra = serverResults.filter((r) => !have.has(r.id));
+        list = [...local, ...extra];
+      } else {
+        list = local;
+      }
     }
     return list;
-  }, [releases, activeGenre, activeType, activeLabel, view, recProfile, query]);
+  }, [releases, activeGenre, activeType, activeLabel, view, recProfile, query, serverResults]);
 
   const shown = filtered.slice(0, visible);
   const searching = query.trim().length > 0;

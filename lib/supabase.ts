@@ -130,3 +130,26 @@ export async function releaseExists(artist: string, title: string): Promise<bool
   if (error) return false;
   return (count ?? 0) > 0;
 }
+
+/**
+ * Server-side search over the WHOLE Supabase archive (which grows daily and
+ * can far exceed the 2000-release payload the homepage ships to the client).
+ * Matches artist, title, genre or label — case-insensitive substring. Used by
+ * /api/search so a query reaches beyond what's currently rendered.
+ */
+export async function searchReleases(q: string, limit = 60): Promise<Release[]> {
+  const term = q.trim().slice(0, 120);
+  if (!term) return [];
+  // Supabase `.or()` with ilike patterns. Escape the pattern metacharacters a
+  // user could type so a stray % or _ doesn't turn into a wildcard match-all.
+  const esc = term.replace(/[%_\\]/g, "");
+  if (!esc) return [];
+  const { data, error } = await supabase
+    .from("releases")
+    .select("*")
+    .or(`artist.ilike.%${esc}%,title.ilike.%${esc}%,genre.ilike.%${esc}%`)
+    .order("release_date", { ascending: false })
+    .limit(limit);
+  if (error) return [];
+  return (data as Release[]) ?? [];
+}
