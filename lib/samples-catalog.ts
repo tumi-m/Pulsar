@@ -185,3 +185,52 @@ export function lookupCatalog(artist: string, title: string): CatalogHit[] {
   }
   return out;
 }
+
+/** One row of the "most sampled" leaderboard. */
+export interface LeaderRow {
+  artist: string;
+  title: string;
+  year: string | null;
+  /** How many catalog entries lift from this record. */
+  count: number;
+  /** The songs that took from it (most recent first is not knowable — catalog order). */
+  takers: { artist: string; title: string }[];
+}
+
+/**
+ * The "most sampled" leaderboard, computed from the curated catalog. This is
+ * the classic crate-digger view: which records keep getting lifted from.
+ */
+export function mostSampledSources(limit = 12): LeaderRow[] {
+  const map = new Map<string, LeaderRow>();
+  for (const c of SAMPLE_CATALOG) {
+    const key = `${c.sourceArtist}::${c.sourceTitle}`.toLowerCase();
+    const row = map.get(key) ?? {
+      artist: c.sourceArtist,
+      title: c.sourceTitle,
+      year: c.sourceYear,
+      count: 0,
+      takers: [] as { artist: string; title: string }[],
+    };
+    row.count += 1;
+    row.takers.push({ artist: c.artist, title: c.title });
+    map.set(key, row);
+  }
+  return Array.from(map.values())
+    .sort((a, b) => b.count - a.count || a.artist.localeCompare(b.artist))
+    .slice(0, limit);
+}
+
+/** Distinct songs in the catalog that contain samples — the curated picks. */
+export function catalogSamplers(limit = 12): { artist: string; title: string; sources: number }[] {
+  const map = new Map<string, { artist: string; title: string; sources: number }>();
+  for (const c of SAMPLE_CATALOG) {
+    const key = `${c.artist}::${c.title}`.toLowerCase();
+    const row = map.get(key) ?? { artist: c.artist, title: c.title, sources: 0 };
+    row.sources += 1;
+    map.set(key, row);
+  }
+  return Array.from(map.values())
+    .sort((a, b) => b.sources - a.sources)
+    .slice(0, limit);
+}

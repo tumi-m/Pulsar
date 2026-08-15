@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { X, Play, Disc3, ArrowDownRight, ArrowUpRight, Youtube, Clock, GitFork } from "lucide-react";
+import { X, Play, Disc3, ArrowDownRight, ArrowUpRight, Youtube, Clock, GitFork, Share2, Check } from "lucide-react";
+import Link from "next/link";
 import { Artwork } from "./Artwork";
 import { useScrollLock } from "@/lib/useScrollLock";
 import { Portal } from "./Portal";
 import { SampleGraph } from "./SampleGraph";
+import type { Release } from "@/lib/types";
 
 export type RelationRole = "samples" | "sampledBy" | "covers" | "coveredBy" | "remixOf" | "remixedBy";
 
@@ -84,15 +86,36 @@ function SampleCard({
   index,
   baseArtist,
   subjectTitle,
+  releases,
 }: {
   sample: SampleRef;
   index: number;
   baseArtist: string;
   subjectTitle: string;
+  releases?: Release[];
 }) {
   const [videoId, setVideoId] = useState<string | null>(null);
   const [state, setState] = useState<"idle" | "loading" | "none">("idle");
   const [playing, setPlaying] = useState(false);
+  // The record's own cover: Cover Art Archive when the MusicBrainz recording
+  // id resolves to one, iTunes proxy otherwise (built into <Artwork>).
+  const [cover, setCover] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!sample.mbid) return;
+    fetch(`/api/sample-cover?mbid=${sample.mbid}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.url) setCover(d.url);
+      })
+      .catch(() => {
+        /* no CAA cover — iTunes fallback takes over */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sample.mbid]);
 
   // Listener-marked timecodes for this specific connection.
   const key = markKey(subjectTitle, sample.title);
@@ -150,6 +173,13 @@ function SampleCard({
   const start = toSeconds(sample.timestamp);
   const thumb = videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null;
 
+  // If the sampled/original track is itself in the loaded catalog, cross-link
+  // to its release page — samples as a doorway into discovery, not a dead end.
+  const normKey = (a: string, t: string) => `${a} ${t}`.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const catalogHit = releases?.find(
+    (r) => normKey(r.artist, r.title) === normKey(sample.artist ?? baseArtist, sample.title)
+  );
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 18 }}
@@ -184,12 +214,33 @@ function SampleCard({
               Partial
             </span>
           )}
+          {catalogHit && (
+            <Link
+              href={`/release/${catalogHit.id}`}
+              className="rounded-full border border-neon-blue/40 bg-neon-blue/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-neon-blue transition-colors hover:bg-neon-blue/20"
+              title="This record is in the Pulsar catalog"
+            >
+              In catalog ↗
+            </Link>
+          )}
           {sample.year && (
             <span className="ml-auto font-mono text-[10px] text-star-white/35">{sample.year}</span>
           )}
         </div>
 
         <div className="mt-3 flex gap-3">
+          {/* the record's own cover — CAA via /api/sample-cover, iTunes fallback */}
+          <div className="relative h-[72px] w-[72px] flex-shrink-0 self-start overflow-hidden rounded-lg ring-1 ring-white/10">
+            <Artwork
+              src={
+                cover ??
+                `/api/artwork?artist=${encodeURIComponent(sample.artist ?? baseArtist)}&title=${encodeURIComponent(sample.title)}`
+              }
+              artist={sample.artist ?? baseArtist}
+              title={sample.title}
+              sizes="72px"
+            />
+          </div>
           {/* video poster / play */}
           <button
             onClick={() => videoId && setPlaying(true)}
@@ -352,12 +403,15 @@ export function SamplePage({
   subject,
   samples,
   onClose,
+  releases,
 }: {
   subject: SampleSubject | null;
   samples: SampleRef[];
   onClose: () => void;
+  releases?: Release[];
 }) {
   const [graphOpen, setGraphOpen] = useState(true);
+  const [copied, setCopied] = useState(false);
   useScrollLock(Boolean(subject));
   if (!subject) return null;
   const contains = samples.filter((s) => s.role === "samples");
@@ -401,6 +455,22 @@ export function SamplePage({
             {subject.title}
           </h3>
         </div>
+        <button
+          onClick={() => {
+            const url = `${window.location.origin}/samples?artist=${encodeURIComponent(subject.artist)}&title=${encodeURIComponent(subject.title)}`;
+            navigator.clipboard?.writeText(url).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1600);
+            }).catch(() => {});
+          }}
+          aria-label="Copy a link to this sample breakdown"
+          title="Copy link to this breakdown"
+          className={`relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full transition-colors ${
+            copied ? "bg-neon-green/20 text-neon-green" : "text-star-white/50 hover:bg-white/10 hover:text-star-white"
+          }`}
+        >
+          {copied ? <Check size={15} /> : <Share2 size={15} />}
+        </button>
         <button
           onClick={() => setGraphOpen((v) => !v)}
           aria-label="Toggle graph"
@@ -459,7 +529,7 @@ export function SamplePage({
             </p>
             <div className="space-y-3">
               {contains.map((s, i) => (
-                <SampleCard key={`c-${i}`} sample={s} index={i} baseArtist={subject.artist} subjectTitle={subject.title} />
+                <SampleCard key={`c-${i}`} sample={s} index={i} baseArtist={subject.artist} subjectTitle={subject.title} releases={releases} />
               ))}
             </div>
           </>
@@ -472,7 +542,7 @@ export function SamplePage({
             </p>
             <div className="space-y-3">
               {sampledIn.map((s, i) => (
-                <SampleCard key={`s-${i}`} sample={s} index={i} baseArtist={subject.artist} subjectTitle={subject.title} />
+                <SampleCard key={`s-${i}`} sample={s} index={i} baseArtist={subject.artist} subjectTitle={subject.title} releases={releases} />
               ))}
             </div>
           </>
@@ -485,7 +555,7 @@ export function SamplePage({
             </p>
             <div className="space-y-3">
               {covers.map((s, i) => (
-                <SampleCard key={`cv-${i}`} sample={s} index={i} baseArtist={subject.artist} subjectTitle={subject.title} />
+                <SampleCard key={`cv-${i}`} sample={s} index={i} baseArtist={subject.artist} subjectTitle={subject.title} releases={releases} />
               ))}
             </div>
           </>
@@ -498,7 +568,7 @@ export function SamplePage({
             </p>
             <div className="space-y-3">
               {coveredBy.map((s, i) => (
-                <SampleCard key={`cb-${i}`} sample={s} index={i} baseArtist={subject.artist} subjectTitle={subject.title} />
+                <SampleCard key={`cb-${i}`} sample={s} index={i} baseArtist={subject.artist} subjectTitle={subject.title} releases={releases} />
               ))}
             </div>
           </>
@@ -511,10 +581,10 @@ export function SamplePage({
             </p>
             <div className="space-y-3">
               {remixOf.map((s, i) => (
-                <SampleCard key={`rx-${i}`} sample={s} index={i} baseArtist={subject.artist} subjectTitle={subject.title} />
+                <SampleCard key={`rx-${i}`} sample={s} index={i} baseArtist={subject.artist} subjectTitle={subject.title} releases={releases} />
               ))}
               {remixedBy.map((s, i) => (
-                <SampleCard key={`rb-${i}`} sample={s} index={i} baseArtist={subject.artist} subjectTitle={subject.title} />
+                <SampleCard key={`rb-${i}`} sample={s} index={i} baseArtist={subject.artist} subjectTitle={subject.title} releases={releases} />
               ))}
             </div>
           </>

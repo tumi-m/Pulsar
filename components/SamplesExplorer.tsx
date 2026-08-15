@@ -231,6 +231,7 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
           <SamplePage
             subject={viewing.subject}
             samples={viewing.samples}
+            releases={releases}
             onClose={() => setViewing(null)}
           />
         )}

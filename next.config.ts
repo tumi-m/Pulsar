@@ -11,6 +11,8 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "**.ytimg.com" },
       { protocol: "https", hostname: "upload.wikimedia.org" },
       { protocol: "https", hostname: "**.dzcdn.net" },
+      { protocol: "https", hostname: "coverartarchive.org" },
+      { protocol: "https", hostname: "**.archive.org" },
     ],
   },
   experimental: {},
