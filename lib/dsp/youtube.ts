@@ -21,7 +21,13 @@ import {
   type ProgressFn,
 } from "./shared";
 
-const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
+// Build-time inline, overlaid at runtime by /api/dsp-config (see
+// ensureDspConfig in ./index.ts) so setting the env var works without a
+// redeploy.
+let CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
+export function setGoogleClientId(id: string) {
+  if (id) CLIENT_ID = id;
+}
 const SCOPE = "https://www.googleapis.com/auth/youtube";
 
 function beginAuth() {

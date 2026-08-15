@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useDragControls } from "framer-motion";
-import { Sparkles, X, Play, LayoutGrid, MessagesSquare } from "lucide-react";
+import { Sparkles, X, Play, LayoutGrid, MessagesSquare, ArrowUp, RotateCcw } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";
 import { genreBucket, type GenreBucket } from "@/lib/utils";
@@ -12,6 +12,7 @@ import { Artwork } from "./Artwork";
 import { useScrollLock } from "@/lib/useScrollLock";
 import { useBackClose } from "@/lib/useBackClose";
 import { Portal } from "./Portal";
+import { PLATFORMS } from "./platforms";
 
 interface AiChatProps {
   releases: Release[];
@@ -90,20 +91,33 @@ function buildList(releases: Release[], p: Parsed): Release[] {
     .map(({ r }) => r);
 }
 
+const uniq = <T,>(xs: T[]) => Array.from(new Set(xs));
+
+/** One exchange: the prompt, the signals derived from it, and the matches. */
+interface Turn {
+  prompt: string;
+  signals: Parsed;
+  results: Release[];
+  source: "llm" | "fallback";
+  model?: string;
+}
+
 export function AiChat({ releases }: AiChatProps) {
   const player = usePlayer();
   const { current } = usePlayer();
-  // null = closed, "choose" = the left/right picker, "chat" = the describer
+  // null = closed, "choose" = the left/right picker, "chat" = the selector room
   const [view, setView] = useState<"choose" | "chat" | null>(null);
   const [text, setText] = useState("");
-  const [result, setResult] = useState<Release[] | null>(null);
+  const [turns, setTurns] = useState<Turn[]>([]);
   const [thinking, setThinking] = useState(false);
-  // On phones the panel is a bottom sheet (thumb-reachable, keyboard-safe);
-  // on larger screens it's a centered card.
+  // On phones the panel is a fullscreen room; on larger screens a large
+  // centered card that fills most of the viewport — this is a conversation,
+  // not a dropdown.
   const [isMobile, setIsMobile] = useState(false);
   useScrollLock(Boolean(view));
   useBackClose(Boolean(view), () => setView(null));
   const dragControls = useDragControls();
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 639px)");
@@ -120,46 +134,88 @@ export function AiChat({ releases }: AiChatProps) {
     return () => window.removeEventListener("pulsar-ai-activate", activate);
   }, []);
 
+  // Keep the thread pinned to the newest message as it arrives.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [turns, thinking]);
+
   const close = () => setView(null);
   const chooseSurvey = () => {
     setView(null);
     window.dispatchEvent(new CustomEvent("pulsar-retake-quiz"));
   };
 
-  const run = async () => {
-    if (!text.trim()) return;
+  const run = async (raw?: string) => {
+    const prompt = (raw ?? text).trim();
+    if (!prompt || thinking) return;
+    setText("");
+    setThinking(true);
     // Agentic path: ask the model to extract structured signals from free
     // text, then feed those into the scorer. Falls back to the keyless keyword
     // matcher instantly if the model is unreachable or unconfigured.
-    setThinking(true);
-    let parsed = parse(text);
+    let parsed = parse(prompt);
+    let source: Turn["source"] = "fallback";
+    let model: string | undefined;
     try {
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: text }),
-        signal: AbortSignal.timeout(8000),
+        body: JSON.stringify({ prompt }),
+        signal: AbortSignal.timeout(15000),
       });
       if (res.ok) {
         const llm = await res.json();
+        if (llm.source === "llm") {
+          source = "llm";
+          model = llm.model;
+        }
         // Merge LLM signals with the keyword parse (union) so the recommender
         // gets the broadest, most accurate signal set.
-        const moods = Array.from(new Set([...parsed.moods, ...(llm.moods ?? [])]));
-        const genres = Array.from(new Set([...parsed.genres, ...(llm.genres ?? [])]));
-        const decades = Array.from(new Set([...parsed.decades, ...(llm.decades ?? [])]));
+        const moods = uniq([...parsed.moods, ...(llm.moods ?? [])]);
+        const genres = uniq([...parsed.genres, ...(llm.genres ?? [])]) as GenreBucket[];
+        const decades = uniq([...parsed.decades, ...(llm.decades ?? [])]);
         const freeText = `${parsed.freeText} ${llm.freeText ?? ""}`.trim();
         parsed = { moods, genres, decades, freeText };
       }
     } catch {
       /* timeout / network — use the keyword parse as-is */
     }
-    setResult(buildList(releases, parsed));
+    // Refinement: each turn carries the union of every signal so far, so the
+    // conversation narrows in instead of starting over — "euphoric house",
+    // then "slower and more hypnotic", keeps the house signal.
+    const prior = turns[turns.length - 1]?.signals;
+    if (prior) {
+      parsed = {
+        moods: uniq([...prior.moods, ...parsed.moods]),
+        genres: uniq([...prior.genres, ...parsed.genres]) as GenreBucket[],
+        decades: uniq([...prior.decades, ...parsed.decades]),
+        freeText: `${prior.freeText} ${parsed.freeText}`.trim(),
+      };
+    }
+    setTurns((t) => [...t, { prompt, signals: parsed, results: buildList(releases, parsed), source, model }]);
     setThinking(false);
   };
 
+  /** Tap a signal chip on the latest turn to drop it and re-curate instantly. */
+  const dropSignal = (kind: "moods" | "genres" | "decades", value: string) => {
+    setTurns((ts) => {
+      if (!ts.length) return ts;
+      const next = [...ts];
+      const last = next[next.length - 1];
+      const signals = { ...last.signals, [kind]: last.signals[kind].filter((v) => v !== value) };
+      next[next.length - 1] = { ...last, signals, results: buildList(releases, signals) };
+      return next;
+    });
+  };
+
+  const reset = () => {
+    setTurns([]);
+    setText("");
+  };
+
   // add the whole generated list to the crate
-  const addAll = () => {
-    (result ?? []).forEach((r) => {
+  const addAll = (rs: Release[]) => {
+    rs.forEach((r) => {
       if (!inPlaylist(r.id)) togglePlaylist(r);
     });
   };
@@ -170,6 +226,16 @@ export function AiChat({ releases }: AiChatProps) {
     "melancholic indie for a rainy day",
     "euphoric house to dance to",
   ];
+
+  // The pill in the masthead: is the live model actually answering, or are we
+  // in keyword mode? Honest status instead of a silent fallback.
+  const lastTurn = turns[turns.length - 1];
+  const status =
+    thinking || !lastTurn
+      ? { label: thinking ? "Listening…" : "Standby", color: "#9b5de5" }
+      : lastTurn.source === "llm"
+        ? { label: lastTurn.model ?? "DeepSeek", color: "#1DB954" }
+        : { label: "Keyword mode", color: "#ffb347" };
 
   return (
     <Portal>
@@ -197,24 +263,30 @@ export function AiChat({ releases }: AiChatProps) {
               if (info.offset.y > 120) close();
             }}
             className="
-              fixed inset-x-0 bottom-0 z-[58] flex max-h-[88dvh] w-full transform-gpu flex-col
+              fixed inset-x-0 bottom-0 z-[58] flex h-[100dvh] w-full transform-gpu flex-col
               overflow-hidden rounded-t-[26px] border border-white/15 border-b-0
-              bg-[#0a0a14]/60 pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl
-              sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-h-[80dvh]
-              sm:w-[min(92vw,26rem)] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border-b
+              bg-[#0a0a14]/75 pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl
+              sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:h-auto
+              sm:max-h-[86dvh] sm:w-[min(94vw,44rem)] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl sm:border-b
             "
             style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35), 0 -12px 60px rgba(0,0,0,0.6), 0 24px 70px rgba(0,0,0,0.6)" }}
           >
-            {/* aurora glow strip across the top — the "AI" signature */}
+            {/* aurora backdrop — the "AI" signature, gently drifting */}
             <div
-              className="pointer-events-none absolute inset-x-0 top-0 h-24 opacity-70"
-              style={{
-                background:
-                  "radial-gradient(120% 90% at 50% 0%, rgba(155,93,229,0.35), rgba(255,95,162,0.18) 45%, transparent 72%)",
-              }}
-            />
+              className="pointer-events-none absolute inset-0 overflow-hidden"
+              aria-hidden
+            >
+              <div
+                className="aurora-blob absolute -top-32 left-1/2 h-80 w-[36rem] -translate-x-1/2 rounded-full opacity-60 blur-3xl"
+                style={{ background: "radial-gradient(closest-side, rgba(155,93,229,0.4), rgba(255,95,162,0.2) 55%, transparent)" }}
+              />
+              <div
+                className="aurora-blob absolute -bottom-40 -right-24 h-72 w-72 rounded-full opacity-40 blur-3xl"
+                style={{ background: "radial-gradient(closest-side, rgba(74,163,255,0.35), transparent)" }}
+              />
+            </div>
             {/* drag grabber — mobile only; the sole drag-to-dismiss target so
-                scrolling the results never dismisses the sheet */}
+                scrolling the thread never dismisses the sheet */}
             <div
               onPointerDown={(e) => isMobile && dragControls.start(e)}
               className="relative z-10 flex justify-center py-3 sm:hidden"
@@ -235,15 +307,13 @@ export function AiChat({ releases }: AiChatProps) {
                         boxShadow: "0 6px 18px rgba(155,93,229,0.5), inset 0 1px 0 rgba(255,255,255,0.4)",
                       }}
                     >
-                      <Sparkles size={18} className="text-white" />
+                      <Sparkles size={16} className="text-white" />
                     </span>
                     <div>
-                      <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-star-white/40">
-                        Selector
+                      <p className="text-sm font-black uppercase tracking-[0.2em] text-star-white">The Selector</p>
+                      <p className="text-[10px] font-medium uppercase tracking-widest text-star-white/40">
+                        Curated by DeepSeek
                       </p>
-                      <h3 className="bg-gradient-to-r from-white to-white/70 bg-clip-text text-lg font-bold tracking-tight text-transparent">
-                        How do you want to pick?
-                      </h3>
                     </div>
                   </div>
                   <button
@@ -308,115 +378,162 @@ export function AiChat({ releases }: AiChatProps) {
                 </div>
               </div>
             ) : (
-              /* ── compact chat ── */
+              /* ── the selector room: a real conversation ── */
               <>
-                <div className="relative z-10 flex items-center justify-between gap-3 border-b border-white/8 p-3">
-                  {/* one-tap switch between Chat and Visual Survey */}
-                  <div className="flex items-center gap-1 rounded-full border border-white/12 bg-white/[0.03] p-0.5">
+                {/* masthead */}
+                <div className="relative z-10 flex items-center justify-between gap-2 border-b border-white/8 px-4 py-3 sm:px-5">
+                  <div className="flex min-w-0 items-center gap-2.5">
                     <span
-                      className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white"
-                      style={{ background: "linear-gradient(120deg, #9b5de5, #ff5fa2 70%, #ffb347)" }}
-                    >
-                      <Sparkles size={12} /> Chat
-                    </span>
-                    <button
-                      onClick={chooseSurvey}
-                      className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-star-white/60 transition-colors hover:text-star-white"
-                    >
-                      <LayoutGrid size={12} /> Visual Survey
-                    </button>
-                  </div>
-                  <button
-                    onClick={close}
-                    aria-label="Close"
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-star-white/50 hover:bg-white/10 hover:text-star-white"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-
-                <div className="relative z-10 p-3.5">
-                  <textarea
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) run();
-                    }}
-                    placeholder="e.g. dreamy chillwave for a late-night drive…"
-                    rows={2}
-                    autoFocus
-                    className="w-full resize-none rounded-lg border border-star-white/12 bg-star-white/[0.03] p-3 text-sm text-star-white placeholder:text-star-white/35 focus:border-neon-violet/50 focus:outline-none"
-                  />
-                  {!result && (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {suggestions.map((s) => (
-                        <button
-                          key={s}
-                          onClick={() => setText(s)}
-                          className="rounded-full border border-star-white/12 px-2.5 py-1 text-[10px] text-star-white/50 transition-colors hover:border-star-white/30 hover:text-star-white"
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="mt-3 flex items-center gap-2">
-                    <button
-                      onClick={run}
-                      disabled={thinking}
-                      className="flex-1 rounded-lg py-2.5 text-[11px] font-bold uppercase tracking-widest text-white transition-transform active:scale-[0.98] disabled:opacity-60"
+                      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl"
                       style={{
-                        background: "linear-gradient(120deg, #9b5de5, #ff5fa2 60%, #ffb347)",
-                        boxShadow: "0 6px 18px rgba(155,93,229,0.4)",
+                        background: "linear-gradient(135deg, #9b5de5, #ff5fa2 60%, #ffb347)",
+                        boxShadow: "0 6px 18px rgba(155,93,229,0.5), inset 0 1px 0 rgba(255,255,255,0.4)",
                       }}
                     >
-                      {thinking ? "Curating…" : "Build my list"}
+                      <Sparkles size={14} className="text-white" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-black uppercase tracking-[0.2em] text-star-white">
+                        The Selector
+                      </p>
+                      {/* honest status: live model vs keyword fallback */}
+                      <p className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-star-white/40">
+                        <span
+                          className="inline-block h-1.5 w-1.5 rounded-full"
+                          style={{ backgroundColor: status.color, boxShadow: `0 0 8px ${status.color}` }}
+                        />
+                        {status.label}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={chooseSurvey}
+                      aria-label="Switch to the visual survey"
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-star-white/50 transition-colors hover:bg-white/10 hover:text-star-white"
+                      title="Visual survey"
+                    >
+                      <LayoutGrid size={15} />
                     </button>
-                    {result && result.length > 0 && (
+                    {turns.length > 0 && (
                       <button
-                        onClick={addAll}
-                        className="rounded-lg border border-neon-green/40 bg-neon-green/10 px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-neon-green"
+                        onClick={reset}
+                        aria-label="Start the conversation over"
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-star-white/50 transition-colors hover:bg-white/10 hover:text-star-white"
+                        title="Start over"
                       >
-                        + Crate all
+                        <RotateCcw size={14} />
                       </button>
                     )}
+                    <button
+                      onClick={close}
+                      aria-label="Close"
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-star-white/50 transition-colors hover:bg-white/10 hover:text-star-white"
+                    >
+                      <X size={16} />
+                    </button>
                   </div>
                 </div>
 
-                {/* results — only when there are any (keeps the card compact) */}
-                {result && (
-                  <div className="relative z-10 max-h-[42dvh] flex-1 overflow-y-auto overscroll-contain border-t border-white/8 p-2">
-                    {result.length === 0 && (
-                      <p className="p-6 text-center text-sm text-star-white/40">
-                        Nothing matched that vibe — try different words or a genre.
+                {/* thread */}
+                <div
+                  ref={scrollRef}
+                  className="relative z-10 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5"
+                >
+                  {turns.length === 0 && !thinking && (
+                    <div className="flex h-full min-h-[30dvh] flex-col items-center justify-center gap-3 text-center">
+                      <span
+                        className="flex h-16 w-16 items-center justify-center rounded-3xl"
+                        style={{
+                          background: "linear-gradient(135deg, #9b5de5, #ff5fa2 60%, #ffb347)",
+                          boxShadow: "0 10px 30px rgba(155,93,229,0.45), inset 0 1px 0 rgba(255,255,255,0.4)",
+                        }}
+                      >
+                        <MessagesSquare size={26} className="text-white" />
+                      </span>
+                      <p className="text-lg font-black uppercase tracking-[0.18em] text-star-white">
+                        What should the room sound like?
                       </p>
-                    )}
-                    {result.map((r) => {
-                      const isThis = current?.artist === r.artist && current?.title === r.title;
-                      return (
-                        <div key={r.id} className="flex items-center gap-3 rounded-lg p-2 hover:bg-star-white/[0.04]">
-                          <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-md">
-                            <Artwork src={r.artwork_url} artist={r.artist} title={r.title} sizes="44px" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className={`truncate text-[13px] font-bold ${isThis ? "text-neon-blue" : "text-star-white"}`}>
-                              {r.title}
-                            </p>
-                            <p className="truncate text-[11px] text-star-white/50">{r.artist}</p>
-                          </div>
+                      <p className="max-w-sm text-xs leading-relaxed text-star-white/45">
+                        Describe a mood, an era or a genre — then keep talking to refine it.
+                        “euphoric house” → “slower, more hypnotic”.
+                      </p>
+                      <div className="mt-1 flex max-w-md flex-wrap justify-center gap-1.5">
+                        {suggestions.map((s) => (
                           <button
-                            onClick={() => player.play(r)}
-                            aria-label="Play"
-                            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-star-white text-void"
+                            key={s}
+                            onClick={() => run(s)}
+                            className="rounded-full border border-star-white/12 px-3 py-1.5 text-[10px] text-star-white/55 transition-colors hover:border-neon-violet/50 hover:bg-neon-violet/10 hover:text-star-white"
                           >
-                            <Play size={13} className="ml-0.5" fill="currentColor" />
+                            {s}
                           </button>
-                          <CrateToggle release={r} />
-                        </div>
-                      );
-                    })}
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {turns.map((t, i) => (
+                    <TurnBlock key={i} turn={t} isLast={i === turns.length - 1} onDropSignal={dropSignal} onCrateAll={addAll} current={current} player={player} />
+                  ))}
+
+                  {thinking && (
+                    <div className="mb-4 flex items-center gap-3">
+                      <span
+                        className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-2xl"
+                        style={{ background: "linear-gradient(135deg, #9b5de5, #ff5fa2 60%, #ffb347)" }}
+                      >
+                        <Sparkles size={14} className="text-white" />
+                      </span>
+                      <div className="flex items-end gap-1" aria-label="Thinking">
+                        {[0, 1, 2, 3].map((i) => (
+                          <motion.span
+                            key={i}
+                            className="w-1 rounded-full bg-neon-violet"
+                            initial={{ height: 6 }}
+                            animate={{ height: [6, 18, 6] }}
+                            transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.12, ease: "easeInOut" }}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-[11px] text-star-white/50">Reading the room…</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* composer */}
+                <div className="relative z-10 border-t border-white/8 p-3 sm:p-4">
+                  <div className="flex items-end gap-2 rounded-2xl border border-star-white/12 bg-star-white/[0.04] p-2 transition-colors focus-within:border-neon-violet/50">
+                    <textarea
+                      value={text}
+                      onChange={(e) => setText(e.target.value)}
+                      onKeyDown={(e) => {
+                        // Enter sends on desktop (multiline via Shift+Enter); on
+                        // touch keyboards Enter should newline, send is a tap.
+                        if (e.key === "Enter" && !e.shiftKey && !isMobile) {
+                          e.preventDefault();
+                          run();
+                        }
+                      }}
+                      placeholder={turns.length ? "Refine it — “slower”, “add sax”, “more 80s”…" : "Describe the vibe — mood, genre, era, anything…"}
+                      rows={1}
+                      autoFocus
+                      className="max-h-28 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-star-white placeholder:text-star-white/35 focus:outline-none"
+                    />
+                    <motion.button
+                      whileTap={{ scale: 0.92 }}
+                      onClick={() => run()}
+                      disabled={thinking || !text.trim()}
+                      aria-label="Send"
+                      className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-white transition-opacity disabled:opacity-35"
+                      style={{
+                        background: "linear-gradient(120deg, #9b5de5, #ff5fa2 60%, #ffb347)",
+                        boxShadow: "0 4px 14px rgba(155,93,229,0.4)",
+                      }}
+                    >
+                      <ArrowUp size={16} />
+                    </motion.button>
                   </div>
-                )}
+                </div>
               </>
             )}
           </motion.div>
@@ -424,6 +541,144 @@ export function AiChat({ releases }: AiChatProps) {
       )}
     </AnimatePresence>
     </Portal>
+  );
+}
+
+/**
+ * One exchange rendered as chat: the user's words as a bubble, the Selector's
+ * reply as signal chips + a results list with per-platform deep links.
+ */
+function TurnBlock({
+  turn,
+  isLast,
+  onDropSignal,
+  onCrateAll,
+  current,
+  player,
+}: {
+  turn: Turn;
+  isLast: boolean;
+  onDropSignal: (kind: "moods" | "genres" | "decades", value: string) => void;
+  onCrateAll: (rs: Release[]) => void;
+  current: ReturnType<typeof usePlayer>["current"];
+  player: ReturnType<typeof usePlayer>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const shown = expanded ? turn.results : turn.results.slice(0, 6);
+  const chips = [
+    ...turn.signals.moods.map((v) => ({ kind: "moods" as const, v, color: "rgba(155,93,229,0.5)" })),
+    ...turn.signals.genres.map((v) => ({ kind: "genres" as const, v, color: "rgba(74,163,255,0.5)" })),
+    ...turn.signals.decades.map((v) => ({ kind: "decades" as const, v, color: "rgba(255,179,71,0.5)" })),
+  ];
+
+  return (
+    <div className="mb-5">
+      {/* the user's words */}
+      <div className="mb-2.5 flex justify-end">
+        <p
+          className="max-w-[85%] rounded-2xl rounded-br-md border border-neon-violet/25 bg-neon-violet/[0.12] px-3.5 py-2 text-[13px] leading-relaxed text-star-white"
+        >
+          {turn.prompt}
+        </p>
+      </div>
+
+      {/* the selector's reply: signals, then matches */}
+      {chips.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {chips.map(({ kind, v, color }) => (
+            <button
+              key={`${kind}-${v}`}
+              onClick={() => isLast && onDropSignal(kind, v)}
+              title={isLast ? `Drop “${v}” and re-curate` : v}
+              className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-star-white/80 transition-colors ${
+                isLast ? "hover:border-white/40 hover:text-star-white" : "opacity-70"
+              }`}
+              style={{ borderColor: color, backgroundColor: `${color.slice(0, 7)}1a` }}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {turn.results.length === 0 ? (
+        <p className="rounded-2xl border border-white/8 bg-white/[0.03] px-3.5 py-3 text-[13px] text-star-white/50">
+          Nothing in the catalog matches that yet — try different words, a genre, or an era.
+        </p>
+      ) : (
+        <>
+          <div className="space-y-1">
+            {shown.map((r) => {
+              const isThis = current?.artist === r.artist && current?.title === r.title;
+              const links = PLATFORMS.filter((p) => r[p.key]);
+              return (
+                <div
+                  key={r.id}
+                  className="group flex items-center gap-2.5 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-2 pr-2.5 transition-colors hover:border-white/15 hover:bg-white/[0.06]"
+                >
+                  <button
+                    onClick={() => player.play(r)}
+                    aria-label={`Play ${r.title}`}
+                    className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-xl"
+                  >
+                    <Artwork src={r.artwork_url} artist={r.artist} title={r.title} sizes="44px" />
+                    <span className="absolute inset-0 flex items-center justify-center bg-void/60 opacity-0 transition-opacity group-hover:opacity-100">
+                      <Play size={14} className="ml-0.5 text-star-white" fill="currentColor" />
+                    </span>
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <p className={`truncate text-[13px] font-bold leading-tight ${isThis ? "text-neon-blue" : "text-star-white"}`}>
+                      {r.title}
+                    </p>
+                    <p className="truncate text-[11px] text-star-white/50">{r.artist}</p>
+                  </div>
+                  {/* one-tap deep links to each streaming service */}
+                  <div className="flex flex-shrink-0 items-center gap-1">
+                    {links.map((p) => (
+                      <a
+                        key={p.key}
+                        href={r[p.key] as string}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`Open on ${p.label}`}
+                        aria-label={`Open ${r.title} on ${p.label}`}
+                        className="flex h-7 w-7 items-center justify-center rounded-full border transition-transform hover:scale-110"
+                        style={{ backgroundColor: `${p.color}1f`, borderColor: `${p.color}45`, color: p.color }}
+                      >
+                        <p.Icon />
+                      </a>
+                    ))}
+                    <CrateToggle release={r} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-2 flex items-center justify-between gap-2 px-1">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-star-white/35">
+              {turn.results.length} match{turn.results.length === 1 ? "" : "es"} ·{" "}
+              {turn.source === "llm" ? "DeepSeek" : "keyword match"}
+            </p>
+            <div className="flex items-center gap-2">
+              {turn.results.length > 6 && (
+                <button
+                  onClick={() => setExpanded((e) => !e)}
+                  className="text-[10px] font-bold uppercase tracking-widest text-star-white/50 hover:text-star-white"
+                >
+                  {expanded ? "Show less" : `+${turn.results.length - 6} more`}
+                </button>
+              )}
+              <button
+                onClick={() => onCrateAll(turn.results)}
+                className="rounded-full border border-neon-green/40 bg-neon-green/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-neon-green"
+              >
+                + Crate all
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 

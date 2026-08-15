@@ -39,6 +39,66 @@ export interface DspProvider {
   completeRedirect?(): Promise<boolean>;
 }
 
+// ── Runtime DSP configuration ────────────────────────────────────
+// NEXT_PUBLIC_* values are inlined at build time, so a client id set in the
+// Vercel dashboard after the last deploy never reaches the browser — which
+// showed up as Spotify's `INVALID_CLIENT` screen. The client therefore asks
+// /api/dsp-config (which reads live server env) and overlays whatever it
+// returns on top of the build-time values.
+export interface DspRuntimeConfig {
+  spotifyClientId: string;
+  googleClientId: string;
+  appleEnabled: boolean;
+}
+
+const BUILD_TIME_CONFIG: DspRuntimeConfig = {
+  spotifyClientId: process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ?? "",
+  googleClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "",
+  appleEnabled: process.env.NEXT_PUBLIC_APPLE_MUSIC_ENABLED === "true",
+};
+
+let configPromise: Promise<DspRuntimeConfig> | null = null;
+
+/** Fetch the live DSP config once per session (force to re-check). */
+export function loadDspConfig(force = false): Promise<DspRuntimeConfig> {
+  if (typeof window === "undefined") return Promise.resolve(BUILD_TIME_CONFIG);
+  if (!force && configPromise) return configPromise;
+  configPromise = fetch("/api/dsp-config", { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : BUILD_TIME_CONFIG))
+    .then((c: Partial<DspRuntimeConfig>) => ({
+      spotifyClientId: c.spotifyClientId || BUILD_TIME_CONFIG.spotifyClientId,
+      googleClientId: c.googleClientId || BUILD_TIME_CONFIG.googleClientId,
+      appleEnabled: c.appleEnabled ?? BUILD_TIME_CONFIG.appleEnabled,
+    }))
+    .catch(() => BUILD_TIME_CONFIG);
+  return configPromise;
+}
+
+// ── OAuth failure messages (survive the redirect round-trip) ──────
+// A failed consent/token exchange happens on a fresh page load, so the error
+// is stashed in storage; the next createPlaylist() attempt surfaces it instead
+// of silently bouncing the user back to the authorize screen forever.
+const AUTH_ERROR_PREFIX = "pulsar_dsp_auth_error_";
+
+export function setAuthError(provider: string, message: string) {
+  try {
+    sessionStorage.setItem(AUTH_ERROR_PREFIX + provider, message);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Read-and-clear: an error should be shown exactly once. */
+export function takeAuthError(provider: string): string | null {
+  try {
+    const v = sessionStorage.getItem(AUTH_ERROR_PREFIX + provider);
+    if (v) sessionStorage.removeItem(AUTH_ERROR_PREFIX + provider);
+    return v;
+  } catch {
+    return null;
+  }
+}
+
 // ── PKCE helpers (Spotify, Tidal) ───────────────────────────────
 export function randomString(len: number): string {
   const bytes = new Uint8Array(len);

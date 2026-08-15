@@ -18,7 +18,10 @@ declare global {
   }
 }
 
-const ENABLED = process.env.NEXT_PUBLIC_APPLE_MUSIC_ENABLED === "true";
+let ENABLED = process.env.NEXT_PUBLIC_APPLE_MUSIC_ENABLED === "true";
+export function setAppleEnabled(v: boolean) {
+  ENABLED = v;
+}
 const MUSICKIT_SRC = "https://js-cdn.music.apple.com/musickit/v3/musickit.js";
 
 let musicKitReady: Promise<any> | null = null;

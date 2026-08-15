@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, X, Trash2, Sparkles, Shuffle, Play, Share2, Upload, Plus, Pencil } from "lucide-react";
+import { Heart, X, Trash2, Sparkles, Shuffle, Play, Share2, Upload, Plus, Pencil, Copy } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";
 import type { MediaFormat } from "@/lib/format";
@@ -28,6 +28,7 @@ import { PlaylistBuildOverlay } from "./PlaylistBuildOverlay";
 import {
   exportCrate,
   handleDspRedirect,
+  ensureDspConfig,
   providerConfigured,
   disconnectProvider,
   type BuildResult,
@@ -71,6 +72,9 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   // Crate → playlist export sheet.
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  // Bumped whenever the runtime DSP config is (re)fetched, so providerConfigured
+  // re-evaluates and the export sheet's "Creates playlist" badges update.
+  const [cfgTick, setCfgTick] = useState(0);
   // Live playlist build: progress + success card.
   const [building, setBuilding] = useState<{
     done: number;
@@ -87,6 +91,17 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   // Hide the floating dock while the album/tracklist panel is open so it never
   // covers the tracklist's text/icons (especially on mobile).
   const [detailOpen, setDetailOpen] = useState(false);
+
+  // Re-check the live DSP config each time the export sheet opens — a client
+  // id set in Vercel since page load should light up "Creates playlist" right
+  // away instead of after a redeploy. `key={cfgTick}` on the platform grid
+  // forces the badges to re-render with the fresh values.
+  useEffect(() => {
+    if (!exporting) return;
+    ensureDspConfig(true)
+      .then(() => setCfgTick((t) => t + 1))
+      .catch(() => {});
+  }, [exporting]);
 
   const flash = (msg: string) => {
     setToast(msg);
@@ -107,6 +122,11 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   // playlist build that was pending before we redirected.
   useEffect(() => {
     (async () => {
+      // Pull live DSP client config first so providerConfigured() (used all
+      // over the export sheet) reflects the server's current env, not just the
+      // build-time inlines.
+      await ensureDspConfig().catch(() => {});
+      setCfgTick((t) => t + 1);
       const pending = await handleDspRedirect();
       if (!pending) return;
       const plat = PLATFORMS.find((p) => p.key === pending.provider);
@@ -545,7 +565,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                           </>
                         )}
                       </p>
-                      <div className="mt-3 grid grid-cols-1 gap-1.5">
+                      <div className="mt-3 grid grid-cols-1 gap-1.5" key={cfgTick}>
                         {PLATFORMS.map((p) => {
                           const live = providerConfigured(p.key);
                           return (
@@ -593,6 +613,58 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                           Download CSV
                         </button>
                       </div>
+
+                      {/* ── connection doctor ───────────────────────────
+                          When real playlist creation isn't live for Spotify,
+                          show the exact Redirect URI to register (with a copy
+                          button) — the two things the dashboard needs, right
+                          where the user is stuck. */}
+                      {!providerConfigured("spotify") && (
+                        <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-star-white/55">
+                            Turn on 1-tap Spotify playlists
+                          </p>
+                          <ol className="mt-1.5 list-decimal space-y-0.5 pl-4 text-[10px] leading-relaxed text-star-white/40">
+                            <li>
+                              Create an app at{" "}
+                              <a
+                                href="https://developer.spotify.com/dashboard"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[#1DB954] underline decoration-dotted underline-offset-2"
+                              >
+                                developer.spotify.com
+                              </a>{" "}
+                              and copy its Client ID into this deployment&apos;s{" "}
+                              <span className="font-mono text-star-white/60">SPOTIFY_CLIENT_ID</span>{" "}
+                              env var.
+                            </li>
+                            <li>
+                              Under the app&apos;s Settings, add this exact Redirect URI
+                              (trailing slash included):
+                            </li>
+                          </ol>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard
+                                ?.writeText(`${window.location.origin}/`)
+                                .then(() => flash("Redirect URI copied"))
+                                .catch(() => {});
+                            }}
+                            className="mt-2 flex w-full items-center gap-2 overflow-hidden rounded-lg border border-white/12 bg-white/[0.04] px-2.5 py-2 text-left transition-colors hover:border-white/25"
+                          >
+                            <Copy size={11} className="flex-shrink-0 text-star-white/50" />
+                            <span className="truncate font-mono text-[10px] text-star-white/75">
+                              {typeof window !== "undefined" ? `${window.location.origin}/` : "/"}
+                            </span>
+                          </button>
+                          <p className="mt-2 text-[9px] leading-relaxed text-star-white/35">
+                            Env changes are picked up live — no redeploy needed. While the app is
+                            in Development mode, also add your Spotify account under Users &amp;
+                            Access.
+                          </p>
+                        </div>
+                      )}
                     </motion.div>
                   </>
                 )}

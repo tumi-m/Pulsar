@@ -35,10 +35,11 @@ If a field has nothing, return an empty array. Never invent fields.`;
 export async function POST(req: NextRequest) {
   const { prompt } = (await req.json().catch(() => ({}))) as { prompt?: string };
   const text = (prompt ?? "").trim().slice(0, 500);
-  if (!text) return NextResponse.json({ moods: [], genres: [], decades: [], freeText: "" }, { headers: { "Cache-Control": "no-store" } });
+  const empty = { moods: [], genres: [], decades: [], freeText: "" };
+  if (!text) return NextResponse.json({ ...empty, source: "fallback" }, { headers: { "Cache-Control": "no-store" } });
   if (!BASE_URL || !API_KEY) {
     // No cloud model configured — caller falls back to keyword parsing.
-    return NextResponse.json({ moods: [], genres: [], decades: [], freeText: text }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ ...empty, freeText: text, source: "fallback" }, { headers: { "Cache-Control": "no-store" } });
   }
 
   try {
@@ -60,22 +61,29 @@ export async function POST(req: NextRequest) {
       }),
       signal: AbortSignal.timeout(20000),
     });
-    if (!res.ok) return NextResponse.json({ moods: [], genres: [], decades: [], freeText: text }, { headers: { "Cache-Control": "no-store" } });
+    if (!res.ok)
+      return NextResponse.json({ ...empty, freeText: text, source: "fallback" }, { headers: { "Cache-Control": "no-store" } });
     const data = await res.json();
     const raw = data?.message?.content;
     const match = typeof raw === "string" ? raw.match(/\{[\s\S]*\}/) : null;
-    if (!match) return NextResponse.json({ moods: [], genres: [], decades: [], freeText: text }, { headers: { "Cache-Control": "no-store" } });
+    if (!match)
+      return NextResponse.json({ ...empty, freeText: text, source: "fallback" }, { headers: { "Cache-Control": "no-store" } });
     const obj = JSON.parse(match[0]);
     const moods = (Array.isArray(obj.moods) ? obj.moods : []).filter((m: unknown) =>
       MOODS.includes(m as (typeof MOODS)[number])
     );
-    return NextResponse.json({
-      moods,
-      genres: Array.isArray(obj.genres) ? obj.genres.slice(0, 8) : [],
-      decades: (Array.isArray(obj.decades) ? obj.decades : []).filter((d: unknown) => /^\d{4}$/.test(String(d))),
-      freeText: typeof obj.freeText === "string" ? obj.freeText : text,
-    }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(
+      {
+        moods,
+        genres: Array.isArray(obj.genres) ? obj.genres.slice(0, 8) : [],
+        decades: (Array.isArray(obj.decades) ? obj.decades : []).filter((d: unknown) => /^\d{4}$/.test(String(d))),
+        freeText: typeof obj.freeText === "string" ? obj.freeText : text,
+        source: "llm",
+        model: MODEL,
+      },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch {
-    return NextResponse.json({ moods: [], genres: [], decades: [], freeText: text }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ ...empty, freeText: text, source: "fallback" }, { headers: { "Cache-Control": "no-store" } });
   }
 }

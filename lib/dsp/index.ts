@@ -11,6 +11,7 @@ import type { Release } from "../types";
 import {
   clearPending,
   clearToken,
+  loadDspConfig,
   readPending,
   savePending,
   type BuildResult,
@@ -18,15 +19,28 @@ import {
   type Pending,
   type ProgressFn,
 } from "./shared";
-import { spotifyProvider } from "./spotify";
-import { youtubeProvider } from "./youtube";
-import { appleProvider } from "./apple";
+import { spotifyProvider, setSpotifyClientId } from "./spotify";
+import { youtubeProvider, setGoogleClientId } from "./youtube";
+import { appleProvider, setAppleEnabled } from "./apple";
 
 const PROVIDERS: Record<string, DspProvider> = {
   [spotifyProvider.key]: spotifyProvider,
   [youtubeProvider.key]: youtubeProvider,
   [appleProvider.key]: appleProvider,
 };
+
+/**
+ * Pull the live DSP client configuration from the server and overlay it on the
+ * build-time NEXT_PUBLIC_* inlines. Call once on boot and whenever the export
+ * sheet opens — this is what makes a client id set in the Vercel dashboard
+ * take effect without redeploying.
+ */
+export async function ensureDspConfig(force = false): Promise<void> {
+  const cfg = await loadDspConfig(force);
+  setSpotifyClientId(cfg.spotifyClientId);
+  setGoogleClientId(cfg.googleClientId);
+  setAppleEnabled(cfg.appleEnabled);
+}
 
 /** Does this DSP support real, in-app playlist creation right now? */
 export function providerConfigured(key: string): boolean {
@@ -57,6 +71,9 @@ export async function exportCrate(
   releases: Release[],
   onProgress?: ProgressFn
 ): Promise<BuildResult | "redirecting"> {
+  // Make sure a client id set after the last deploy is in hand before
+  // redirecting out to a consent screen.
+  await ensureDspConfig();
   const provider = PROVIDERS[key];
   if (!provider) throw new Error(`No playlist provider for ${key}`);
   // Remember what we're building so we can resume after an OAuth redirect.

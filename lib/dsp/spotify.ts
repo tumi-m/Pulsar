@@ -9,18 +9,27 @@ import {
   base64url,
   clearToken,
   cleanUrl,
+  loadDspConfig,
   randomString,
   readToken,
   redirectUri,
   saveToken,
+  setAuthError,
   sha256,
   searchTerm,
+  takeAuthError,
   type BuildResult,
   type DspProvider,
   type ProgressFn,
 } from "./shared";
 
-const CLIENT_ID = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ?? "";
+// Start from the build-time inline; /api/dsp-config overlays the live server
+// value at runtime (see ensureDspConfig in ./index.ts) so a client id set in
+// Vercel works immediately — no redeploy, no INVALID_CLIENT screen.
+let CLIENT_ID = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ?? "";
+export function setSpotifyClientId(id: string) {
+  if (id) CLIENT_ID = id;
+}
 // `user-read-private` is REQUIRED: creating a playlist needs the user id from
 // GET /v1/me, and that endpoint answers 403 "Insufficient client scope" without
 // a user-read scope — even though the playlist scopes themselves are present.
@@ -103,6 +112,10 @@ function writeScopes(v: string) {
 }
 
 async function beginAuth() {
+  // If no client id was inlined at build time, pull the live one from the
+  // server before bouncing out to Spotify — otherwise the authorize screen
+  // can only answer INVALID_CLIENT.
+  if (!CLIENT_ID) setSpotifyClientId((await loadDspConfig()).spotifyClientId);
   const verifier = randomString(48);
   const challenge = base64url(await sha256(verifier));
   setVerifier(verifier);
@@ -239,6 +252,10 @@ export const spotifyProvider: DspProvider = {
     }
 
     if (!token) {
+      // A failed consent / token exchange leaves a specific diagnosis in
+      // storage — show that instead of bouncing straight back to Spotify.
+      const authErr = takeAuthError("spotify");
+      if (authErr) throw new Error(authErr);
       // Guard against a redirect loop: if we *just* came back from consent and
       // still have no token, something is misconfigured — surface it instead of
       // bouncing the user to Spotify again.
@@ -328,7 +345,24 @@ export const spotifyProvider: DspProvider = {
     // Always tidy the address bar, whatever the outcome.
     cleanUrl();
 
-    if (oauthError || !code || !verifier) {
+    if (oauthError) {
+      // The authorize endpoint names the problem; translate the common ones
+      // into what actually fixes them.
+      const msg =
+        oauthError === "redirect_uri_mismatch"
+          ? "Spotify rejected the sign-in: the Redirect URI registered in your Spotify " +
+            "developer dashboard doesn't match this site exactly. Open the dashboard, edit " +
+            `the app's settings, and add ${redirectUri()} — including the trailing slash — as a Redirect URI.`
+          : oauthError === "invalid_client"
+            ? "Spotify doesn't recognize this app's Client ID. Re-copy it from the app's page " +
+              "in the Spotify developer dashboard into your deployment's SPOTIFY_CLIENT_ID."
+            : `Spotify sign-in was refused ("${oauthError}"). If you denied consent, just try again.`;
+      setAuthError("spotify", msg);
+      clearVerifier();
+      return false;
+    }
+
+    if (!code || !verifier) {
       clearVerifier();
       return false;
     }
@@ -349,7 +383,32 @@ export const spotifyProvider: DspProvider = {
           code_verifier: verifier,
         }),
       });
-      if (!res.ok) return false;
+      if (!res.ok) {
+        // The token endpoint names the failure. Map the two that matter to the
+        // exact fix; anything else gets a general but honest message.
+        let reason = "";
+        try {
+          reason = (await res.json())?.error ?? "";
+        } catch {
+          /* no body */
+        }
+        setAuthError(
+          "spotify",
+          reason === "invalid_client"
+            ? "Spotify doesn't recognize this app's Client ID. Re-copy it from the app's page " +
+              "in the Spotify developer dashboard into your deployment's SPOTIFY_CLIENT_ID " +
+              "(then reconnect — no redeploy needed)."
+            : reason === "invalid_grant"
+              ? "Spotify couldn't finish the sign-in (the one-time code was already spent or " +
+                "expired). Most often this means the Redirect URI in the dashboard isn't an " +
+                `exact match for ${redirectUri()} — check the trailing slash — then reconnect.`
+              : `Spotify's token endpoint refused the sign-in (${reason || res.status}). ` +
+                "Check the app's Client ID and Redirect URI in the developer dashboard, then reconnect."
+        );
+        clearVerifier();
+        safeRemove(JUST_AUTHED);
+        return false;
+      }
       const data = await res.json();
       if (!data?.access_token) return false;
       saveToken("spotify", data.access_token, data.expires_in ?? 3600);
