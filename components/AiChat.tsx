@@ -614,26 +614,26 @@ function TurnBlock({
               return (
                 <div
                   key={r.id}
-                  className="group flex items-center gap-2.5 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-2 pr-2.5 transition-colors hover:border-white/15 hover:bg-white/[0.06]"
+                  className="group flex items-center gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3 pr-3.5 transition-colors hover:border-white/15 hover:bg-white/[0.06]"
                 >
                   <button
                     onClick={() => player.play(r)}
                     aria-label={`Play ${r.title}`}
-                    className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-xl"
+                    className="relative h-[88px] w-[88px] flex-shrink-0 overflow-hidden rounded-xl"
                   >
-                    <Artwork src={r.artwork_url} artist={r.artist} title={r.title} sizes="44px" />
+                    <Artwork src={r.artwork_url} artist={r.artist} title={r.title} sizes="88px" />
                     <span className="absolute inset-0 flex items-center justify-center bg-void/60 opacity-0 transition-opacity group-hover:opacity-100">
-                      <Play size={14} className="ml-0.5 text-star-white" fill="currentColor" />
+                      <Play size={24} className="ml-0.5 text-star-white" fill="currentColor" />
                     </span>
                   </button>
                   <div className="min-w-0 flex-1">
-                    <p className={`truncate text-[13px] font-bold leading-tight ${isThis ? "text-neon-blue" : "text-star-white"}`}>
+                    <p className={`truncate text-[17px] font-bold leading-tight ${isThis ? "text-neon-blue" : "text-star-white"}`}>
                       {r.title}
                     </p>
-                    <p className="truncate text-[11px] text-star-white/50">{r.artist}</p>
+                    <p className="truncate text-[13px] text-star-white/50">{r.artist}</p>
                   </div>
                   {/* one-tap deep links to each streaming service */}
-                  <div className="flex flex-shrink-0 items-center gap-1">
+                  <div className="flex flex-shrink-0 items-center gap-1.5">
                     {links.map((p) => (
                       <a
                         key={p.key}
@@ -642,7 +642,7 @@ function TurnBlock({
                         rel="noopener noreferrer"
                         title={`Open on ${p.label}`}
                         aria-label={`Open ${r.title} on ${p.label}`}
-                        className="flex h-7 w-7 items-center justify-center rounded-full border transition-transform hover:scale-110"
+                        className="flex h-9 w-9 items-center justify-center rounded-full border transition-transform hover:scale-110 [&>svg]:h-[18px] [&>svg]:w-[18px]"
                         style={{ backgroundColor: `${p.color}1f`, borderColor: `${p.color}45`, color: p.color }}
                       >
                         <p.Icon />
@@ -694,9 +694,9 @@ function CrateToggle({ release }: { release: Release }) {
     <button
       onClick={() => window.dispatchEvent(new CustomEvent("pulsar-crate-picker", { detail: release }))}
       aria-label="Add to a crate"
-      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-star-white/20 text-star-white/70 hover:border-white/50"
+      className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-star-white/20 text-star-white/70 hover:border-white/50"
     >
-      <CrateIcon size={15} filled={inList} className="text-[#c08a4e]" />
+      <CrateIcon size={18} filled={inList} className="text-[#c08a4e]" />
     </button>
   );
 }
