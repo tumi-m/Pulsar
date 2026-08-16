@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { SampleRef, RelationRole } from "../route";
+import { traceChains } from "@/lib/samples-graph";
 
 export const runtime = "nodejs";
 
@@ -7,12 +8,14 @@ export const runtime = "nodejs";
  * GET /api/samples/chain?artist=...&title=...
  *
  * Trace a song's sample DNA backwards through time: "this samples X, which
- * samples Y, which samples Z…" — the deep ancestry WhoSampled shows as a
- * flat list, but is really a tree. We walk up to 4 levels deep, breadth-first,
- * so a user can see the FULL lineage of a track in one call.
+ * samples Y, which samples Z…"
  *
- * Each node carries its level (0 = the song itself, 1 = direct sample, …) and
- * the parent it was reached from, so the UI can render it as a graph.
+ * Two sources, merged:
+ *   1. The curated catalog graph (instant, offline, hand-checked chains —
+ *      e.g. Stronger → Harder Better Faster Stronger → Cola Bottle Baby).
+ *   2. A MusicBrainz BFS walk, which can extend the chain with connections
+ *      the catalog doesn't have. Already-known songs are deduped, with the
+ *      edge still recorded so the graph stays connected.
  */
 
 const UA = "Pulsar/1.0 ( https://pulsar-ten-sigma.vercel.app )";
@@ -26,6 +29,7 @@ interface ChainNode {
   parentId: string | null;
   role: RelationRole;  // how the parent relates to this node
 }
+
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function creditToName(credit: any[]): string | null {
@@ -97,16 +101,36 @@ export async function GET(req: NextRequest) {
   const MAX_DEPTH = 4;
   const nodes: ChainNode[] = [];
   const edges: { from: string; to: string; role: RelationRole }[] = [];
-  const visited = new Set<string>(); // dedupe by normalised artist::title
+  const idByKey = new Map<string, string>();
+  const keyOf = (a: string, t: string) => `${norm(a)}::${norm(t)}`;
 
-  const rootId = "n0";
-  nodes.push({ id: rootId, artist, title, year: null, level: 0, parentId: null, role: "samples" });
-  visited.add(`${norm(artist)}::${norm(title)}`);
+  // ── 1. Seed with the curated catalog graph — instant, offline, hand-checked.
+  const cat = traceChains(artist, title, 3);
+  for (const n of cat.nodes) {
+    idByKey.set(keyOf(n.artist, n.title), n.id);
+    nodes.push({
+      id: n.id,
+      artist: n.artist,
+      title: n.title,
+      year: n.year,
+      level: n.level,
+      parentId: n.parentId,
+      role: "samples",
+    });
+  }
+  for (const e of cat.edges) edges.push({ from: e.from, to: e.to, role: "samples" });
 
-  // Breadth-first traversal up the sample tree.
+  const rootId = cat.nodes[0]?.id ?? "n0";
+  if (!cat.nodes.length) {
+    nodes.push({ id: rootId, artist, title, year: null, level: 0, parentId: null, role: "samples" });
+    idByKey.set(keyOf(artist, title), rootId);
+  }
+
+  // ── 2. Extend with a MusicBrainz BFS walk from the root. ────────────────
   let frontier: ChainNode[] = [nodes[0]];
-  let counter = 1;
-  for (let depth = 1; depth <= MAX_DEPTH; depth++) {
+  let counter = nodes.length;
+  const rootLevel = nodes[0].level;
+  for (let depth = rootLevel + 1; depth <= MAX_DEPTH; depth++) {
     if (frontier.length === 0) break;
     const next: ChainNode[] = [];
     // Bound the fan-out so a prolific track doesn't explode the graph.
@@ -118,15 +142,14 @@ export async function GET(req: NextRequest) {
         const parents = await samplesOf(node.artist, node.title);
         for (const p of parents.slice(0, 5)) {
           const key = `${norm(p.artist ?? "")}::${norm(p.title)}`;
-          if (visited.has(key)) {
-            // Already seen — still record the edge so the graph is connected.
-            const existing = nodes.find(
- (n) => `${norm(n.artist)}::${norm(n.title)}` === key
-            );
-            if (existing) edges.push({ from: node.id, to: existing.id, role: "samples" });
+          const existingId = idByKey.get(key);
+          if (existingId) {
+            // Already in the graph (usually via the catalog) - still connect.
+            if (!edges.some((e) => e.from === node.id && e.to === existingId)) {
+              edges.push({ from: node.id, to: existingId, role: "samples" });
+            }
             continue;
           }
-          visited.add(key);
           const id = `n${counter++}`;
           const child: ChainNode = {
             id,
@@ -138,6 +161,7 @@ export async function GET(req: NextRequest) {
             role: "samples",
           };
           nodes.push(child);
+          idByKey.set(key, id);
           edges.push({ from: node.id, to: id, role: "samples" });
           next.push(child);
         }
