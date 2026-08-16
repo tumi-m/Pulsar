@@ -903,6 +903,7 @@ export const CATALOG_DATA = RELEASES;
 
 import { EXPANSION } from "./catalog-expansion";
 import { EXPANSION2 } from "./catalog-expansion-2";
+import { EXPANSION3 } from "./catalog-expansion-3";
 import { CHILLWAVE } from "./catalog-chillwave";
 import { labelFor } from "./labels";
 
@@ -931,7 +932,7 @@ const dedupeKey = (r: Release) =>
   `${r.artist.toLowerCase().replace(/^the\s+/, "")}::${r.title.toLowerCase()}`;
 
 const seenKeys = new Set<string>();
-export const CATALOG: Release[] = [...CHILLWAVE, ...EXPANSION, ...EXPANSION2, ...CORE]
+export const CATALOG: Release[] = [...CHILLWAVE, ...EXPANSION, ...EXPANSION2, ...EXPANSION3, ...CORE]
   .filter((r) => {
     const k = dedupeKey(r);
     if (seenKeys.has(k)) return false;

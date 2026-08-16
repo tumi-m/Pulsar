@@ -209,7 +209,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
   const [tracksLoading, setTracksLoading] = useState(false);
   const [tracksOpen, setTracksOpen] = useState(true);
   const [origDate, setOrigDate] = useState<string | null>(null);
-  const [visualMode, setVisualMode] = useState<VisualMode>("bars");
+  const [visualMode, setVisualMode] = useState<VisualMode>("video");
   // The visualiser stays OFF until the user taps the Visualise button.
   const [showVisual, setShowVisual] = useState(false);
   useEffect(() => setShowVisual(false), [release]);

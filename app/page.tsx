@@ -94,7 +94,7 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen">
-      <HeroSection totalReleases={gridReleases.length} totalToday={freshCount} />
+      <HeroSection totalToday={freshCount} />
 
       <section className="pb-20">
         <ReleaseGrid releases={gridReleases} />

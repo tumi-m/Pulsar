@@ -20,8 +20,9 @@ export type VisualMode =
   | "art"
   | "video";
 
-// Classic media-player visualisations first — each one looks clearly different.
+// Video leads — it's the marquee mode; classic media-player visualisations follow.
 export const VISUAL_MODES: { id: VisualMode; label: string }[] = [
+  { id: "video", label: "Video" },
   { id: "bars", label: "Bars" },
   { id: "waves", label: "Waves" },
   { id: "tunnel", label: "Tunnel" },
@@ -31,7 +32,6 @@ export const VISUAL_MODES: { id: VisualMode; label: string }[] = [
   { id: "ambience", label: "Ambience" },
   { id: "silhouette", label: "Kaleido" },
   { id: "art", label: "Cover" },
-  { id: "video", label: "Video" },
 ];
 
 const WMP_MODES: Record<string, WmpMode> = {

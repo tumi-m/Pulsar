@@ -5,7 +5,6 @@ import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 
 interface HeroSectionProps {
-  totalReleases: number;
   totalToday: number;
 }
 
@@ -34,7 +33,7 @@ function useCountUp(n: number, duration = 1000) {
  * rotating feature reel) floats in the reserved space below, so the header and
  * search read as one cohesive unit with no overlap.
  */
-export function HeroSection({ totalReleases, totalToday }: HeroSectionProps) {
+export function HeroSection({ totalToday }: HeroSectionProps) {
   // When the album/tracklist panel opens (right half), re-center the Pulsar
   // letterhead over the visible left half.
   const [detailOpen, setDetailOpen] = useState(false);
@@ -50,7 +49,6 @@ export function HeroSection({ totalReleases, totalToday }: HeroSectionProps) {
     };
   }, []);
 
-  const counted = useCountUp(totalReleases);
   const countedToday = useCountUp(totalToday, 700);
 
   // Fibonacci spacing above; the generous bottom padding reserves room for the
@@ -86,25 +84,13 @@ export function HeroSection({ totalReleases, totalToday }: HeroSectionProps) {
       </motion.p>
 
       {/* Live catalog stats — the daily growth made visible */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.55, duration: 0.8 }}
-        className="mx-auto mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-3"
-      >
-        <div className="flex items-baseline gap-2">
-          <span
-            className="font-mono text-2xl font-bold tabular-nums text-star-white md:text-3xl"
-            style={{ textShadow: "0 0 24px rgba(155,93,229,0.45)" }}
-          >
-            {counted.toLocaleString()}
-          </span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-star-white/40">
-            releases
-          </span>
-        </div>
-
-        {totalToday > 0 && (
+      {totalToday > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.55, duration: 0.8 }}
+          className="mx-auto mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-3"
+        >
           <div className="flex items-center gap-2">
             <span
               className="inline-flex items-center gap-1.5 rounded-full border border-neon-violet/40 bg-neon-violet/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-neon-violet"
@@ -114,8 +100,8 @@ export function HeroSection({ totalReleases, totalToday }: HeroSectionProps) {
               {countedToday} fresh today
             </span>
           </div>
-        )}
-      </motion.div>
+        </motion.div>
+      )}
     </section>
   );
 }
