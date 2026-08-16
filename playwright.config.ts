@@ -43,7 +43,7 @@ export default defineConfig({
     // feed payload that truncates the CATALOG payload and breaks the
     // "Beatles" search assertion. Wiping .next/cache/fetch makes the e2e
     // run deterministic: only fetch-mock data is ever served.
-    command: "node -e \"require('fs').rmSync('.next/cache/fetch',{recursive:true,force:true})\" && npm run dev",
+    command: "node -e \"require('fs').rmSync('.next/cache',{recursive:true,force:true})\" && npm run dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
