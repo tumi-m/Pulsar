@@ -1,74 +1,27 @@
 "use client";
 
-import { Suspense, useMemo, useRef, useState, useEffect } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { AdaptiveDpr, PerformanceMonitor } from "@react-three/drei";
-import * as THREE from "three";
 import { probeCapabilities, type Capabilities } from "@/lib/capabilities";
 import { PerfHarness, type PerfSample } from "@/lib/perf-harness";
+import { Observatory } from "@/components/three/Observatory";
 
 /**
- * Experience3D — P0 foundation.
+ * Experience3D — capability-gated R3F canvas (P0 scaffold, P1 content).
  *
- * A capability-gated R3F canvas. On unsupported/reduced-motion devices it
- * renders `fallback` (the accessible 2D baseline) instead. Adaptive DPR +
- * PerformanceMonitor keep it inside the frame budget. The starfield here
- * is a proof-of-life; later phases replace `<Scene/>` with real set-pieces.
+ * On unsupported/reduced-motion devices it renders `fallback` (the
+ * accessible 2D baseline) instead. While the probe resolves (and inside
+ * Suspense) it shows `loader` — a designed title event, never a spinner.
+ * Adaptive DPR + PerformanceMonitor keep it inside the frame budget.
  */
 
 interface Experience3DProps {
   fallback: React.ReactNode;
+  /** designed loading state (e.g. <BassLoader/>) */
+  loader?: React.ReactNode;
   /** surface perf samples (e.g. a dev HUD) */
   onPerf?: (s: PerfSample) => void;
-}
-
-function Starfield({ count = 2600 }: { count?: number }) {
-  const pointsRef = useRef<THREE.Points>(null);
-
-  const geometry = useMemo(() => {
-    const positions = new Float32Array(count * 3);
-    const colors = new Float32Array(count * 3);
-    const c = new THREE.Color();
-    for (let i = 0; i < count; i++) {
-      // distribute in a deep shell around the camera
-      const r = 6 + Math.random() * 26;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-      positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      positions[i * 3 + 2] = r * Math.cos(phi);
-      // cosmic palette: violet → ion blue → near-white
-      c.setHSL(0.62 + Math.random() * 0.12, 0.55, 0.6 + Math.random() * 0.35);
-      colors[i * 3] = c.r;
-      colors[i * 3 + 1] = c.g;
-      colors[i * 3 + 2] = c.b;
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-    return g;
-  }, [count]);
-
-  useFrame((_, delta) => {
-    if (pointsRef.current) {
-      pointsRef.current.rotation.y += delta * 0.02;
-      pointsRef.current.rotation.x += delta * 0.006;
-    }
-  });
-
-  return (
-    <points ref={pointsRef} geometry={geometry}>
-      <pointsMaterial
-        size={0.05}
-        vertexColors
-        transparent
-        opacity={0.9}
-        sizeAttenuation
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-      />
-    </points>
-  );
 }
 
 function PerfBridge({ onPerf }: { onPerf?: (s: PerfSample) => void }) {
@@ -79,19 +32,7 @@ function PerfBridge({ onPerf }: { onPerf?: (s: PerfSample) => void }) {
   return null;
 }
 
-function Scene({ onPerf }: { onPerf?: (s: PerfSample) => void }) {
-  return (
-    <>
-      <color attach="background" args={["#04040a"]} />
-      <fog attach="fog" args={["#04040a", 12, 34]} />
-      <ambientLight intensity={0.4} />
-      <Starfield />
-      <PerfBridge onPerf={onPerf} />
-    </>
-  );
-}
-
-export function Experience3D({ fallback, onPerf }: Experience3DProps) {
+export function Experience3D({ fallback, loader, onPerf }: Experience3DProps) {
   const [caps, setCaps] = useState<Capabilities | null>(null);
   const [dpr, setDpr] = useState(1.5);
 
@@ -99,8 +40,8 @@ export function Experience3D({ fallback, onPerf }: Experience3DProps) {
     setCaps(probeCapabilities());
   }, []);
 
-  // Before probe resolves (SSR / first paint) show the accessible baseline.
-  if (!caps) return <>{fallback}</>;
+  // Before probe resolves (SSR / first paint) show the designed loader.
+  if (!caps) return <>{loader ?? fallback}</>;
   if (!caps.enable3D) return <>{fallback}</>;
 
   return (
@@ -116,9 +57,11 @@ export function Experience3D({ fallback, onPerf }: Experience3DProps) {
         />
         <AdaptiveDpr pixelated />
         <Suspense fallback={null}>
-          <Scene onPerf={onPerf} />
+          <Observatory reducedMotion={caps.reducedMotion} />
+          <PerfBridge onPerf={onPerf} />
         </Suspense>
       </Canvas>
     </div>
   );
 }
+
