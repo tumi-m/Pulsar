@@ -1,4 +1,4 @@
-import { getTodaysReleases, getReleases } from "@/lib/supabase";
+import { getReleases } from "@/lib/supabase";
 import { getLiveFeed } from "@/lib/feed";
 import { HeroSection } from "@/components/HeroSection";
 import { ReleaseGrid } from "@/components/ReleaseGrid";
@@ -41,16 +41,14 @@ function mergeReleases(...sources: Release[][]): Release[] {
 }
 
 async function getPageData(): Promise<{
-  todaysReleases: Release[];
   liveFeed: Release[];
   dbReleases: Release[];
 }> {
-  const [todaysReleases, dbReleases, liveFeed] = await Promise.all([
-    getTodaysReleases().catch(() => [] as Release[]),
+  const [dbReleases, liveFeed] = await Promise.all([
     getReleases({ limit: 300 }).catch(() => [] as Release[]),
     getLiveFeed().catch(() => [] as Release[]),
   ]);
-  return { todaysReleases, dbReleases, liveFeed };
+  return { dbReleases, liveFeed };
 }
 
 /**
@@ -71,7 +69,7 @@ async function getPageData(): Promise<{
 const MAX_CLIENT_RELEASES = 2000;
 
 export default async function HomePage() {
-  const { todaysReleases, dbReleases, liveFeed } = await getPageData();
+  const { dbReleases, liveFeed } = await getPageData();
 
   // Priority: Supabase releases → live feed → built-in catalog.
   // The site always shows a large, fresh grid — with or without config.
@@ -85,16 +83,9 @@ export default async function HomePage() {
     );
   }
 
-  // "New today" counts genuine last-24h drops from DB + live feed.
-  const today = new Date().toISOString().split("T")[0];
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
-  const freshCount = mergeReleases(todaysReleases, liveFeed).filter(
-    (r) => r.release_date === today || r.release_date === yesterday
-  ).length;
-
   return (
     <div className="min-h-screen">
-      <HeroSection totalToday={freshCount} />
+      <HeroSection />
 
       <section className="pb-20">
         <ReleaseGrid releases={gridReleases} />

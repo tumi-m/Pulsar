@@ -1,39 +1,14 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
-
-interface HeroSectionProps {
-  totalToday: number;
-}
-
-/** Count up to `n` over ~1s once the hero mounts, so the catalog size feels alive. */
-function useCountUp(n: number, duration = 1000) {
-  const [val, setVal] = useState(0);
-  const raf = useRef<number>(0);
-  useEffect(() => {
-    if (n <= 0) return;
-    const start = performance.now();
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / duration);
-      // easeOutExpo for a snappy settle
-      const eased = t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
-      setVal(Math.round(eased * n));
-      if (t < 1) raf.current = requestAnimationFrame(tick);
-    };
-    raf.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf.current);
-  }, [n, duration]);
-  return val;
-}
 
 /**
  * The Pulsar letterhead. Kept deliberately compact — the search bar (with its
  * rotating feature reel) floats in the reserved space below, so the header and
  * search read as one cohesive unit with no overlap.
  */
-export function HeroSection({ totalToday }: HeroSectionProps) {
+export function HeroSection() {
   // When the album/tracklist panel opens (right half), re-center the Pulsar
   // letterhead over the visible left half.
   const [detailOpen, setDetailOpen] = useState(false);
@@ -48,8 +23,6 @@ export function HeroSection({ totalToday }: HeroSectionProps) {
       window.removeEventListener("pulsar-samples-open", onSamples);
     };
   }, []);
-
-  const countedToday = useCountUp(totalToday, 700);
 
   // Fibonacci spacing above; the generous bottom padding reserves room for the
   // floating search bar + feature reel so the grid always starts below them.
@@ -82,26 +55,6 @@ export function HeroSection({ totalToday }: HeroSectionProps) {
       >
         Music discovery
       </motion.p>
-
-      {/* Live catalog stats — the daily growth made visible */}
-      {totalToday > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.55, duration: 0.8 }}
-          className="mx-auto mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-3"
-        >
-          <div className="flex items-center gap-2">
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full border border-neon-violet/40 bg-neon-violet/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-neon-violet"
-              style={{ boxShadow: "0 0 20px rgba(155,93,229,0.25)" }}
-            >
-              <Sparkles size={11} />
-              {countedToday} fresh today
-            </span>
-          </div>
-        </motion.div>
-      )}
     </section>
   );
 }
