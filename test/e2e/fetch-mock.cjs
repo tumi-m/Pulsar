@@ -23,6 +23,9 @@
     artistName: "The Beatles",
     collectionName: PEPPER,
     releaseDate: "1967-06-01T00:00:00Z",
+    // Real-looking CDN path (host matches next.config remotePatterns); served
+    // as a PNG by the image branch below so /api/artwork can stream it offline.
+    artworkUrl100: "https://is1-ssl.mzstatic.com/image/thumb/Music1001/lp.jpg/1200x1200bb.jpg",
   };
   const ITUNES_TRACKS = [
     { wrapperType: "track", kind: "song", trackNumber: 1, trackName: "Sgt. Pepper's Lonely Hearts Club Band", trackTimeMillis: 122000, previewUrl: null },
@@ -52,6 +55,31 @@
     // iTunes lookup → the tracklist for our canned album id.
     if (url && url.startsWith("https://itunes.apple.com/lookup")) {
       return json({ resultCount: ITUNES_TRACKS.length, results: ITUNES_TRACKS });
+    }
+
+    // Image CDNs (Wikipedia covers, Apple/Spotify/Deezer art, Cover Art
+    // Archive…). next/image's optimizer fetches these server-side; returning
+    // empty JSON here makes every cover 500 → the Artwork component cascades
+    // to its letter-tile fallback, which renders NO <img> — e2e assertions on
+    // "main img" then see zero tiles. Serve a valid 1×1 PNG instead so the
+    // optimizer succeeds and the grid keeps real <img> elements, fully offline.
+    const PNG_1X1 = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "base64"
+    );
+    const IMAGE_HOST =
+      /(^|\.)((upload\.)?wikimedia\.org|mzstatic\.com|scdn\.co|cloudfront\.net|supabase\.co|bcbits\.com|ytimg\.com|dzcdn\.net|coverartarchive\.org|archive\.org)$/i;
+    let host = null;
+    try {
+      host = new URL(url).hostname;
+    } catch {
+      host = null;
+    }
+    if (host && IMAGE_HOST.test(host)) {
+      return new Response(PNG_1X1, {
+        status: 200,
+        headers: { "content-type": "image/png", "cache-control": "public, max-age=3600" },
+      });
     }
 
     // Every other external DSP / feed endpoint (Deezer, Apple RSS, MusicBrainz,

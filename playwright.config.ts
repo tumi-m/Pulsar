@@ -18,8 +18,16 @@ export default defineConfig({
     screenshot: "only-on-failure",
     // Devcontainers/CI images often mount a tiny 64MB /dev/shm, which makes
     // Chromium tabs crash ("Target crashed"). Force off-heap temp storage.
+    // Also disable the GPU process + force SwiftShader software WebGL: the
+    // release-detail sheet mounts a three.js canvas, and hardware GL paths
+    // crash the renderer ("Page crashed") in GPU-less containers.
     launchOptions: {
-      args: ["--disable-dev-shm-usage"],
+      args: [
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--use-angle=swiftshader",
+        "--enable-unsafe-swiftshader",
+      ],
     },
   },
   projects: [
