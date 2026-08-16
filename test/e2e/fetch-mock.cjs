@@ -48,9 +48,30 @@
       return real(input, init);
     }
 
-    // iTunes album search → one matching album.
+    // iTunes album search → one album that ECHOES the query term back as both
+    // artist and title. /api/artwork (and friends) match strictly on BOTH
+    // artist and title before trusting a result, so a single canned album
+    // 404s every other cover and the grid loses its <img> elements. Echoing
+    // the term satisfies the strict matchers for any release, and the CDN
+    // artwork URL below is served as a 1×1 PNG by the image branch.
     if (url && url.startsWith("https://itunes.apple.com/search")) {
-      return json({ resultCount: 1, results: [ITUNES_ALBUM] });
+      let term = "";
+      try {
+        term = decodeURIComponent(new URL(url).searchParams.get("term") ?? "");
+      } catch {
+        term = "";
+      }
+      const echoed = term || `${ITUNES_ALBUM.artistName} ${PEPPER}`;
+      return json({
+        resultCount: 1,
+        results: [
+          {
+            ...ITUNES_ALBUM,
+            artistName: echoed,
+            collectionName: echoed,
+          },
+        ],
+      });
     }
     // iTunes lookup → the tracklist for our canned album id.
     if (url && url.startsWith("https://itunes.apple.com/lookup")) {

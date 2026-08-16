@@ -34,7 +34,16 @@ export default defineConfig({
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
   ],
   webServer: {
-    command: "npm run dev",
+    // Boot the dev server with a CLEAN data cache: the CI job runs an
+    // unmocked `npm run build` first, and that build persists real
+    // Deezer/Apple feed responses into .next/cache/fetch with long
+    // revalidate windows (up to 30 days for some routes). The mocked dev
+    // server would serve those cached REAL responses without ever calling
+    // fetch, so a lucky CI runner (network-wise) could ship a ~2000-release
+    // feed payload that truncates the CATALOG payload and breaks the
+    // "Beatles" search assertion. Wiping .next/cache/fetch makes the e2e
+    // run deterministic: only fetch-mock data is ever served.
+    command: "node -e \"require('fs').rmSync('.next/cache/fetch',{recursive:true,force:true})\" && npm run dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
