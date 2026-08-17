@@ -87,7 +87,7 @@ function buildList(releases: Release[], p: Parsed): Release[] {
   return scored
     .filter(({ s }) => s > 0)
     .sort((a, b) => b.s - a.s)
-    .slice(0, 40)
+    .slice(0, 80)
     .map(({ r }) => r);
 }
 
@@ -381,7 +381,7 @@ export function AiChat({ releases }: AiChatProps) {
               /* ── the selector room: a real conversation ── */
               <>
                 {/* masthead */}
-                <div className="relative z-10 flex items-center justify-between gap-2 border-b border-white/8 px-4 py-3 sm:px-5">
+                <div className="relative z-10 flex items-center justify-between gap-2 border-b border-white/[0.08] px-4 py-3 sm:px-5">
                   <div className="flex min-w-0 items-center gap-2.5">
                     <span
                       className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl"
@@ -463,7 +463,7 @@ export function AiChat({ releases }: AiChatProps) {
                           <button
                             key={s}
                             onClick={() => run(s)}
-                            className="rounded-full border border-star-white/12 px-3 py-1.5 text-[10px] text-star-white/55 transition-colors hover:border-neon-violet/50 hover:bg-neon-violet/10 hover:text-star-white"
+                            className="rounded-full border border-star-white/[0.12] px-3 py-1.5 text-[10px] text-star-white/55 transition-colors hover:border-neon-violet/50 hover:bg-neon-violet/10 hover:text-star-white"
                           >
                             {s}
                           </button>
@@ -501,8 +501,8 @@ export function AiChat({ releases }: AiChatProps) {
                 </div>
 
                 {/* composer */}
-                <div className="relative z-10 border-t border-white/8 p-3 sm:p-4">
-                  <div className="flex items-end gap-2 rounded-2xl border border-star-white/12 bg-star-white/[0.04] p-2 transition-colors focus-within:border-neon-violet/50">
+                <div className="relative z-10 border-t border-white/[0.08] p-3 sm:p-4">
+                  <div className="flex items-end gap-2 rounded-2xl border border-star-white/[0.12] bg-star-white/[0.04] p-2 transition-colors focus-within:border-neon-violet/50">
                     <textarea
                       value={text}
                       onChange={(e) => setText(e.target.value)}
@@ -563,8 +563,10 @@ function TurnBlock({
   current: ReturnType<typeof usePlayer>["current"];
   player: ReturnType<typeof usePlayer>;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const shown = expanded ? turn.results : turn.results.slice(0, 6);
+  // Start at 10 and grow in 10s, so a long list stays browsable
+  // instead of flipping between 6 and everything.
+  const [visible, setVisible] = useState(10);
+  const shown = turn.results.slice(0, visible);
   const chips = [
     ...turn.signals.moods.map((v) => ({ kind: "moods" as const, v, color: "rgba(155,93,229,0.5)" })),
     ...turn.signals.genres.map((v) => ({ kind: "genres" as const, v, color: "rgba(74,163,255,0.5)" })),
@@ -602,7 +604,7 @@ function TurnBlock({
       )}
 
       {turn.results.length === 0 ? (
-        <p className="rounded-2xl border border-white/8 bg-white/[0.03] px-3.5 py-3 text-[13px] text-star-white/50">
+        <p className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3 text-[13px] text-star-white/50">
           Nothing in the catalog matches that yet — try different words, a genre, or an era.
         </p>
       ) : (
@@ -614,42 +616,49 @@ function TurnBlock({
               return (
                 <div
                   key={r.id}
-                  className="group flex items-center gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3 pr-3.5 transition-colors hover:border-white/15 hover:bg-white/[0.06]"
+                  className="group flex items-start gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-2.5 transition-colors hover:border-white/15 hover:bg-white/[0.06] sm:gap-4 sm:p-3"
                 >
                   <button
                     onClick={() => player.play(r)}
                     aria-label={`Play ${r.title}`}
-                    className="relative h-[88px] w-[88px] flex-shrink-0 overflow-hidden rounded-xl"
+                    className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl sm:h-[88px] sm:w-[88px]"
                   >
                     <Artwork src={r.artwork_url} artist={r.artist} title={r.title} sizes="88px" />
                     <span className="absolute inset-0 flex items-center justify-center bg-void/60 opacity-0 transition-opacity group-hover:opacity-100">
-                      <Play size={24} className="ml-0.5 text-star-white" fill="currentColor" />
+                      <Play size={22} className="ml-0.5 text-star-white" fill="currentColor" />
                     </span>
                   </button>
+
+                  {/* Title, artist and the service links share one column. The
+                      links used to sit in the same ROW as the title, and on a
+                      390px phone the artwork + five 36px icons + crate button
+                      left the title literally zero width — it rendered as a
+                      single letter. On their own line they cost nothing. */}
                   <div className="min-w-0 flex-1">
-                    <p className={`truncate text-[17px] font-bold leading-tight ${isThis ? "text-neon-blue" : "text-star-white"}`}>
+                    <p className={`truncate text-[15px] font-bold leading-tight sm:text-[17px] ${isThis ? "text-neon-blue" : "text-star-white"}`}>
                       {r.title}
                     </p>
-                    <p className="truncate text-[13px] text-star-white/50">{r.artist}</p>
+                    <p className="truncate text-[12px] text-star-white/50 sm:text-[13px]">{r.artist}</p>
+
+                    <div className="scrollbar-none mt-2 flex items-center gap-1.5 overflow-x-auto">
+                      {links.map((p) => (
+                        <a
+                          key={p.key}
+                          href={r[p.key] as string}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={`Open on ${p.label}`}
+                          aria-label={`Open ${r.title} on ${p.label}`}
+                          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border transition-transform hover:scale-110 [&>svg]:h-4 [&>svg]:w-4"
+                          style={{ backgroundColor: `${p.color}1f`, borderColor: `${p.color}45`, color: p.color }}
+                        >
+                          <p.Icon />
+                        </a>
+                      ))}
+                    </div>
                   </div>
-                  {/* one-tap deep links to each streaming service */}
-                  <div className="flex flex-shrink-0 items-center gap-1.5">
-                    {links.map((p) => (
-                      <a
-                        key={p.key}
-                        href={r[p.key] as string}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={`Open on ${p.label}`}
-                        aria-label={`Open ${r.title} on ${p.label}`}
-                        className="flex h-9 w-9 items-center justify-center rounded-full border transition-transform hover:scale-110 [&>svg]:h-[18px] [&>svg]:w-[18px]"
-                        style={{ backgroundColor: `${p.color}1f`, borderColor: `${p.color}45`, color: p.color }}
-                      >
-                        <p.Icon />
-                      </a>
-                    ))}
-                    <CrateToggle release={r} />
-                  </div>
+
+                  <CrateToggle release={r} />
                 </div>
               );
             })}
@@ -660,12 +669,20 @@ function TurnBlock({
               {turn.source === "llm" ? "DeepSeek" : "keyword match"}
             </p>
             <div className="flex items-center gap-2">
-              {turn.results.length > 6 && (
+              {turn.results.length > visible && (
                 <button
-                  onClick={() => setExpanded((e) => !e)}
+                  onClick={() => setVisible((v) => v + 10)}
                   className="text-[10px] font-bold uppercase tracking-widest text-star-white/50 hover:text-star-white"
                 >
-                  {expanded ? "Show less" : `+${turn.results.length - 6} more`}
+                  +{Math.min(10, turn.results.length - visible)} more
+                </button>
+              )}
+              {visible > 10 && (
+                <button
+                  onClick={() => setVisible(10)}
+                  className="text-[10px] font-bold uppercase tracking-widest text-star-white/35 hover:text-star-white"
+                >
+                  Less
                 </button>
               )}
               <button

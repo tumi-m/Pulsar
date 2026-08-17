@@ -56,7 +56,7 @@ export function LyricsPanel({ subject, onClose }: { subject: LyricsSubject | nul
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
       transition={{ type: "spring", stiffness: 480, damping: 40 }}
-      className="fixed inset-0 z-[56] flex flex-col bg-[#07070d]/98 backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-14 lg:w-1/2"
+      className="fixed inset-0 z-[56] flex flex-col bg-[#07070d]/[0.98] backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-14 lg:w-1/2"
     >
       <div className="relative flex items-center gap-3 border-b border-white/10 px-4 py-3">
         <span

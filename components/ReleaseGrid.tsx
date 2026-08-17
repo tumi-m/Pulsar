@@ -506,7 +506,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
           {/* ONE compact, immersive control row: menu · search · genre · refine.
               Only as wide as its contents → maximal screen real estate. */}
           <div
-            className="flex max-w-[94vw] items-center gap-2 rounded-full border border-white/12 p-1.5"
+            className="flex max-w-[94vw] items-center gap-2 rounded-full border border-white/[0.12] p-1.5"
             style={{
               background: "rgba(10,10,18,0.6)",
               backdropFilter: "blur(22px) saturate(170%)",
@@ -613,7 +613,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 className="overflow-hidden"
               >
                 <div
-                  className="mx-auto mb-1 max-w-[92vw] rounded-2xl border border-white/12 p-2.5"
+                  className="mx-auto mb-1 max-w-[92vw] rounded-2xl border border-white/[0.12] p-2.5"
                   style={{
                     background: "rgba(12,12,20,0.96)",
                     backdropFilter: "blur(24px) saturate(160%)",
@@ -646,7 +646,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 className="overflow-hidden"
               >
                 <div
-                  className="mx-auto mb-1 flex max-w-[92vw] flex-col gap-3 rounded-2xl border border-white/12 p-3"
+                  className="mx-auto mb-1 flex max-w-[92vw] flex-col gap-3 rounded-2xl border border-white/[0.12] p-3"
                   style={{
                     background: "rgba(12,12,20,0.96)",
                     backdropFilter: "blur(24px) saturate(160%)",

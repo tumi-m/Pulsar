@@ -83,13 +83,13 @@ export function NowPlayingBar() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 12 }}
                     transition={{ type: "spring", stiffness: 460, damping: 34 }}
-                    className="absolute bottom-full left-4 mb-2 w-[min(88vw,300px)] overflow-hidden rounded-2xl border border-white/12 md:left-8"
+                    className="absolute bottom-full left-4 mb-2 w-[min(88vw,300px)] overflow-hidden rounded-2xl border border-white/[0.12] md:left-8"
                     style={{
                       background: "rgba(12,12,20,0.97)",
                       boxShadow: "inset 0 1px 0 rgba(255,255,255,0.14), 0 22px 60px rgba(0,0,0,0.7)",
                     }}
                   >
-                    <p className="truncate border-b border-white/8 px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.24em] text-star-white/40">
+                    <p className="truncate border-b border-white/[0.08] px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.24em] text-star-white/40">
                       {current.artist}
                     </p>
 
@@ -179,7 +179,7 @@ export function NowPlayingBar() {
               }}
               className="group absolute -top-2 left-0 right-0 z-10 h-5 cursor-pointer touch-none"
             >
-              <div className="absolute top-2 left-0 right-0 h-1 rounded-full bg-star-white/12" />
+              <div className="absolute top-2 left-0 right-0 h-1 rounded-full bg-star-white/[0.12]" />
               <div
                 className={`absolute top-2 left-0 h-1 rounded-full bg-gradient-to-r from-neon-violet to-neon-blue ${
                   scrubbing ? "" : "transition-[width]"
