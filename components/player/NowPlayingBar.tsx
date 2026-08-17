@@ -297,17 +297,25 @@ export function NowPlayingBar() {
               </button>
             </div>
 
+            {/* Status line. The message is kept purely descriptive in
+                PlayerProvider and the retry affordance lives here, so the two
+                can't read as "…tap play to retry. — tap to retry". Tracking is
+                tight enough and the message truncates, because 0.25em on a full
+                sentence overran both edges of a 390px phone. */}
             {error && !loading && (
               <button
                 onClick={() => current && play(current)}
-                className="pb-1.5 text-center text-[9px] font-bold uppercase tracking-[0.25em] text-neon-amber/70 transition-colors hover:text-neon-amber"
+                className="mx-auto flex max-w-full items-center justify-center gap-2 px-4 pb-1.5 text-[9px] font-bold uppercase tracking-[0.16em] text-neon-amber/70 transition-colors hover:text-neon-amber"
               >
-                {error} — tap to retry
+                <span className="truncate">{error}</span>
+                <span className="flex-shrink-0 rounded-full border border-neon-amber/40 px-2 py-0.5 text-neon-amber">
+                  Retry
+                </span>
               </button>
             )}
             {!hasAudio && !loading && !error && (
-              <p className="pb-1.5 text-center text-[9px] font-bold uppercase tracking-[0.25em] text-neon-amber/60">
-                No preview available for this release
+              <p className="truncate px-4 pb-1.5 text-center text-[9px] font-bold uppercase tracking-[0.16em] text-neon-amber/60">
+                No preview available
               </p>
             )}
           </motion.div>

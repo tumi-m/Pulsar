@@ -188,7 +188,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     // truncated — a top cause of "sometimes music doesn't play".
     const onError = () => {
       if (reqIdRef.current === 0) return;
-      setError("Couldn't load this preview — it may be unavailable.");
+      setError("Couldn’t load this preview");
       setHasAudio(false);
       setPlaying(false);
       setLoading(false);
@@ -267,7 +267,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           await new Promise((r) => setTimeout(r, 140));
           await audio.play().catch(() => {
             if (reqId === reqIdRef.current) {
-              setError("Playback was blocked — tap play to retry.");
+              setError("Playback was blocked");
               setPlaying(false);
             }
           });
@@ -276,7 +276,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (reqId === reqIdRef.current) {
           setHasAudio(false);
           setPlaying(false);
-          setError("No preview available for this release.");
+          setError("No preview available");
         }
       } finally {
         if (reqId === reqIdRef.current) setLoading(false);
@@ -307,7 +307,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audio.play().catch(async () => {
         await new Promise((r) => setTimeout(r, 140));
         audio.play().catch(() => {
-          setError("Playback was blocked — tap play to retry.");
+          setError("Playback was blocked");
           setPlaying(false);
         });
       });
