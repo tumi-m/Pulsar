@@ -623,32 +623,53 @@ function TurnBlock({
                     aria-label={`Play ${r.title}`}
                     className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl sm:h-[88px] sm:w-[88px]"
                   >
-                    <Artwork src={r.artwork_url} artist={r.artist} title={r.title} sizes="88px" />
+                    <Artwork
+                      src={r.artwork_url}
+                      artist={r.artist}
+                      title={r.title}
+                      sizes="(min-width: 640px) 88px, 64px"
+                    />
                     <span className="absolute inset-0 flex items-center justify-center bg-void/60 opacity-0 transition-opacity group-hover:opacity-100">
                       <Play size={22} className="ml-0.5 text-star-white" fill="currentColor" />
                     </span>
                   </button>
 
-                  {/* Title, artist and the service links share one column. The
-                      links used to sit in the same ROW as the title, and on a
-                      390px phone the artwork + five 36px icons + crate button
-                      left the title literally zero width — it rendered as a
-                      single letter. On their own line they cost nothing. */}
+                  {/* Everything that identifies the record — title, artist,
+                      what kind of release it is — plus the service links, in
+                      one column. The links used to sit in the same ROW as the
+                      title, and on a 390px phone the artwork + five icons +
+                      crate button left the title literally zero width: it
+                      rendered as a single letter, and the icons still ran off
+                      the right edge. Stacked, everything fits and the icons
+                      WRAP rather than scroll, so none is ever unreachable. */}
                   <div className="min-w-0 flex-1">
-                    <p className={`truncate text-[15px] font-bold leading-tight sm:text-[17px] ${isThis ? "text-neon-blue" : "text-star-white"}`}>
+                    <p
+                      className={`text-[15px] font-bold leading-tight sm:text-[17px] ${isThis ? "text-neon-blue" : "text-star-white"}`}
+                      style={{
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
                       {r.title}
                     </p>
-                    <p className="truncate text-[12px] text-star-white/50 sm:text-[13px]">{r.artist}</p>
+                    <p className="truncate text-[13px] font-medium text-star-white/75">{r.artist}</p>
+                    <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-[0.14em] text-star-white/35">
+                      {r.type === "ep" ? "EP" : r.type}
+                      {r.release_date ? ` · ${r.release_date.slice(0, 4)}` : ""}
+                      {r.genre ? ` · ${r.genre}` : ""}
+                    </p>
 
-                    <div className="scrollbar-none mt-2 flex items-center gap-1.5 overflow-x-auto">
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       {links.map((p) => (
                         <a
                           key={p.key}
                           href={r[p.key] as string}
                           target="_blank"
                           rel="noopener noreferrer"
-                          title={`Open on ${p.label}`}
-                          aria-label={`Open ${r.title} on ${p.label}`}
+                          title={`${r.artist} — ${r.title} on ${p.label}`}
+                          aria-label={`Find ${r.title} by ${r.artist} on ${p.label}`}
                           className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border transition-transform hover:scale-110 [&>svg]:h-4 [&>svg]:w-4"
                           style={{ backgroundColor: `${p.color}1f`, borderColor: `${p.color}45`, color: p.color }}
                         >
