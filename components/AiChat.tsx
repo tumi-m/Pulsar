@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useDragControls } from "framer-motion";
-import { Sparkles, X, Play, LayoutGrid, MessagesSquare, ArrowUp, RotateCcw } from "lucide-react";
+import { Sparkles, X, Play, Pause, Loader2, LayoutGrid, MessagesSquare, ArrowUp, RotateCcw } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";
-import { genreBucket, type GenreBucket } from "@/lib/utils";
+import { parse, buildList, MOOD_WORDS, GENRE_WORDS, type Parsed } from "@/lib/selector";
+import type { GenreBucket } from "@/lib/utils";
 import { usePlayer } from "./player/PlayerProvider";
 import { togglePlaylist, inPlaylist } from "@/lib/collection";
 import { Artwork } from "./Artwork";
@@ -16,79 +17,6 @@ import { PLATFORMS } from "./platforms";
 
 interface AiChatProps {
   releases: Release[];
-}
-
-// keyword → signal maps (a light, keyless "AI" that reads the vibe)
-const MOOD_WORDS: Record<string, string[]> = {
-  euphoric: ["happy", "joy", "euphoric", "uplifting", "party", "hype", "celebrate", "bright"],
-  melancholic: ["sad", "melancholy", "heartbreak", "cry", "blue", "lonely", "rainy", "moody"],
-  energetic: ["energy", "energetic", "workout", "gym", "run", "pump", "fast", "aggressive"],
-  ambient: ["ambient", "calm", "relax", "chill", "study", "focus", "sleep", "peaceful"],
-  raw: ["raw", "gritty", "angry", "heavy", "loud", "rebellious"],
-  cinematic: ["cinematic", "epic", "dramatic", "film", "soundtrack", "grand"],
-  hypnotic: ["hypnotic", "trance", "dreamy", "psychedelic", "trippy", "loop"],
-  tender: ["tender", "love", "romantic", "soft", "gentle", "intimate", "sweet"],
-};
-
-const GENRE_WORDS: Record<GenreBucket, string[]> = {
-  "Hip-Hop": ["hip hop", "hip-hop", "rap", "trap", "drill", "boom bap"],
-  Afrobeats: ["afrobeats", "afrobeat", "afropop", "afro-fusion", "naija", "highlife"],
-  Amapiano: ["amapiano", "yanos", "log drum"],
-  House: ["house", "gqom", "kwaito", "afro house", "deep house"],
-  Electronic: ["electronic", "edm", "techno", "dance", "synth", "disco", "idm", "trance"],
-  Reggae: ["reggae", "dancehall", "dub", "ska"],
-  "Soul / R&B": ["soul", "r&b", "rnb", "funk", "neo-soul"],
-  Gospel: ["gospel", "worship", "praise", "christian", "spiritual", "hymn"],
-  Pop: ["pop", "synth-pop", "bedroom pop"],
-  Rock: ["rock", "punk", "grunge", "indie", "shoegaze", "alt", "guitar"],
-  Metal: ["metal", "doom", "sludge", "stoner", "hardcore"],
-  Jazz: ["jazz", "bebop", "fusion", "swing"],
-  Blues: ["blues", "delta blues", "rhythm and blues"],
-  Latin: ["latin", "reggaeton", "salsa", "bachata", "cumbia", "bossa"],
-  Classical: ["classical", "orchestra", "symphony", "opera", "piano"],
-  "Folk / Country": ["folk", "country", "americana", "singer-songwriter", "acoustic"],
-};
-
-interface Parsed {
-  moods: string[];
-  genres: GenreBucket[];
-  decades: string[];
-  freeText: string;
-}
-
-function parse(text: string): Parsed {
-  const q = text.toLowerCase();
-  const moods = Object.entries(MOOD_WORDS)
-    .filter(([, kws]) => kws.some((k) => q.includes(k)))
-    .map(([m]) => m);
-  const genres = (Object.entries(GENRE_WORDS) as [GenreBucket, string[]][])
-    .filter(([, kws]) => kws.some((k) => q.includes(k)))
-    .map(([g]) => g);
-  const decades: string[] = [];
-  for (const d of ["50", "60", "70", "80", "90"]) if (q.includes(`${d}s`)) decades.push(`19${d}`);
-  if (q.includes("2000s") || q.includes("00s")) decades.push("200");
-  if (q.includes("2010s") || q.includes("10s")) decades.push("201");
-  if (q.includes("2020s") || q.includes("20s")) decades.push("202");
-  return { moods, genres, decades, freeText: q };
-}
-
-function buildList(releases: Release[], p: Parsed): Release[] {
-  const words = p.freeText.split(/\s+/).filter((w) => w.length > 3);
-  const scored = releases.map((r) => {
-    let s = 0;
-    if (r.mood && p.moods.includes(r.mood)) s += 3;
-    const bucket = genreBucket(r.genre);
-    if (bucket && p.genres.includes(bucket)) s += 3;
-    if (p.decades.some((d) => r.release_date.startsWith(d))) s += 2;
-    const hay = `${r.artist} ${r.title} ${r.genre ?? ""} ${r.label ?? ""}`.toLowerCase();
-    for (const w of words) if (hay.includes(w)) s += 1;
-    return { r, s };
-  });
-  return scored
-    .filter(({ s }) => s > 0)
-    .sort((a, b) => b.s - a.s)
-    .slice(0, 80)
-    .map(({ r }) => r);
 }
 
 const uniq = <T,>(xs: T[]) => Array.from(new Set(xs));
@@ -618,10 +546,18 @@ function TurnBlock({
                   key={r.id}
                   className="group flex items-start gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-2.5 transition-colors hover:border-white/15 hover:bg-white/[0.06] sm:gap-4 sm:p-3"
                 >
+                  {/* 30-second preview. The play badge used to be
+                      opacity-0 group-hover:opacity-100 — on a phone there is no
+                      hover, so nothing ever revealed it and the rows looked
+                      like static artwork. It is always visible now, and shows
+                      real transport state: pause while this row is playing, a
+                      spinner while its preview resolves. */}
                   <button
-                    onClick={() => player.play(r)}
-                    aria-label={`Play ${r.title}`}
-                    className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl sm:h-[88px] sm:w-[88px]"
+                    onClick={() => (isThis ? player.toggle() : player.play(r))}
+                    aria-label={
+                      isThis && player.playing ? `Pause ${r.title}` : `Play a preview of ${r.title}`
+                    }
+                    className="group/art relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl sm:h-[88px] sm:w-[88px]"
                   >
                     <Artwork
                       src={r.artwork_url}
@@ -629,8 +565,26 @@ function TurnBlock({
                       title={r.title}
                       sizes="(min-width: 640px) 88px, 64px"
                     />
-                    <span className="absolute inset-0 flex items-center justify-center bg-void/60 opacity-0 transition-opacity group-hover:opacity-100">
-                      <Play size={22} className="ml-0.5 text-star-white" fill="currentColor" />
+                    <span
+                      className={`absolute inset-0 flex items-center justify-center transition-colors ${
+                        isThis ? "bg-void/45" : "bg-void/20 group-hover/art:bg-void/50"
+                      }`}
+                    >
+                      <span
+                        className={`flex h-9 w-9 items-center justify-center rounded-full backdrop-blur-sm transition-transform group-active/art:scale-90 ${
+                          isThis
+                            ? "bg-neon-blue/85 text-void"
+                            : "bg-void/60 text-star-white ring-1 ring-star-white/40"
+                        }`}
+                      >
+                        {isThis && player.loading ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : isThis && player.playing ? (
+                          <Pause size={15} fill="currentColor" />
+                        ) : (
+                          <Play size={15} className="ml-0.5" fill="currentColor" />
+                        )}
+                      </span>
                     </span>
                   </button>
 
