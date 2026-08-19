@@ -20,6 +20,7 @@ import Link from "next/link";
 import { Artwork } from "./Artwork";
 import { useScrollLock } from "@/lib/useScrollLock";
 import { useYouTubePlayer } from "@/lib/useYouTubePlayer";
+import { youtubeSearchUrl } from "@/lib/samples-media";
 import { Portal } from "./Portal";
 import { SampleGraph } from "./SampleGraph";
 import type { Release } from "@/lib/types";
@@ -373,12 +374,33 @@ function SampleCard({
           ))}
         </div>
 
-        {/* player — poster until asked for, then the real thing */}
+        {/* player — poster until asked for, then the real thing.
+            When nothing resolves, this becomes a real way out to YouTube
+            rather than a disabled box reading "No video found", which is where
+            the feature used to die. */}
         <div className="mt-2 aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
-          {!playing ? (
+          {!playing && !activeVideoId && state !== "loading" ? (
+            <a
+              href={youtubeSearchUrl(sample.artist ?? baseArtist, sample.title)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center transition-colors hover:bg-white/[0.04]"
+            >
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ff0000]/15 text-[#ff5b5b] transition-transform group-hover:scale-110">
+                <Youtube size={20} />
+              </span>
+              <span className="text-[12px] font-bold text-star-white">
+                Find it on YouTube
+              </span>
+              <span className="max-w-[36ch] text-[10px] leading-snug text-star-white/45">
+                No upload is pinned for this record yet, so it can&rsquo;t play inline —
+                this opens a YouTube search for it.
+              </span>
+            </a>
+          ) : !playing ? (
             <button
-              onClick={() => videoId && setPlaying(true)}
-              disabled={!videoId}
+              onClick={() => activeVideoId && setPlaying(true)}
+              disabled={!activeVideoId}
               className="group relative h-full w-full disabled:cursor-default"
               aria-label={`Play ${sample.title} on YouTube`}
             >
@@ -390,7 +412,7 @@ function SampleCard({
                   <Disc3 size={30} className={state === "loading" ? "animate-spin" : ""} />
                 </span>
               )}
-              {videoId && (
+              {activeVideoId && (
                 <span className="absolute inset-0 flex items-center justify-center bg-black/25">
                   <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/60 ring-1 ring-white/40 backdrop-blur transition-transform group-hover:scale-110">
                     <Play size={18} className="ml-0.5 text-white" fill="currentColor" />
@@ -465,21 +487,23 @@ function SampleCard({
             <Pencil size={10} />
           </button>
 
-          {videoId && (
-            <a
-              href={`https://www.youtube.com/watch?v=${videoId}${
-                mark.inSource != null ? `&t=${Math.floor(mark.inSource)}` : ""
-              }`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ml-auto flex items-center gap-1 rounded-full bg-[#ff0000]/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#ff5b5b] hover:bg-[#ff0000]/25"
-            >
-              <Youtube size={12} /> YouTube
-            </a>
-          )}
-          {state === "none" && (
-            <span className="text-[10px] text-star-white/30">No video found</span>
-          )}
+          {/* Always a way out to YouTube: the exact video when one is pinned,
+              a search for the record when not. The old branch rendered nothing
+              at all in the second case and left the card with no action. */}
+          <a
+            href={
+              videoId
+                ? `https://www.youtube.com/watch?v=${videoId}${
+                    mark.inSource != null ? `&t=${Math.floor(mark.inSource)}` : ""
+                  }`
+                : youtubeSearchUrl(sample.artist ?? baseArtist, sample.title)
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-auto flex items-center gap-1 rounded-full bg-[#ff0000]/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#ff5b5b] hover:bg-[#ff0000]/25"
+          >
+            <Youtube size={12} /> {videoId ? "YouTube" : "Search"}
+          </a>
         </div>
 
         {/* manual entry — the fallback when there's no playhead to read */}
@@ -622,7 +646,7 @@ export function SamplePage({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
       transition={{ type: "spring", stiffness: 480, damping: 40 }}
-      className="fixed inset-0 z-[56] flex flex-col bg-[#07070d]/[0.98] backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-14 lg:w-1/2"
+      className="fixed inset-0 z-[58] flex flex-col bg-[#07070d]/[0.98] backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-14 lg:w-1/2"
     >
       {/* header */}
       <div className="relative flex items-center gap-2 border-b border-white/10 px-3 py-3 sm:gap-3 sm:px-4">

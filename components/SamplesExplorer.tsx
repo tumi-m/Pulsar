@@ -88,6 +88,11 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
           },
           samples,
         });
+        // Stand down so the breakdown is actually visible. This panel is
+        // `fixed inset-0` and fully opaque on a phone; leaving it up rendered
+        // the entire breakdown underneath it and nothing appeared to happen —
+        // which is exactly the "samples still doesn't work" report.
+        setOpen(false);
       } else {
         setNotFound(true);
       }
@@ -314,14 +319,18 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
         )}
       </AnimatePresence>
 
-      {/* the full breakdown, layered above */}
+      {/* The full breakdown. Closing it returns to the browse list rather than
+          dumping you back on the grid — the explorer is where you were. */}
       <AnimatePresence>
         {viewing && (
           <SamplePage
             subject={viewing.subject}
             samples={viewing.samples}
             releases={releases}
-            onClose={() => setViewing(null)}
+            onClose={() => {
+              setViewing(null);
+              setOpen(true);
+            }}
           />
         )}
       </AnimatePresence>
