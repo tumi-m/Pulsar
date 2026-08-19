@@ -376,7 +376,7 @@ export function SampleGraph({
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
-            className="absolute bottom-3 left-3 right-3 rounded-xl border border-white/12 bg-[#0a0a14]/90 p-3 backdrop-blur-xl md:right-auto md:max-w-sm"
+            className="absolute bottom-3 left-3 right-3 rounded-xl border border-white/[0.12] bg-[#0a0a14]/90 p-3 backdrop-blur-xl md:right-auto md:max-w-sm"
           >
             <p className="truncate text-[13px] font-bold text-star-white">{selNode.title}</p>
             <p className="truncate text-[11px] text-star-white/55">{selNode.artist}</p>

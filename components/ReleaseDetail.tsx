@@ -646,7 +646,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                         </div>
                       </div>
                       <div
-                        className="relative aspect-video w-full overflow-hidden rounded-xl border border-white/12"
+                        className="relative aspect-video w-full overflow-hidden rounded-xl border border-white/[0.12]"
                         style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), 0 10px 30px rgba(0,0,0,0.5)" }}
                       >
                         <VisualCanvas release={release} mode={visualMode} className="absolute inset-0 h-full w-full" />
@@ -807,7 +807,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
                 transition={{ type: "spring", stiffness: 480, damping: 40 }}
-                className="fixed inset-x-0 bottom-0 top-0 z-[45] flex flex-col bg-[#0a0a14]/97 backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-14 lg:w-1/2"
+                className="fixed inset-x-0 bottom-0 top-0 z-[45] flex flex-col bg-[#0a0a14]/[0.97] backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-14 lg:w-1/2"
               >
                 <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
                   <button

@@ -1,21 +1,26 @@
 /**
- * YouTube Music — Google OAuth (implicit flow, no secret) + YouTube Data API v3.
- * Needs a public client id (NEXT_PUBLIC_GOOGLE_CLIENT_ID) from a Google Cloud
- * OAuth "Web application" whose Authorised JavaScript origin + redirect URI is
+ * YouTube Music — Google OAuth (Authorization Code + PKCE) + YouTube Data API v3.
+ *
+ * Needs NEXT_PUBLIC_GOOGLE_CLIENT_ID (public) and GOOGLE_CLIENT_SECRET
+ * (server-only, used by /api/youtube-token) from a Google Cloud OAuth
+ * "Web application" whose authorised JavaScript origin and redirect URI are
  * this site's origin. The `youtube` scope is sensitive, so for public use the
- * OAuth consent screen must be verified by Google.
+ * consent screen must be verified by Google.
  *
  * Note: each track search costs 100 quota units (default 10k/day ≈ 100 lookups).
  */
 
 import type { Release } from "../types";
 import {
+  base64url,
   cleanUrl,
   clearToken,
+  randomString,
   readToken,
   redirectUri,
   saveToken,
   searchTerm,
+  sha256,
   type BuildResult,
   type DspProvider,
   type ProgressFn,
@@ -29,16 +34,58 @@ export function setGoogleClientId(id: string) {
   if (id) CLIENT_ID = id;
 }
 const SCOPE = "https://www.googleapis.com/auth/youtube";
+const VERIFIER_KEY = "pulsar_youtube_verifier";
 
-function beginAuth() {
+// Mirrored into localStorage because some mobile browsers drop sessionStorage
+// across the OAuth round-trip, which would strand the user in a redirect loop.
+function setVerifier(v: string) {
+  try {
+    sessionStorage.setItem(VERIFIER_KEY, v);
+    localStorage.setItem(VERIFIER_KEY, v);
+  } catch {
+    /* storage unavailable */
+  }
+}
+function getVerifier(): string | null {
+  try {
+    return sessionStorage.getItem(VERIFIER_KEY) ?? localStorage.getItem(VERIFIER_KEY);
+  } catch {
+    return null;
+  }
+}
+function clearVerifier() {
+  try {
+    sessionStorage.removeItem(VERIFIER_KEY);
+    localStorage.removeItem(VERIFIER_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Authorization Code + PKCE.
+ *
+ * NOT the implicit flow: Google deprecated `response_type=token` and no longer
+ * supports it for new integrations, so a freshly-created OAuth client cannot
+ * use it at all. The code is exchanged for a token by /api/youtube-token,
+ * because Google's Web-application client type requires the client secret on
+ * the exchange and a secret must never reach the browser.
+ */
+async function beginAuth() {
+  const verifier = randomString(48);
+  const challenge = base64url(await sha256(verifier));
+  setVerifier(verifier);
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     redirect_uri: redirectUri(),
-    response_type: "token", // implicit → token in URL hash, no secret needed
+    response_type: "code",
     scope: SCOPE,
     state: "youtube",
     include_granted_scopes: "true",
     prompt: "consent",
+    access_type: "online",
+    code_challenge_method: "S256",
+    code_challenge: challenge,
   });
   window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 }
@@ -114,6 +161,9 @@ export const youtubeProvider: DspProvider = {
         status: { privacyStatus: "private" },
       }),
     });
+    // Without this, an unexpected response leaves playlist.id undefined and
+    // every insert fails with "playlistId required" — a silent empty playlist.
+    if (!playlist?.id) throw new Error("YouTube didn't return a playlist.");
 
     let addedReleases = 0;
     let trackCount = 0;
@@ -149,15 +199,32 @@ export const youtubeProvider: DspProvider = {
   },
 
   async completeRedirect(): Promise<boolean> {
-    // Implicit flow returns the token in the URL fragment.
-    if (!window.location.hash) return false;
-    const hash = new URLSearchParams(window.location.hash.slice(1));
-    if (hash.get("state") !== "youtube") return false;
-    const accessToken = hash.get("access_token");
-    const expiresIn = Number(hash.get("expires_in") ?? "3600");
-    cleanUrl();
-    if (!accessToken) return false;
-    saveToken("youtube", accessToken, expiresIn);
-    return true;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("state") !== "youtube") return false;
+
+    const oauthError = url.searchParams.get("error");
+    const code = url.searchParams.get("code");
+    const verifier = getVerifier();
+    cleanUrl(); // tidy the address bar whatever the outcome
+
+    if (oauthError || !code || !verifier) {
+      clearVerifier();
+      return false;
+    }
+
+    try {
+      const res = await fetch("/api/youtube-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, verifier, redirectUri: redirectUri() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.access_token) return false;
+      saveToken("youtube", data.access_token, data.expires_in ?? 3600);
+      clearVerifier();
+      return true;
+    } catch {
+      return false;
+    }
   },
 };

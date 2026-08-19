@@ -53,10 +53,10 @@ function SongPicker({
             onChange={(e) => setQ(e.target.value)}
             placeholder="Pick a song…"
             aria-label={label}
-            className="min-h-[52px] w-full rounded-xl border border-white/12 bg-white/[0.05] px-3 py-2 text-sm text-star-white placeholder:text-star-white/35 focus:border-neon-violet/40 focus:outline-none"
+            className="min-h-[52px] w-full rounded-xl border border-white/[0.12] bg-white/[0.05] px-3 py-2 text-sm text-star-white placeholder:text-star-white/35 focus:border-neon-violet/40 focus:outline-none"
           />
           {results.length > 0 && (
-            <div className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-xl border border-white/12 bg-[#0a0a14]/95 p-1 backdrop-blur-xl">
+            <div className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-xl border border-white/[0.12] bg-[#0a0a14]/95 p-1 backdrop-blur-xl">
               {results.map((r) => (
                 <button
                   key={`${r.artist}-${r.title}`}

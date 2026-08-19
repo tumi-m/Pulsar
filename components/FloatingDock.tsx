@@ -495,7 +495,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                         className={`flex-shrink-0 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide transition-colors ${
                           c.id === activeCrateId
                             ? "border-[#c08a4e]/60 bg-[#c08a4e]/15 text-[#e0b070]"
-                            : "border-white/12 text-star-white/50 hover:text-star-white"
+                            : "border-white/[0.12] text-star-white/50 hover:text-star-white"
                         }`}
                       >
                         {c.name}
@@ -545,7 +545,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 16 }}
                       transition={{ type: "spring", stiffness: 460, damping: 34 }}
-                      className="absolute inset-x-3 bottom-3 top-16 z-20 overflow-y-auto overscroll-contain rounded-2xl border border-white/15 bg-[#0d0d16]/97 p-4 backdrop-blur-2xl sm:inset-x-4 sm:bottom-auto sm:top-20"
+                      className="absolute inset-x-3 bottom-3 top-16 z-20 overflow-y-auto overscroll-contain rounded-2xl border border-white/15 bg-[#0d0d16]/[0.97] p-4 backdrop-blur-2xl sm:inset-x-4 sm:bottom-auto sm:top-20"
                       style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 24px 60px rgba(0,0,0,0.6)" }}
                     >
                       <p className="text-sm font-bold uppercase tracking-wide text-star-white">
@@ -651,7 +651,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                                 .then(() => flash("Redirect URI copied"))
                                 .catch(() => {});
                             }}
-                            className="mt-2 flex w-full items-center gap-2 overflow-hidden rounded-lg border border-white/12 bg-white/[0.04] px-2.5 py-2 text-left transition-colors hover:border-white/25"
+                            className="mt-2 flex w-full items-center gap-2 overflow-hidden rounded-lg border border-white/[0.12] bg-white/[0.04] px-2.5 py-2 text-left transition-colors hover:border-white/25"
                           >
                             <Copy size={11} className="flex-shrink-0 text-star-white/50" />
                             <span className="truncate font-mono text-[10px] text-star-white/75">
@@ -803,7 +803,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                 animate={{ scale: 1, y: 0 }}
                 exit={{ scale: 0.9, opacity: 0 }}
                 onClick={(e) => e.stopPropagation()}
-                className="w-[min(88vw,360px)] rounded-2xl border bg-[#0d0d16]/97 p-6 text-center"
+                className="w-[min(88vw,360px)] rounded-2xl border bg-[#0d0d16]/[0.97] p-6 text-center"
                 style={{ borderColor: `${color}66`, boxShadow: "0 24px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.15)" }}
               >
                 {/* celebratory burst behind the badge */}
@@ -885,7 +885,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.92, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-[min(92vw,380px)] rounded-2xl border border-neon-pink/40 bg-[#0d0d16]/97 p-6 text-center"
+              className="w-[min(92vw,380px)] rounded-2xl border border-neon-pink/40 bg-[#0d0d16]/[0.97] p-6 text-center"
               style={{ boxShadow: "0 24px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.15)" }}
             >
               <p className="text-base font-bold uppercase tracking-wide text-star-white">

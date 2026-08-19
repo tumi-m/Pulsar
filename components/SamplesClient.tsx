@@ -145,7 +145,7 @@ export function SamplesClient({
       {tab === "lookup" && (
         <>
           {/* search */}
-          <div className="flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.05] px-4 py-3">
+          <div className="flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.05] px-4 py-3">
             <Search size={16} className="flex-shrink-0 text-star-white/45" />
             <input
               value={query}

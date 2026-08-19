@@ -15,6 +15,7 @@
 
 import type { Release, ReleaseType, MoodTag } from "./types";
 import { GRAMMY_ARTISTS_UNIQUE } from "./grammy-artists";
+import { WORLD_ARTISTS_FLAT } from "./world-artists";
 
 // ── platform deep links ──────────────────────
 const sp = (q: string) => `https://open.spotify.com/search/${encodeURIComponent(q)}`;
@@ -440,6 +441,54 @@ async function fromGrammyArtists(): Promise<Release[]> {
   return out;
 }
 
+// ── Source 1g: regional + canonical sweeps ──────────────────────────
+/**
+ * Latin America, Brazil, the Caribbean, Asia, the Arab world and Europe, plus
+ * the jazz, blues and electronic canons — the parts of music the other sweeps
+ * don't reach. Same shape as the Grammy sweep: resolve the name to a Deezer
+ * artist id (so we get the real catalogue rather than fuzzy title matches),
+ * then page through their discography.
+ */
+async function fromWorldArtists(): Promise<Release[]> {
+  const names = WORLD_ARTISTS_FLAT;
+  const out: Release[] = [];
+  const CONC = 24;
+  const MAX_PAGES = 2; // up to 200 releases per artist
+  const DEADLINE = Date.now() + 20_000;
+  let idx = 0;
+
+  const worker = async () => {
+    while (idx < names.length) {
+      if (Date.now() > DEADLINE) return;
+      const name = names[idx++];
+      const search = (await fetchJSON(
+        `https://api.deezer.com/search/artist?q=${encodeURIComponent(name)}&limit=1`
+      )) as { data?: { id?: number; name?: string }[] } | null;
+      const hit = search?.data?.[0];
+      if (!hit?.id) continue;
+
+      // Guard against a loose match ("Can" → "Canserbero").
+      const norm = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (norm(hit.name ?? "") !== norm(name)) continue;
+
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const albums = (await fetchJSON(
+          `https://api.deezer.com/artist/${hit.id}/albums?limit=100&index=${page * 100}`
+        )) as { data?: DeezerAlbum[] } | null;
+        const rows = albums?.data ?? [];
+        for (const a of rows) {
+          const r = mapDeezer(a, null);
+          if (r) out.push(r);
+        }
+        if (rows.length < 100) break;
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: CONC }, worker));
+  return out;
+}
+
 // ── Source 2: Apple most-played albums + songs (current, popular) ────
 interface AppleFeedResult {
   artistName?: string;
@@ -498,7 +547,7 @@ async function fromApple(): Promise<Release[]> {
  * Never throws — on total failure it returns an empty array.
  */
 export async function getLiveFeed(): Promise<Release[]> {
-  const [deezer, apple, genres, africa, gospel, genreArtists, grammy] = await Promise.all([
+  const [deezer, apple, genres, africa, gospel, genreArtists, grammy, world] = await Promise.all([
     fromDeezer(),
     fromApple(),
     fromDeezerGenres(),
@@ -506,11 +555,12 @@ export async function getLiveFeed(): Promise<Release[]> {
     fromGospel(),
     fromGenreArtists(),
     fromGrammyArtists(),
+    fromWorldArtists(),
   ]);
   console.log(
     `[feed] deezer: ${deezer.length} · apple: ${apple.length} · genres: ${genres.length} · ` +
       `africa: ${africa.length} · gospel: ${gospel.length} · genreArtists: ${genreArtists.length} · ` +
-      `grammy: ${grammy.length}`
+      `grammy: ${grammy.length} · world: ${world.length}`
   );
 
   const all: FeedRelease[] = [];
@@ -526,6 +576,7 @@ export async function getLiveFeed(): Promise<Release[]> {
     ...africa,
     ...genreArtists,
     ...grammy,
+    ...world,
   ] as FeedRelease[]) {
     const key = `${r.artist.toLowerCase()}::${r.title.toLowerCase()}`;
     const existing = byKey.get(key);

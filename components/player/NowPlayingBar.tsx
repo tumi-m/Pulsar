@@ -83,13 +83,13 @@ export function NowPlayingBar() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 12 }}
                     transition={{ type: "spring", stiffness: 460, damping: 34 }}
-                    className="absolute bottom-full left-4 mb-2 w-[min(88vw,300px)] overflow-hidden rounded-2xl border border-white/12 md:left-8"
+                    className="absolute bottom-full left-4 mb-2 w-[min(88vw,300px)] overflow-hidden rounded-2xl border border-white/[0.12] md:left-8"
                     style={{
                       background: "rgba(12,12,20,0.97)",
                       boxShadow: "inset 0 1px 0 rgba(255,255,255,0.14), 0 22px 60px rgba(0,0,0,0.7)",
                     }}
                   >
-                    <p className="truncate border-b border-white/8 px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.24em] text-star-white/40">
+                    <p className="truncate border-b border-white/[0.08] px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.24em] text-star-white/40">
                       {current.artist}
                     </p>
 
@@ -179,7 +179,7 @@ export function NowPlayingBar() {
               }}
               className="group absolute -top-2 left-0 right-0 z-10 h-5 cursor-pointer touch-none"
             >
-              <div className="absolute top-2 left-0 right-0 h-1 rounded-full bg-star-white/12" />
+              <div className="absolute top-2 left-0 right-0 h-1 rounded-full bg-star-white/[0.12]" />
               <div
                 className={`absolute top-2 left-0 h-1 rounded-full bg-gradient-to-r from-neon-violet to-neon-blue ${
                   scrubbing ? "" : "transition-[width]"
@@ -297,17 +297,25 @@ export function NowPlayingBar() {
               </button>
             </div>
 
+            {/* Status line. The message is kept purely descriptive in
+                PlayerProvider and the retry affordance lives here, so the two
+                can't read as "…tap play to retry. — tap to retry". Tracking is
+                tight enough and the message truncates, because 0.25em on a full
+                sentence overran both edges of a 390px phone. */}
             {error && !loading && (
               <button
                 onClick={() => current && play(current)}
-                className="pb-1.5 text-center text-[9px] font-bold uppercase tracking-[0.25em] text-neon-amber/70 transition-colors hover:text-neon-amber"
+                className="mx-auto flex max-w-full items-center justify-center gap-2 px-4 pb-1.5 text-[9px] font-bold uppercase tracking-[0.16em] text-neon-amber/70 transition-colors hover:text-neon-amber"
               >
-                {error} — tap to retry
+                <span className="truncate">{error}</span>
+                <span className="flex-shrink-0 rounded-full border border-neon-amber/40 px-2 py-0.5 text-neon-amber">
+                  Retry
+                </span>
               </button>
             )}
             {!hasAudio && !loading && !error && (
-              <p className="pb-1.5 text-center text-[9px] font-bold uppercase tracking-[0.25em] text-neon-amber/60">
-                No preview available for this release
+              <p className="truncate px-4 pb-1.5 text-center text-[9px] font-bold uppercase tracking-[0.16em] text-neon-amber/60">
+                No preview available
               </p>
             )}
           </motion.div>
