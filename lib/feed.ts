@@ -14,6 +14,7 @@
  */
 
 import type { Release, ReleaseType, MoodTag } from "./types";
+import { artistMatches } from "./match";
 import { GRAMMY_ARTISTS_UNIQUE } from "./grammy-artists";
 import { WORLD_ARTISTS_FLAT } from "./world-artists";
 
@@ -372,14 +373,24 @@ async function fromGospel(): Promise<Release[]> {
       )) as { data?: DeezerAlbum[] } | null;
       for (const a of data?.data ?? []) {
         const r = mapDeezer(a, null);
-        if (r) {
-          // Curated as gospel → tag it so it buckets correctly regardless of
-          // Deezer's own genre label.
-          r.genre = "Gospel";
-          r.tags = ["gospel"];
-          r.mood = "euphoric";
-          out.push(r);
-        }
+        if (!r) continue;
+        // Deezer's album search is FUZZY — `artist:"Zaza"` happily returns
+        // house compilations by nobody of the sort. This loop used to stamp
+        // every hit as gospel regardless, which is how "Club Ibiza, Vol. 2
+        // (Chillhouse Vibes)" and "The View (50 Deephouse Grooves)" ended up
+        // in the Gospel bucket. Require the album to actually be by the
+        // artist we asked for.
+        if (!artistMatches(name, r.artist)) continue;
+        r.genre = "Gospel";
+        r.tags = ["gospel"];
+        // Mood is deliberately NOT forced. Blanket-tagging the entire gospel
+        // sweep "euphoric" meant every one of these records scored a mood hit
+        // on any request mentioning joy, a party or celebration — which is
+        // exactly how a search for "euphoric house to dance to" came back
+        // full of mislabelled gospel compilations. Gospel spans jubilant
+        // praise and quiet worship; whatever mapDeezer inferred is closer to
+        // the truth than one blanket answer.
+        out.push(r);
       }
     })
   );
