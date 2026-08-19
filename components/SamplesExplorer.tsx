@@ -7,7 +7,7 @@ import { Portal } from "./Portal";
 import { useScrollLock } from "@/lib/useScrollLock";
 import { useBackClose } from "@/lib/useBackClose";
 import { SamplePage, readMarks, type SampleRef, type SampleSubject } from "./SamplePage";
-import { mostSampledSources, catalogSamplers } from "@/lib/samples-catalog";
+import { mostSampledSources, catalogSamplers, lookupCatalog } from "@/lib/samples-catalog";
 import { catalogSongs, type SongKey } from "@/lib/samples-graph";
 import type { Release } from "@/lib/types";
 
@@ -106,16 +106,22 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
   // Suggestions span BOTH the Pulsar catalogue and every song in the sample
   // graph. Searching "Edwin Birdsong" or "Chic" used to dead-end because those
   // records aren't releases in the grid — they're only ever sources.
+  //
+  // Each row also carries how many connections it actually has, and rows that
+  // have some sort first. Searching "Lo" used to return eight modern releases
+  // with ZERO sample data between them: every tap was a dead end, and the
+  // feature looked broken when it was behaving correctly. Now you can see
+  // which records will pay off before you tap one.
   const suggestions = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (q.length < 2) return [] as (Release | SongKey)[];
+    if (q.length < 2) return [] as { item: Release | SongKey; connections: number }[];
     const seen = new Set<string>();
-    const out: (Release | SongKey)[] = [];
+    const out: { item: Release | SongKey; connections: number }[] = [];
     const push = (s: Release | SongKey) => {
       const k = `${s.artist}::${s.title}`.toLowerCase();
       if (seen.has(k)) return;
       seen.add(k);
-      out.push(s);
+      out.push({ item: s, connections: lookupCatalog(s.artist, s.title).length });
     };
     for (const r of releases) {
       if (r.artist.toLowerCase().includes(q) || r.title.toLowerCase().includes(q)) push(r);
@@ -123,8 +129,15 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
     for (const s of songs) {
       if (s.artist.toLowerCase().includes(q) || s.title.toLowerCase().includes(q)) push(s);
     }
-    return out.slice(0, 8);
+    // Records with documented connections first; everything else keeps order.
+    return out
+      .sort((a, b) => (b.connections > 0 ? 1 : 0) - (a.connections > 0 ? 1 : 0))
+      .slice(0, 8);
   }, [query, releases, songs]);
+
+  /** True when the query matched only records we have nothing to say about. */
+  const allSuggestionsEmpty =
+    suggestions.length > 0 && suggestions.every((s) => s.connections === 0);
 
   const busyFor = (artist: string, title: string) => busy === `${artist}::${title}`;
 
@@ -181,31 +194,56 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
                 {busy && <Loader2 size={15} className="animate-spin text-neon-violet" />}
               </div>
 
-              {/* catalogue + graph suggestions */}
+              {/* Catalogue + graph suggestions, each labelled with what it will
+                  actually give you. A row with no connections is dimmed and says
+                  so rather than looking identical to one with three. */}
               {suggestions.length > 0 && (
                 <div className="mt-3 space-y-1">
-                  {suggestions.map((r) => (
+                  {suggestions.map(({ item: r, connections }) => (
                     <button
                       key={`${r.artist}-${r.title}`}
                       onClick={() =>
                         lookup(r.artist, r.title, "artwork_url" in r ? r.artwork_url : undefined)
                       }
-                      className="flex min-h-[52px] w-full items-center gap-3 rounded-xl border border-white/10 px-3 py-2 text-left transition-colors hover:bg-white/[0.06]"
+                      className={`flex min-h-[52px] w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition-colors ${
+                        connections > 0
+                          ? "border-neon-violet/30 bg-neon-violet/[0.06] hover:bg-neon-violet/[0.12]"
+                          : "border-white/10 hover:bg-white/[0.06]"
+                      }`}
                     >
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13px] font-bold text-star-white">
+                        <span
+                          className={`block truncate text-[13px] font-bold ${
+                            connections > 0 ? "text-star-white" : "text-star-white/60"
+                          }`}
+                        >
                           {r.title}
                         </span>
                         <span className="block truncate text-[11px] text-star-white/50">{r.artist}</span>
                       </span>
                       {busyFor(r.artist, r.title) ? (
                         <Loader2 size={14} className="flex-shrink-0 animate-spin text-neon-violet" />
+                      ) : connections > 0 ? (
+                        <span className="flex-shrink-0 rounded-full bg-neon-violet/20 px-2 py-1 text-[10px] font-bold text-neon-violet">
+                          {connections} sample{connections === 1 ? "" : "s"}
+                        </span>
                       ) : (
-                        <AudioLines size={14} className="flex-shrink-0 text-neon-violet/70" />
+                        <span className="flex-shrink-0 text-[10px] uppercase tracking-wide text-star-white/25">
+                          none yet
+                        </span>
                       )}
                     </button>
                   ))}
                 </div>
+              )}
+
+              {/* Every match came back empty — say so up front instead of
+                  letting someone tap eight rows to find that out. */}
+              {allSuggestionsEmpty && !notFound && (
+                <p className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center text-[11px] leading-relaxed text-star-white/45">
+                  None of those have documented samples yet. The connections below are
+                  the ones worth digging into.
+                </p>
               )}
 
               {notFound && (
