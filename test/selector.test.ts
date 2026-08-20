@@ -117,3 +117,33 @@ describe("buildList ranking", () => {
     expect(out[0].genre).toBe("House");
   });
 });
+
+describe("descriptor tags", () => {
+  it("matches a request against how a record is described, not just its title", () => {
+    // The whole point: "for a rainy day" should reach a record somebody
+    // described that way, even though those words appear in no title.
+    const described: Release = {
+      ...rel("Nils Frahm", "Spaces", "Modern Classical", "ambient"),
+      tags: ["modern classical", "sparse piano", "rainy day", "slow", "intimate"],
+    };
+    const undescribed = rel("Some Band", "Rainy Day Anthem", "Rock", "raw");
+    const out = buildList([undescribed, described], parse("something sparse for a rainy day"));
+    expect(out[0].artist).toBe("Nils Frahm");
+  });
+
+  it("scores a descriptor tag above an incidental title word", () => {
+    const tagged: Release = {
+      ...rel("Burial", "Untrue", "Electronic", "melancholic"),
+      tags: ["electronic", "late night", "crackling", "sparse"],
+    };
+    const titleOnly = rel("Nobody", "Late Night Party Smash", "Pop", "euphoric");
+    const out = buildList([titleOnly, tagged], parse("late night"));
+    expect(out[0].artist).toBe("Burial");
+  });
+
+  it("still works for records that carry no descriptors at all", () => {
+    // Most of the catalogue is unenriched; it must not be pushed out.
+    const bare = rel("Kerri Chandler", "Spaces and Places", "House", "hypnotic");
+    expect(buildList([bare], parse("house"))).toHaveLength(1);
+  });
+});

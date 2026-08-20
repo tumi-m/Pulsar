@@ -78,7 +78,17 @@ export const SCORE = {
   /** Mood supports a genre match; it does not substitute for one. */
   moodHit: 2,
   decadeHit: 2,
-  /** A query word appearing anywhere in the metadata. The weakest signal. */
+  /**
+   * A query word matching one of the record's descriptor tags.
+   *
+   * Tags are the only field that describes how a record actually sounds —
+   * "sparse", "late night", "driving", "warm analog synths" — and the scorer
+   * used to ignore them completely, matching only artist, title, genre and
+   * label. That is why "for a rainy day" or "to dance to" contributed nothing:
+   * the words could only ever hit a song title by coincidence.
+   */
+  tagHit: 3,
+  /** A query word appearing anywhere else in the metadata. The weakest signal. */
   wordHit: 1,
 } as const;
 
@@ -109,8 +119,15 @@ export function buildList(releases: Release[], p: Parsed, limit = 80): Release[]
     if (r.mood && p.moods.includes(r.mood)) s += SCORE.moodHit;
     if (p.decades.some((d) => r.release_date.startsWith(d))) s += SCORE.decadeHit;
 
+    // Descriptor tags are scored separately and higher: a tag is something
+    // somebody asserted about the record, whereas a word in a title is usually
+    // a coincidence ("Housework" is not house).
+    const tagHay = (r.tags ?? []).join(" ").toLowerCase();
     const hay = `${r.artist} ${r.title} ${r.genre ?? ""} ${r.label ?? ""}`.toLowerCase();
-    for (const w of words) if (hay.includes(w)) s += SCORE.wordHit;
+    for (const w of words) {
+      if (tagHay.includes(w)) s += SCORE.tagHit;
+      else if (hay.includes(w)) s += SCORE.wordHit;
+    }
 
     return { r, s };
   });
