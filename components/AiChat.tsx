@@ -24,11 +24,14 @@ const uniq = <T,>(xs: T[]) => Array.from(new Set(xs));
 
 /** One exchange: the prompt, the signals derived from it, and the matches. */
 interface Turn {
+  id: string;
   prompt: string;
   signals: Parsed;
   results: Release[];
   source: "llm" | "fallback";
   model?: string;
+  /** true once the model has re-ranked this turn's shortlist */
+  reranked?: boolean;
 }
 
 export function AiChat({ releases }: AiChatProps) {
@@ -121,8 +124,65 @@ export function AiChat({ releases }: AiChatProps) {
         freeText: `${prior.freeText} ${parsed.freeText}`.trim(),
       };
     }
-    setTurns((t) => [...t, { prompt, signals: parsed, results: buildList(releases, parsed), source, model }]);
+    // Show the scorer's answer immediately — the model's judgement is an
+    // improvement on it, not a prerequisite for it.
+    const scored = buildList(releases, parsed);
+    const turnId = `${Date.now()}-${turns.length}`;
+    setTurns((t) => [...t, { id: turnId, prompt, signals: parsed, results: scored, source, model }]);
     setThinking(false);
+
+    // Then ask the model to re-rank the shortlist by how the records actually
+    // SOUND against what was asked for. The scorer can only compare strings; it
+    // has no idea what any of these records sound like. Any failure leaves the
+    // list exactly as it was.
+    void rerank(prompt, scored, turnId);
+  };
+
+  /**
+   * Second pass: the model sees the actual candidates and reorders them.
+   * Applied by turn id so a slow response can't overwrite a newer question.
+   */
+  const rerank = async (prompt: string, scored: Release[], turnId: string) => {
+    const head = scored.slice(0, 40);
+    if (head.length < 2) return;
+    try {
+      const res = await fetch("/api/rerank", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          candidates: head.map((r) => ({
+            artist: r.artist,
+            title: r.title,
+            genre: r.genre,
+            year: r.release_date?.slice(0, 4),
+            tags: r.tags,
+          })),
+        }),
+        signal: AbortSignal.timeout(14000),
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { order: number[] | null; drop?: number[] };
+      if (!data.order?.length) return;
+
+      const dropped = new Set(data.drop ?? []);
+      const takenIdx = new Set(data.order);
+      const reordered = [
+        ...data.order.map((i) => head[i]).filter(Boolean),
+        // Unjudged candidates keep their relative order behind the ranked ones.
+        ...head.filter((_, i) => !takenIdx.has(i) && !dropped.has(i)),
+        // Rejected ones go last rather than vanishing, so the match count
+        // stays honest and nothing silently disappears.
+        ...head.filter((_, i) => dropped.has(i)),
+        ...scored.slice(40),
+      ];
+
+      setTurns((ts) =>
+        ts.map((t) => (t.id === turnId ? { ...t, results: reordered, reranked: true } : t))
+      );
+    } catch {
+      /* timed out or unreachable — the scorer's order stands */
+    }
   };
 
   /** Tap a signal chip on the latest turn to drop it and re-curate instantly. */
@@ -654,9 +714,18 @@ function TurnBlock({
             })}
           </div>
           <div className="mt-2 flex items-center justify-between gap-2 px-1">
+            {/* Say which stage produced this order. "Ranked" means the model
+                actually judged these records; "DeepSeek" alone means it only
+                read the request and the keyword scorer did the ordering. */}
             <p className="text-[10px] font-bold uppercase tracking-widest text-star-white/35">
               {turn.results.length} match{turn.results.length === 1 ? "" : "es"} ·{" "}
-              {turn.source === "llm" ? "DeepSeek" : "keyword match"}
+              {turn.reranked ? (
+                <span className="text-neon-green/70">Ranked by DeepSeek</span>
+              ) : turn.source === "llm" ? (
+                "DeepSeek"
+              ) : (
+                "keyword match"
+              )}
             </p>
             <div className="flex items-center gap-2">
               {turn.results.length > visible && (

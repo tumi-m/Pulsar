@@ -87,32 +87,55 @@ export async function getTodaysReleases(): Promise<Release[]> {
   return (data as Release[]) ?? [];
 }
 
+
+/**
+ * Build the upsert payload for a release.
+ *
+ * The subtlety is what is DELIBERATELY OMITTED. PostgREST's upsert only writes
+ * the columns present in the payload — `ON CONFLICT DO UPDATE SET col =
+ * EXCLUDED.col` for those columns and no others — so leaving a key out means
+ * "keep whatever is already stored".
+ *
+ * That matters because the ingest pipeline enriches only ENRICH_LIMIT releases
+ * per run and then saves ALL of them. Writing `curator_note: null` and
+ * `tags: []` for the unenriched majority wiped the curator notes and sonic
+ * descriptors of every release enriched on a previous run — so enrichment
+ * could never accumulate, and the descriptors the Selector now matches against
+ * would be erased nightly for everything outside the newest slice.
+ *
+ * Enrichment fields are therefore written only when they carry something.
+ * Factual fields (artwork, links, dates) are always written, because a fresh
+ * value from the feed should win.
+ */
+export function upsertPayload(release: AgentRelease): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    artist: release.artist,
+    title: release.title,
+    type: release.type,
+    artwork_url: release.artwork_url,
+    release_date: release.release_date,
+    genre: release.genre ?? null,
+    spotify: release.spotify,
+    apple_music: release.apple_music,
+    tidal: release.tidal,
+    soundcloud: release.soundcloud,
+    youtube_music: release.youtube_music,
+    boomplay: release.boomplay ?? null,
+  };
+  // Only overwrite enrichment when this run actually produced some.
+  if (release.tags && release.tags.length > 0) payload.tags = release.tags;
+  if (release.mood) payload.mood = release.mood;
+  if (release.curator_note) payload.curator_note = release.curator_note;
+  return payload;
+}
+
 export async function saveRelease(
   release: AgentRelease
 ): Promise<Release> {
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("releases")
-    .upsert(
-      {
-        artist: release.artist,
-        title: release.title,
-        type: release.type,
-        artwork_url: release.artwork_url,
-        release_date: release.release_date,
-        genre: release.genre ?? null,
-        tags: release.tags ?? [],
-        mood: release.mood ?? null,
-        spotify: release.spotify,
-        apple_music: release.apple_music,
-        tidal: release.tidal,
-        soundcloud: release.soundcloud,
-        youtube_music: release.youtube_music,
-        boomplay: release.boomplay ?? null,
-        curator_note: release.curator_note ?? null,
-      },
-      { onConflict: "artist,title" }
-    )
+    .upsert(upsertPayload(release), { onConflict: "artist,title" })
     .select()
     .single();
 
