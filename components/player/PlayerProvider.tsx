@@ -61,6 +61,36 @@ interface PlayerCtx {
 const SILENT_WAV =
   "data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA";
 
+/**
+ * Turn a failed play() into something a screenshot can diagnose.
+ *
+ * "Playback was blocked" was a guess dressed as a diagnosis: it assumed the
+ * autoplay policy, when the same branch is reached by a decode failure, a CORS
+ * rejection, or a dead URL. Three rounds of fixes were aimed at the wrong
+ * cause because the message never distinguished them. The browser knows
+ * exactly what went wrong — so say it.
+ */
+function describePlayFailure(audio: HTMLAudioElement, err: unknown): string {
+  const name = err && typeof err === "object" && "name" in err ? String((err as Error).name) : "";
+  // MediaError beats the play() rejection: it says why the MEDIA failed rather
+  // than why the call was refused.
+  switch (audio.error?.code) {
+    case 1:
+      return "Playback aborted — tap play to retry";
+    case 2:
+      return "Network error loading the preview";
+    case 3:
+      return "This preview couldn't be decoded";
+    case 4:
+      return "Preview unavailable from the source";
+  }
+  if (name === "NotAllowedError") return "Your browser blocked audio — tap play again";
+  if (name === "NotSupportedError") return "Preview format not supported here";
+  if (name === "AbortError") return "Playback interrupted — tap play to retry";
+  if (!audio.currentSrc && !audio.getAttribute("src")) return "Preview didn't load — tap play to retry";
+  return name ? `Playback failed (${name})` : "Playback failed — tap play to retry";
+}
+
 const Ctx = createContext<PlayerCtx | null>(null);
 
 export function usePlayer(): PlayerCtx {
@@ -139,6 +169,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // are allowed. Runs once, and never touches src after that so it can't
   // interrupt real playback.
   const unlockedRef = useRef(false);
+  /** Bumped whenever a real source is assigned, invalidating an in-flight prime. */
+  const primeTokenRef = useRef(0);
 
   /**
    * Prime the <audio> element inside a real user gesture.
@@ -155,24 +187,31 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const audio = audioRef.current;
     if (!audio || unlockedRef.current) return Promise.resolve();
 
-    const prevSrc = audio.src;
+    // Priming is asynchronous, and play() assigns the REAL preview URL while
+    // this promise is still pending. The teardown below must therefore never
+    // touch an element that has moved on: clearing the src here deleted the
+    // track we were about to play, so playback failed, and every later tap hit
+    // a source-less element and did nothing at all.
+    const token = ++primeTokenRef.current;
     audio.src = SILENT_WAV;
-    return audio
-      .play()
-      .then(() => {
-        audio.pause();
-        audio.currentTime = 0;
-        if (!prevSrc) audio.removeAttribute("src");
+    return audio.play().then(
+      () => {
         // Only NOW is the element genuinely activated. This flag used to be set
         // BEFORE the attempt, so a single failure permanently disabled
         // unlocking for the rest of the session — the guard `!unlockedRef
-        // .current` then skipped every later gesture. That is a certain bug
-        // independent of why any given attempt failed.
+        // .current` then skipped every later gesture.
         unlockedRef.current = true;
-      })
-      .catch(() => {
+        // Superseded: a real source was assigned while we were priming. Leave
+        // it completely alone.
+        if (primeTokenRef.current !== token) return;
+        audio.pause();
+        audio.currentTime = 0;
+        audio.removeAttribute("src");
+      },
+      () => {
         // Leave unlockedRef false so the next gesture tries again.
-      });
+      }
+    );
   }, []);
 
   useEffect(() => {
@@ -297,6 +336,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (!data.previewUrl) throw new Error("no preview");
         audio.src = data.previewUrl;
         audio.load();
+        // A prime started before this fetch is still pending; stop its teardown
+        // from clearing what we just assigned.
+        primeTokenRef.current++;
         setHasAudio(true);
         // Log the listen (signed-in users only) so history feeds the taste
         // engine and the daily-mix feature. Best-effort, fire-and-forget.
@@ -318,11 +360,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           // One retry: on a cold element the src may not be ready on the first
           // attempt even when permission is fine.
           await new Promise((r) => setTimeout(r, 140));
-          await audio.play().catch(() => {
+          await audio.play().catch((err) => {
             if (reqId === reqIdRef.current) {
-              // Reaching here means permission is genuinely refused rather
-              // than merely un-primed, so say what the listener can do.
-              setError("Tap play again to start audio");
+              setError(describePlayFailure(audio, err));
               setPlaying(false);
             }
           });
@@ -354,6 +394,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setError(null);
       audio.src = previewUrl;
       audio.load();
+      primeTokenRef.current++;
       currentUserId()
         .then((uid) => {
           if (uid) void recordListen(uid, display);
@@ -364,8 +405,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       // is the listener's first interaction with audio.
       audio.play().catch(async () => {
         await unlockAudio();
-        await audio.play().catch(() => {
-          setError("Tap play again to start audio");
+        await audio.play().catch((err) => {
+          setError(describePlayFailure(audio, err));
           setPlaying(false);
         });
       });
@@ -382,9 +423,26 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const audio = audioRef.current;
     if (!audio || !hasAudio) return;
     if (ctxRef.current?.state === "suspended") ctxRef.current.resume().catch(() => {});
-    if (audio.paused) audio.play().catch(() => {});
-    else audio.pause();
-  }, [hasAudio]);
+    if (!audio.paused) {
+      audio.pause();
+      return;
+    }
+    // This tap IS a user activation, so prime first if we never managed to —
+    // that is exactly the state someone is in when they've been told to tap
+    // play again.
+    void unlockAudio().then(() => {
+      audio.play().then(
+        () => setError(null),
+        (err) => {
+          // Never swallow this. Swallowing it is why tapping again appeared to
+          // do nothing whatsoever: the element had no source, play() rejected,
+          // and the failure went into an empty catch.
+          setError(describePlayFailure(audio, err));
+          setPlaying(false);
+        }
+      );
+    });
+  }, [hasAudio, unlockAudio]);
 
   // Shuffle: when ON, previews stop looping so "ended" can advance to the
   // next taste-ranked track; when OFF, previews loop as before.

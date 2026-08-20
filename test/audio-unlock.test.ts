@@ -79,3 +79,83 @@ describe("unlock control flow", () => {
     expect(SRC).toMatch(/capture:\s*true/);
   });
 });
+
+/**
+ * The teardown race.
+ *
+ * Priming is asynchronous and play() assigns the real preview URL while that
+ * promise is still pending. The teardown then ran unconditionally — pausing the
+ * element and calling removeAttribute("src") — which DELETED the track that had
+ * just been loaded. Playback failed for want of a source, the user was told to
+ * tap play again, and every subsequent tap hit a source-less element whose
+ * rejection went into an empty catch. Nothing happened, with no explanation.
+ */
+describe("priming teardown", () => {
+  it("is guarded by a token, so it can't clear a source assigned since", () => {
+    const fn = SRC.slice(SRC.indexOf("const unlockAudio"), SRC.indexOf("const toggle"));
+    const guardIdx = fn.indexOf("primeTokenRef.current !== token");
+    const clearIdx = fn.indexOf('removeAttribute("src")');
+    expect(guardIdx, "expected a token guard before the teardown").toBeGreaterThan(-1);
+    expect(clearIdx).toBeGreaterThan(guardIdx);
+  });
+
+  it("no longer decides what to clear from a stale prevSrc snapshot", () => {
+    // The original captured audio.src BEFORE priming and cleared based on it,
+    // which said nothing about what the element held by the time it resolved.
+    expect(SRC).not.toMatch(/const prevSrc = audio\.src/);
+  });
+
+  it("invalidates a pending prime whenever a real source is assigned", () => {
+    // Both play() and playDirect() must bump the token.
+    const bumps = SRC.match(/primeTokenRef\.current\+\+/g) ?? [];
+    expect(bumps.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("toggle", () => {
+  it("does not swallow a failed play", () => {
+    const fn = SRC.slice(SRC.indexOf("const toggle = useCallback"));
+    const body = fn.slice(0, fn.indexOf("}, [hasAudio"));
+    // The shipped version was `audio.play().catch(() => {})` — a tap that
+    // reported nothing at all.
+    expect(body).not.toMatch(/play\(\)\.catch\(\(\) => \{\}\)/);
+    expect(body).toMatch(/setError\(/);
+  });
+
+  it("primes before playing, since the tap is itself a user activation", () => {
+    const fn = SRC.slice(SRC.indexOf("const toggle = useCallback"));
+    const body = fn.slice(0, fn.indexOf("}, [hasAudio"));
+    expect(body).toMatch(/unlockAudio\(\)/);
+  });
+});
+
+
+/**
+ * Diagnosability.
+ *
+ * "Playback was blocked" asserted a cause (the autoplay policy) that the code
+ * had not established. The same branch is reached by a decode failure, a CORS
+ * rejection or a dead URL — so three rounds of fixes were aimed at a guess.
+ * The browser knows which it was; the UI must repeat it rather than invent one.
+ */
+describe("play failure reporting", () => {
+  it("reads the browser's MediaError code rather than assuming a cause", () => {
+    const fn = SRC.slice(SRC.indexOf("function describePlayFailure"));
+    const body = fn.slice(0, fn.indexOf("\nconst Ctx"));
+    // All four MediaError codes must be distinguished.
+    for (const code of ["case 1:", "case 2:", "case 3:", "case 4:"]) {
+      expect(body, `missing ${code}`).toContain(code);
+    }
+    expect(body).toContain("NotAllowedError");
+  });
+
+  it("no longer claims playback was blocked without evidence", () => {
+    expect(SRC).not.toContain('setError("Playback was blocked")');
+  });
+
+  it("is used by every path that can fail a play", () => {
+    // play(), toggle() and playDirect() must all report through it.
+    const uses = SRC.match(/describePlayFailure\(/g) ?? [];
+    expect(uses.length).toBeGreaterThanOrEqual(4); // definition + 3 call sites
+  });
+});
