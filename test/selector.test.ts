@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parse, buildList } from "@/lib/selector";
+import { parse, buildList, resolveGenres } from "@/lib/selector";
 import type { Release } from "@/lib/types";
 import type { MoodTag } from "@/lib/types";
 
@@ -145,5 +145,46 @@ describe("descriptor tags", () => {
     // Most of the catalogue is unenriched; it must not be pushed out.
     const bare = rel("Kerri Chandler", "Spaces and Places", "House", "hypnotic");
     expect(buildList([bare], parse("house"))).toHaveLength(1);
+  });
+});
+
+describe("resolveGenres", () => {
+  it("maps the model's free-form genres onto real buckets", () => {
+    expect(resolveGenres(["boom bap"]).buckets).toEqual(["Hip-Hop"]);
+    expect(resolveGenres(["neo-soul"]).buckets).toEqual(["Soul / R&B"]);
+    expect(resolveGenres(["shoegaze"]).buckets).toEqual(["Rock"]);
+    expect(resolveGenres(["amapiano"]).buckets).toEqual(["Amapiano"]);
+  });
+
+  it("passes bucket names through unchanged", () => {
+    expect(resolveGenres(["House", "Gospel"]).buckets).toEqual(["House", "Gospel"]);
+  });
+
+  it("returns unmappable terms as leftover instead of poisoning the filter", () => {
+    const { buckets, leftover } = resolveGenres(["chillwave"]);
+    expect(buckets).toEqual([]);
+    expect(leftover).toEqual(["chillwave"]);
+  });
+
+  it("never emits duplicates", () => {
+    expect(resolveGenres(["rap", "hip-hop", "trap"]).buckets).toEqual(["Hip-Hop"]);
+  });
+
+  it("stops an unmappable genre from penalising every genred record", () => {
+    // The shipped bug: "chillwave" entered p.genres, matched no bucket, and the
+    // mismatch branch then charged -4 to every record that HAD a genre — so a
+    // genre-less compilation won on a title word alone.
+    const { buckets } = resolveGenres(["chillwave"]);
+    const real = rel("Washed Out", "Within and Without", "Electronic", "hypnotic");
+    const genreless: Release = { ...rel("Various Artists", "Chill Drives", null, null), tags: [] };
+    const out = buildList([genreless, real], {
+      moods: ["hypnotic"],
+      genres: buckets,
+      decades: [],
+      freeText: "dreamy chillwave for a late-night drive",
+    });
+    // With no usable genre signal, neither is penalised — and the record that
+    // actually matches the mood is not beaten by a title coincidence.
+    expect(out[0].artist).toBe("Washed Out");
   });
 });

@@ -5,7 +5,7 @@ import { motion, AnimatePresence, useDragControls } from "framer-motion";
 import { Sparkles, X, Play, Pause, Loader2, LayoutGrid, MessagesSquare, ArrowUp, RotateCcw } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";
-import { parse, buildList, MOOD_WORDS, GENRE_WORDS, type Parsed } from "@/lib/selector";
+import { parse, buildList, resolveGenres, MOOD_WORDS, GENRE_WORDS, type Parsed } from "@/lib/selector";
 import type { GenreBucket } from "@/lib/utils";
 import { usePlayer } from "./player/PlayerProvider";
 import { togglePlaylist, inPlaylist } from "@/lib/collection";
@@ -103,10 +103,22 @@ export function AiChat({ releases }: AiChatProps) {
         }
         // Merge LLM signals with the keyword parse (union) so the recommender
         // gets the broadest, most accurate signal set.
+        //
+        // The model's genres are free-form ("chillwave", "boom bap"), so they
+        // MUST be resolved to real buckets rather than cast. Casting them broke
+        // scoring both ways: no record could match the genre list, and the
+        // mismatch penalty then fired on every record that had a genre — so
+        // genre-less records won on coincidental title words.
+        const { buckets, leftover } = resolveGenres([
+          ...parsed.genres,
+          ...((llm.genres ?? []) as string[]),
+        ]);
         const moods = uniq([...parsed.moods, ...(llm.moods ?? [])]);
-        const genres = uniq([...parsed.genres, ...(llm.genres ?? [])]) as GenreBucket[];
+        const genres = uniq(buckets);
         const decades = uniq([...parsed.decades, ...(llm.decades ?? [])]);
-        const freeText = `${parsed.freeText} ${llm.freeText ?? ""}`.trim();
+        // Unmapped genre words join the free text, where they can still match a
+        // record's descriptor tags.
+        const freeText = `${parsed.freeText} ${llm.freeText ?? ""} ${leftover.join(" ")}`.trim();
         parsed = { moods, genres, decades, freeText };
       }
     } catch {

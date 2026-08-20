@@ -137,3 +137,48 @@ export function buildList(releases: Release[], p: Parsed, limit = 80): Release[]
     .slice(0, limit)
     .map(({ r }) => r);
 }
+
+/**
+ * Map free-form genre names onto the buckets the scorer understands.
+ *
+ * /api/ask returns whatever the model thinks the genre is — "chillwave",
+ * "boom bap", "neo-soul", "shoegaze". Those were cast straight to GenreBucket
+ * and merged into the signal list, which broke scoring in both directions at
+ * once: nothing could match `p.genres.includes(bucket)`, so NO record earned
+ * the genre bonus, and the mismatch branch then penalised every record that
+ * had a genre at all. Records with no genre metadata sailed to the top on a
+ * coincidental title word — which is how "dreamy chillwave for a late-night
+ * drive" returned "Taxi Driver" and "Pop Drive".
+ *
+ * Anything that maps becomes a real bucket. Anything that doesn't is returned
+ * as leftover text rather than discarded, so a term like "shoegaze" can still
+ * match a record's descriptor tags instead of silently poisoning the genre
+ * filter.
+ */
+export function resolveGenres(freeform: string[]): {
+  buckets: GenreBucket[];
+  leftover: string[];
+} {
+  const buckets: GenreBucket[] = [];
+  const leftover: string[] = [];
+  const entries = Object.entries(GENRE_WORDS) as [GenreBucket, string[]][];
+
+  for (const raw of freeform) {
+    const g = raw.trim().toLowerCase();
+    if (!g) continue;
+    // Already a bucket name (the keyword parser emits these directly).
+    const exact = entries.find(([bucket]) => bucket.toLowerCase() === g);
+    if (exact) {
+      if (!buckets.includes(exact[0])) buckets.push(exact[0]);
+      continue;
+    }
+    // Otherwise look it up in each bucket's keyword vocabulary.
+    const viaKeyword = entries.find(([, kws]) => kws.some((k) => g.includes(k) || k.includes(g)));
+    if (viaKeyword) {
+      if (!buckets.includes(viaKeyword[0])) buckets.push(viaKeyword[0]);
+      continue;
+    }
+    leftover.push(g);
+  }
+  return { buckets, leftover };
+}
