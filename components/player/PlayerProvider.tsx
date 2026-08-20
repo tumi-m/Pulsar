@@ -49,6 +49,18 @@ interface PlayerCtx {
   getAnalyser: () => AnalyserNode | null;
 }
 
+/**
+ * 0.05s of true silence — 8kHz mono 8-bit PCM, 400 real frames.
+ *
+ * The clip this replaced declared a `data` chunk of ZERO bytes: a valid header
+ * with no audio behind it. Chromium tolerates that (it fires loadedmetadata,
+ * though duration comes back null); Safari is stricter about media it cannot
+ * decode, and this unlock exists for Safari. Rather than rely on a malformed
+ * file being tolerated, prime with something that genuinely plays.
+ */
+const SILENT_WAV =
+  "data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA";
+
 const Ctx = createContext<PlayerCtx | null>(null);
 
 export function usePlayer(): PlayerCtx {
@@ -127,33 +139,58 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // are allowed. Runs once, and never touches src after that so it can't
   // interrupt real playback.
   const unlockedRef = useRef(false);
-  useEffect(() => {
-    const unlock = () => {
-      ctxRef.current?.resume?.().catch(() => {});
-      const audio = audioRef.current;
-      if (audio && !unlockedRef.current) {
+
+  /**
+   * Prime the <audio> element inside a real user gesture.
+   *
+   * Safari only allows a programmatic play() if the element has already played
+   * once from a genuine user activation. Ours runs AFTER an async preview
+   * fetch, which spends the activation — so without this every first play is
+   * rejected and the user is told "Playback was blocked".
+   *
+   * Returns the play promise so callers can wait for it if they need to.
+   */
+  const unlockAudio = useCallback((): Promise<void> => {
+    ctxRef.current?.resume?.().catch(() => {});
+    const audio = audioRef.current;
+    if (!audio || unlockedRef.current) return Promise.resolve();
+
+    const prevSrc = audio.src;
+    audio.src = SILENT_WAV;
+    return audio
+      .play()
+      .then(() => {
+        audio.pause();
+        audio.currentTime = 0;
+        if (!prevSrc) audio.removeAttribute("src");
+        // Only NOW is the element genuinely activated. This flag used to be set
+        // BEFORE the attempt, so a single failure permanently disabled
+        // unlocking for the rest of the session — the guard `!unlockedRef
+        // .current` then skipped every later gesture. That is a certain bug
+        // independent of why any given attempt failed.
         unlockedRef.current = true;
-        const SILENT =
-          "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
-        const prevSrc = audio.src;
-        audio.src = SILENT;
-        audio
-          .play()
-          .then(() => {
-            audio.pause();
-            audio.currentTime = 0;
-            if (!prevSrc) audio.removeAttribute("src");
-          })
-          .catch(() => {});
-      }
-    };
-    document.addEventListener("pointerdown", unlock);
-    document.addEventListener("touchend", unlock);
-    return () => {
-      document.removeEventListener("pointerdown", unlock);
-      document.removeEventListener("touchend", unlock);
-    };
+      })
+      .catch(() => {
+        // Leave unlockedRef false so the next gesture tries again.
+      });
   }, []);
+
+  useEffect(() => {
+    const onGesture = () => {
+      void unlockAudio();
+    };
+    // Capture phase: a component calling stopPropagation() on pointerdown
+    // would otherwise stop the unlock from ever running.
+    const opts = { capture: true } as const;
+    document.addEventListener("pointerdown", onGesture, opts);
+    document.addEventListener("touchend", onGesture, opts);
+    document.addEventListener("keydown", onGesture, opts);
+    return () => {
+      document.removeEventListener("pointerdown", onGesture, opts);
+      document.removeEventListener("touchend", onGesture, opts);
+      document.removeEventListener("keydown", onGesture, opts);
+    };
+  }, [unlockAudio]);
 
   useEffect(() => {
     const audio = new Audio();
@@ -219,6 +256,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       // graph is built lazily, on desktop, only when the visualiser opens.
       if (ctxRef.current?.state === "suspended") ctxRef.current.resume().catch(() => {});
 
+      // Prime the element NOW, synchronously, while we still hold the user
+      // activation from the tap that called this. Everything below awaits a
+      // network round-trip for the preview URL, and by the time that resolves
+      // the activation is spent — which is precisely why playback was being
+      // blocked. The document-level listener usually gets here first, but this
+      // covers the case where it didn't, or where its attempt failed.
+      const unlocking = unlockedRef.current ? null : unlockAudio();
+
       // Same track → just toggle. Compare id AND title so that an album track
       // (which shares the album's id via playDirect) doesn't short-circuit a
       // real album play into a mute pause toggle.
@@ -260,14 +305,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             if (uid) void recordListen(uid, release);
           })
           .catch(() => {});
-        // Play; retry once — the first mobile play can race the unlock.
+        // Make sure the priming play() has finished before we start the real
+        // one — two concurrent play() calls on the same element make Safari
+        // reject both. A bare 140ms sleep used to stand in for this and lost
+        // the race whenever the silent clip took longer.
+        if (unlocking) await unlocking.catch(() => {});
+        if (reqId !== reqIdRef.current) return;
+
         try {
           await audio.play();
         } catch {
+          // One retry: on a cold element the src may not be ready on the first
+          // attempt even when permission is fine.
           await new Promise((r) => setTimeout(r, 140));
           await audio.play().catch(() => {
             if (reqId === reqIdRef.current) {
-              setError("Playback was blocked");
+              // Reaching here means permission is genuinely refused rather
+              // than merely un-primed, so say what the listener can do.
+              setError("Tap play again to start audio");
               setPlaying(false);
             }
           });
@@ -282,7 +337,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (reqId === reqIdRef.current) setLoading(false);
       }
     },
-    [current, hasAudio]
+    [current, hasAudio, unlockAudio]
   );
 
   // Play a specific, already-resolved preview URL (e.g. an album track).
@@ -304,15 +359,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           if (uid) void recordListen(uid, display);
         })
         .catch(() => {});
+      // playDirect is called with an already-resolved URL, so there's no fetch
+      // in the way — but the element may still never have been primed if this
+      // is the listener's first interaction with audio.
       audio.play().catch(async () => {
-        await new Promise((r) => setTimeout(r, 140));
-        audio.play().catch(() => {
-          setError("Playback was blocked");
+        await unlockAudio();
+        await audio.play().catch(() => {
+          setError("Tap play again to start audio");
           setPlaying(false);
         });
       });
     },
-    []
+    [unlockAudio]
   );
 
   // Keep a stable ref to play() so the audio "ended" handler can advance.
