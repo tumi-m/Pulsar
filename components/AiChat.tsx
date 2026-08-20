@@ -14,6 +14,7 @@ import { useScrollLock } from "@/lib/useScrollLock";
 import { useBackClose } from "@/lib/useBackClose";
 import { Portal } from "./Portal";
 import { PLATFORMS } from "./platforms";
+import { MiniPlayer } from "./player/MiniPlayer";
 
 interface AiChatProps {
   releases: Release[];
@@ -428,8 +429,17 @@ export function AiChat({ releases }: AiChatProps) {
                   )}
                 </div>
 
+                {/* Transport for the previews started from the result rows.
+                    The global NowPlayingBar is z-50 and this sheet is z-[58] at
+                    full height, so the bar is buried whenever the Selector is
+                    open — you could start a clip and then have no way to see or
+                    control it. This strip gives the panel its own. */}
+                <div className="relative z-10 px-3 sm:px-4">
+                  <MiniPlayer />
+                </div>
+
                 {/* composer */}
-                <div className="relative z-10 border-t border-white/[0.08] p-3 sm:p-4">
+                <div className="relative z-10 border-t border-white/[0.08] p-3 pt-2.5 sm:p-4 sm:pt-3">
                   <div className="flex items-end gap-2 rounded-2xl border border-star-white/[0.12] bg-star-white/[0.04] p-2 transition-colors focus-within:border-neon-violet/50">
                     <textarea
                       value={text}
