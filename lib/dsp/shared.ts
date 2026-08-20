@@ -48,12 +48,14 @@ export interface DspProvider {
 export interface DspRuntimeConfig {
   spotifyClientId: string;
   googleClientId: string;
+  tidalClientId: string;
   appleEnabled: boolean;
 }
 
 const BUILD_TIME_CONFIG: DspRuntimeConfig = {
   spotifyClientId: process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ?? "",
   googleClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "",
+  tidalClientId: process.env.NEXT_PUBLIC_TIDAL_CLIENT_ID ?? "",
   appleEnabled: process.env.NEXT_PUBLIC_APPLE_MUSIC_ENABLED === "true",
 };
 
@@ -68,6 +70,7 @@ export function loadDspConfig(force = false): Promise<DspRuntimeConfig> {
     .then((c: Partial<DspRuntimeConfig>) => ({
       spotifyClientId: c.spotifyClientId || BUILD_TIME_CONFIG.spotifyClientId,
       googleClientId: c.googleClientId || BUILD_TIME_CONFIG.googleClientId,
+      tidalClientId: c.tidalClientId || BUILD_TIME_CONFIG.tidalClientId,
       appleEnabled: c.appleEnabled ?? BUILD_TIME_CONFIG.appleEnabled,
     }))
     .catch(() => BUILD_TIME_CONFIG);

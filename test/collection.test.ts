@@ -35,6 +35,7 @@ const r = (id: string): Release =>
     tidal: null,
     soundcloud: null,
     youtube_music: null,
+  boomplay: null,
     created_at: "2026-01-01T00:00:00Z",
     curator_note: null,
   }) as Release;

@@ -25,6 +25,7 @@ create table if not exists releases (
   tidal         text,
   soundcloud    text,
   youtube_music text,
+  boomplay      text,
   curator_note  text,
   created_at    timestamptz default now(),
 
@@ -148,3 +149,10 @@ create index if not exists listen_history_user_idx on listen_history (user_id, p
 -- drop them once:
 --   delete from releases where artwork_url like '%placeholder%';
 -- ─────────────────────────────────────────────
+
+-- ─────────────────────────────────────────────
+-- Migrations for databases created before a column existed.
+-- `create table if not exists` above is a no-op on an existing database, so a
+-- new column has to be added explicitly or every write silently drops it.
+-- ─────────────────────────────────────────────
+alter table releases add column if not exists boomplay text;

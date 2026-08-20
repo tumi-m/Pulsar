@@ -108,6 +108,7 @@ export async function saveRelease(
         tidal: release.tidal,
         soundcloud: release.soundcloud,
         youtube_music: release.youtube_music,
+        boomplay: release.boomplay ?? null,
         curator_note: release.curator_note ?? null,
       },
       { onConflict: "artist,title" }

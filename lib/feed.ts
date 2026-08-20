@@ -15,6 +15,7 @@
 
 import type { Release, ReleaseType, MoodTag } from "./types";
 import { artistMatches } from "./match";
+import { boomplaySearchUrl } from "./utils";
 import { GRAMMY_ARTISTS_UNIQUE } from "./grammy-artists";
 import { WORLD_ARTISTS_FLAT } from "./world-artists";
 
@@ -24,6 +25,7 @@ const am = (q: string) => `https://music.apple.com/search?term=${encodeURICompon
 const td = (q: string) => `https://tidal.com/search?q=${encodeURIComponent(q)}`;
 const sc = (q: string) => `https://soundcloud.com/search?q=${encodeURIComponent(q)}`;
 const yt = (q: string) => `https://music.youtube.com/search?q=${encodeURIComponent(q)}`;
+const bp = (q: string) => boomplaySearchUrl(q);
 
 // Map a genre string onto one of our mood accent colors.
 const GENRE_MOOD: Record<string, MoodTag> = {
@@ -104,6 +106,7 @@ function baseRelease(
     tidal: td(q),
     soundcloud: sc(q),
     youtube_music: yt(q),
+    boomplay: bp(q),
     created_at: releaseDate + "T00:00:00Z",
     curator_note: null,
   };

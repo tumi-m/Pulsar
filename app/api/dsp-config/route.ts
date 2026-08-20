@@ -31,6 +31,7 @@ export async function GET() {
     {
       spotifyClientId: pick("SPOTIFY_CLIENT_ID", "NEXT_PUBLIC_SPOTIFY_CLIENT_ID"),
       googleClientId: pick("GOOGLE_CLIENT_ID", "NEXT_PUBLIC_GOOGLE_CLIENT_ID"),
+      tidalClientId: pick("TIDAL_CLIENT_ID", "NEXT_PUBLIC_TIDAL_CLIENT_ID"),
       appleEnabled:
         process.env.APPLE_MUSIC_ENABLED === "true" ||
         process.env.NEXT_PUBLIC_APPLE_MUSIC_ENABLED === "true",

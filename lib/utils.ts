@@ -154,4 +154,31 @@ export const PLATFORM_META = {
     hoverBg: "hover:bg-[#FF0000]/20",
     icon: "youtube",
   },
+  boomplay: {
+    label: "Boomplay",
+    color: "#2F6BFF",
+    hoverBg: "hover:bg-[#2F6BFF]/20",
+    icon: "boomplay",
+  },
 };
+
+/**
+ * Boomplay search deep link.
+ *
+ * Boomplay has no public API, so like Tidal and SoundCloud this is a search
+ * URL rather than a direct track link. It is worth having despite that:
+ * Boomplay is the largest streaming service in Africa at roughly 95M monthly
+ * active users, which is an order of magnitude more reach than Tidal, and it
+ * is where a lot of Pulsar's amapiano, gqom, kwaito and SA gospel catalogue
+ * actually lives.
+ *
+ * ⚠ UNVERIFIED PATH. This session could not reach boomplay.com — the egress
+ * proxy refuses it — so the path below could not be confirmed against the live
+ * site. It is deliberately the only place the format appears: if tapping a
+ * Boomplay icon lands somewhere wrong, correct this one line and every link in
+ * the app follows.
+ */
+export const BOOMPLAY_SEARCH_PATH = "https://www.boomplay.com/search/default/";
+
+export const boomplaySearchUrl = (q: string): string =>
+  `${BOOMPLAY_SEARCH_PATH}${encodeURIComponent(q)}`;

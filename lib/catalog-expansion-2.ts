@@ -9,6 +9,7 @@
  * generate->verify multi-agent workflow.
  */
 
+import { boomplaySearchUrl } from "./utils";
 import type { Release } from "./types";
 
 const enc = encodeURIComponent;
@@ -21,6 +22,7 @@ const links = (artist: string, title: string) => {
     tidal: `https://tidal.com/search?q=${enc(q)}`,
     soundcloud: `https://soundcloud.com/search?q=${enc(q)}`,
     youtube_music: `https://music.youtube.com/search?q=${enc(q)}`,
+    boomplay: boomplaySearchUrl(q),
   };
 };
 

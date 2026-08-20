@@ -20,6 +20,7 @@ import {
   type ProgressFn,
 } from "./shared";
 import { spotifyProvider, setSpotifyClientId } from "./spotify";
+import { tidalProvider, setTidalClientId } from "./tidal";
 import { youtubeProvider, setGoogleClientId } from "./youtube";
 import { appleProvider, setAppleEnabled } from "./apple";
 
@@ -27,6 +28,7 @@ const PROVIDERS: Record<string, DspProvider> = {
   [spotifyProvider.key]: spotifyProvider,
   [youtubeProvider.key]: youtubeProvider,
   [appleProvider.key]: appleProvider,
+  [tidalProvider.key]: tidalProvider,
 };
 
 /**
@@ -39,6 +41,7 @@ export async function ensureDspConfig(force = false): Promise<void> {
   const cfg = await loadDspConfig(force);
   setSpotifyClientId(cfg.spotifyClientId);
   setGoogleClientId(cfg.googleClientId);
+  setTidalClientId(cfg.tidalClientId);
   setAppleEnabled(cfg.appleEnabled);
 }
 

@@ -1,3 +1,4 @@
+import { boomplaySearchUrl } from "@/lib/utils";
 import { NextRequest, NextResponse } from "next/server";
 import type { Release, ReleaseType } from "@/lib/types";
 
@@ -16,6 +17,7 @@ const am = (q: string) => `https://music.apple.com/search?term=${encodeURICompon
 const td = (q: string) => `https://tidal.com/search?q=${encodeURIComponent(q)}`;
 const sc = (q: string) => `https://soundcloud.com/search?q=${encodeURIComponent(q)}`;
 const yt = (q: string) => `https://music.youtube.com/search?q=${encodeURIComponent(q)}`;
+const bp = (q: string) => boomplaySearchUrl(q);
 
 interface DeezerAlbum {
   id?: number;
@@ -88,6 +90,7 @@ export async function GET(req: NextRequest) {
         tidal: td(q),
         soundcloud: sc(q),
         youtube_music: yt(q),
+    boomplay: bp(q),
         created_at: (date || "1900-01-01") + "T00:00:00Z",
         curator_note: null,
       });

@@ -615,6 +615,11 @@ function TurnBlock({
                       {r.genre ? ` · ${r.genre}` : ""}
                     </p>
 
+                    {/* Six services have to fit one line inside a ~200px text
+                        column on a 390px phone. At 32px they wrapped and left a
+                        single orphaned icon on a second row, pushing every row
+                        from 120px to 155px. 28px + 6px gaps = 198px — fits,
+                        and returns to 32px as soon as there's room. */}
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       {links.map((p) => (
                         <a
@@ -624,7 +629,7 @@ function TurnBlock({
                           rel="noopener noreferrer"
                           title={`${r.artist} — ${r.title} on ${p.label}`}
                           aria-label={`Find ${r.title} by ${r.artist} on ${p.label}`}
-                          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border transition-transform hover:scale-110 [&>svg]:h-4 [&>svg]:w-4"
+                          className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border transition-transform hover:scale-110 sm:h-8 sm:w-8 [&>svg]:h-[15px] [&>svg]:w-[15px] sm:[&>svg]:h-4 sm:[&>svg]:w-4"
                           style={{ backgroundColor: `${p.color}1f`, borderColor: `${p.color}45`, color: p.color }}
                         >
                           <p.Icon />
