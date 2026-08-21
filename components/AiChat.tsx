@@ -250,6 +250,15 @@ export function AiChat({ releases }: AiChatProps) {
             onClick={close}
             className="fixed inset-0 z-[58] bg-void/75 backdrop-blur-md"
           />
+          {/* Centring lives HERE, in flexbox, not on the panel.
+              The panel used `left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`,
+              but Framer Motion writes the element's `transform` to animate it —
+              and once the entrance finished it set `transform: none`, wiping the
+              centring translate. The panel was left anchored at (50%, 50%) with
+              no correction, so on a 1920x1080 screen it hung 320px off the right
+              edge and 356px off the bottom. A flex container can't be clobbered
+              by an animated transform. */}
+          <div className="pointer-events-none fixed inset-0 z-[58] flex items-end justify-center sm:items-center sm:p-6">
           <motion.div
             initial={isMobile ? { y: "100%" } : { opacity: 0, y: 16, scale: 0.97 }}
             animate={isMobile ? { y: 0 } : { opacity: 1, y: 0, scale: 1 }}
@@ -264,11 +273,13 @@ export function AiChat({ releases }: AiChatProps) {
               if (info.offset.y > 120) close();
             }}
             className="
-              fixed inset-x-0 bottom-0 z-[58] flex h-[100dvh] w-full transform-gpu flex-col
+              pointer-events-auto relative flex h-[100dvh] w-full transform-gpu flex-col
               overflow-hidden rounded-t-[26px] border border-white/15 border-b-0
               bg-[#0a0a14]/75 pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl
-              sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:h-auto
-              sm:max-h-[86dvh] sm:w-[min(94vw,44rem)] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl sm:border-b
+              sm:rounded-3xl sm:border-b
+              sm:h-[min(88dvh,44rem)] sm:w-[min(94vw,46rem)]
+              lg:h-[min(88dvh,50rem)] lg:w-[min(92vw,66rem)]
+              2xl:h-[min(90dvh,56rem)] 2xl:w-[min(88vw,80rem)]
             "
             style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35), 0 -12px 60px rgba(0,0,0,0.6), 0 24px 70px rgba(0,0,0,0.6)" }}
           >
@@ -325,11 +336,11 @@ export function AiChat({ releases }: AiChatProps) {
                     <X size={16} />
                   </button>
                 </div>
-                <div className="mt-5 grid grid-cols-2 gap-3">
+                <div className="mt-5 grid grid-cols-2 gap-3 lg:mt-8 lg:gap-5">
                   <motion.button
                     whileTap={{ scale: 0.96 }}
                     onClick={chooseSurvey}
-                    className="group relative flex flex-col items-center gap-3 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-center transition-all hover:border-neon-violet/50 hover:bg-neon-violet/[0.07]"
+                    className="group relative flex flex-col items-center gap-3 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-center transition-all hover:border-neon-violet/50 hover:bg-neon-violet/[0.07] lg:gap-4 lg:p-9"
                   >
                     <span
                       className="pointer-events-none absolute -inset-8 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
@@ -354,7 +365,7 @@ export function AiChat({ releases }: AiChatProps) {
                   <motion.button
                     whileTap={{ scale: 0.96 }}
                     onClick={() => setView("chat")}
-                    className="group relative flex flex-col items-center gap-3 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-center transition-all hover:border-neon-blue/50 hover:bg-neon-blue/[0.07]"
+                    className="group relative flex flex-col items-center gap-3 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-center transition-all hover:border-neon-blue/50 hover:bg-neon-blue/[0.07] lg:gap-4 lg:p-9"
                   >
                     <span
                       className="pointer-events-none absolute -inset-8 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
@@ -547,6 +558,7 @@ export function AiChat({ releases }: AiChatProps) {
               </>
             )}
           </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>
@@ -573,9 +585,9 @@ function TurnBlock({
   current: ReturnType<typeof usePlayer>["current"];
   player: ReturnType<typeof usePlayer>;
 }) {
-  // Start at 10 and grow in 10s, so a long list stays browsable
-  // instead of flipping between 6 and everything.
-  const [visible, setVisible] = useState(10);
+  // Start at 12 and grow in 12s: it divides evenly into the two- and
+  // three-column desktop grids, so the last row is never a lone orphan.
+  const [visible, setVisible] = useState(12);
   const shown = turn.results.slice(0, visible);
   const chips = [
     ...turn.signals.moods.map((v) => ({ kind: "moods" as const, v, color: "rgba(155,93,229,0.5)" })),
@@ -619,7 +631,11 @@ function TurnBlock({
         </p>
       ) : (
         <>
-          <div className="space-y-1">
+          {/* A single column left most of a desktop panel empty. Results are a
+              browsable set, so they get a grid: two columns once there's room,
+              three on a large display. Each cell keeps the same internal layout
+              that already fits a 390px phone, so nothing has to reflow. */}
+          <div className="grid grid-cols-1 gap-1.5 lg:grid-cols-2 2xl:grid-cols-3">
             {shown.map((r) => {
               const isThis = current?.artist === r.artist && current?.title === r.title;
               const links = PLATFORMS.filter((p) => r[p.key]);
@@ -742,15 +758,15 @@ function TurnBlock({
             <div className="flex items-center gap-2">
               {turn.results.length > visible && (
                 <button
-                  onClick={() => setVisible((v) => v + 10)}
+                  onClick={() => setVisible((v) => v + 12)}
                   className="text-[10px] font-bold uppercase tracking-widest text-star-white/50 hover:text-star-white"
                 >
-                  +{Math.min(10, turn.results.length - visible)} more
+                  +{Math.min(12, turn.results.length - visible)} more
                 </button>
               )}
-              {visible > 10 && (
+              {visible > 12 && (
                 <button
-                  onClick={() => setVisible(10)}
+                  onClick={() => setVisible(12)}
                   className="text-[10px] font-bold uppercase tracking-widest text-star-white/35 hover:text-star-white"
                 >
                   Less
