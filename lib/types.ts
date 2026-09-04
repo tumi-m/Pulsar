@@ -43,6 +43,10 @@ export interface Release {
   popularity?: number | null;
   /** Record label (e.g. "Sub Pop", "Griselda"). Optional metadata. */
   label?: string | null;
+  /** Extracted credit list. Not persisted by the legacy ingest path. */
+  credits?: import("./credits").Credit[];
+  /** Title with credit fragments stripped — use for display and dedupe. */
+  clean_title?: string;
 }
 
 export interface AgentRelease {

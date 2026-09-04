@@ -1,14 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  /* Off-White / industrial: Helvetica Neue, bold, caps, quoted labels */
-  --font-display: 'Helvetica Neue', Helvetica, Arial, system-ui, sans-serif;
-  --font-body: 'Helvetica Neue', Helvetica, Arial, system-ui, sans-serif;
-  --font-mono: 'Space Mono', monospace;
+  /* Typefaces are provided by next/font in app/layout.tsx
+     (--font-display/body/mono). Fallbacks live in tailwind.config.ts. */
 
   /* ── Design tokens: one radius / hairline / layering scale ──
      Components previously hard-coded rounded-lg/xl/2xl and z-[57]-style
@@ -135,6 +131,23 @@ body {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+}
+
+/* ─── Eyebrow — the ONE small-label style ─────────
+   Replaces the 9/10/11px + tracking 0.18–0.4em sprawl. Use for section
+   labels, kickers, and meta rows. Sentence-case body text elsewhere. */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  line-height: 1.5;
+}
+
+/* ─── Balanced headlines ───────────────────────── */
+.text-balance {
+  text-wrap: balance;
 }
 
 /* ─── Antigravity noise texture overlay ───────── */

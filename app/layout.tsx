@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Inter, Space_Mono } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { ParticleField } from "@/components/ParticleField";
@@ -11,6 +12,9 @@ import { NowPlayingBar } from "@/components/player/NowPlayingBar";
 import { SyncBridge } from "@/components/SyncBridge";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://pulsar-ten-sigma.vercel.app"
+  ),
   title: "PULSAR — Daily Music Discovery",
   description:
     "The best new music — every day. Curated by AI across genres. One-click access to Spotify, Apple Music, Tidal, SoundCloud, and YouTube Music.",
@@ -41,20 +45,50 @@ export const viewport: Viewport = {
   themeColor: "#04040a",
 };
 
+/**
+ * Premium-minimal type scale — self-hosted via next/font (no render-blocking
+ * Google Fonts request). Display/body share Inter; labels stay Space Mono.
+ * Tailwind maps `font-display/body/mono` to these vars (tailwind.config.ts).
+ */
+const fontDisplay = Inter({
+  subsets: ["latin"],
+  variable: "--font-display",
+  weight: ["700", "800"],
+  display: "swap",
+});
+const fontBody = Inter({
+  subsets: ["latin"],
+  variable: "--font-body",
+  display: "swap",
+});
+const fontMono = Space_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  weight: ["400", "700"],
+  display: "swap",
+});
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html
+      lang="en"
+      className={`dark ${fontDisplay.variable} ${fontBody.variable} ${fontMono.variable}`}
+    >
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/icon.svg" />
       </head>
       <body className="noise-overlay vignette bg-void min-h-screen">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[90] focus:rounded-full focus:bg-white focus:px-4 focus:py-2 focus:text-xs focus:font-bold focus:text-black"
+        >
+          Skip to content
+        </a>
         {/* Themed nebula background (reacts to the chosen theme) */}
         <ThemedBackground />
 
@@ -75,7 +109,7 @@ export default function RootLayout({
           <Sidebar />
 
           {/* Page content */}
-          <main className="relative z-10">
+          <main id="main" className="relative z-10">
             {children}
           </main>
 

@@ -24,11 +24,13 @@ export function HeroSection() {
     };
   }, []);
 
-  // Fibonacci spacing above; the generous bottom padding reserves room for the
-  // floating search bar + feature reel so the grid always starts below them.
+  // Horizontal rhythm matches the nav (px-5/md:px-10); the generous bottom
+  // padding reserves room for the floating search bar + feature reel so the
+  // grid always starts below them. Verticals stay coupled to the search
+  // pill's fixed top offset in ReleaseGrid — change them together.
   return (
     <section
-      className={`px-[21px] pb-[132px] pt-[89px] text-center transition-[padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:pb-[140px] md:pt-[120px] ${
+      className={`px-5 pb-[132px] pt-[89px] text-center transition-[padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:px-10 md:pb-[140px] md:pt-[120px] ${
         detailOpen || samplesOpen ? "lg:pr-[50vw]" : ""
       }`}
     >
@@ -36,7 +38,7 @@ export function HeroSection() {
         initial={{ opacity: 0, y: 14, filter: "blur(6px)" }}
         animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
         transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-        className="mx-auto max-w-3xl text-5xl font-bold tracking-tight md:text-7xl"
+        className="text-balance mx-auto max-w-3xl font-display text-5xl font-bold tracking-tight md:text-7xl"
         style={{
           background: "linear-gradient(120deg, #ffe8c9 0%, #ff9d5c 22%, #ff5fa2 48%, #9b5de5 72%, #00d4ff 100%)",
           WebkitBackgroundClip: "text",
@@ -51,7 +53,7 @@ export function HeroSection() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.35, duration: 0.9 }}
-        className="mt-[13px] text-[11px] font-bold uppercase tracking-[0.4em] text-star-white/45"
+        className="eyebrow mx-auto mt-4 max-w-md text-star-white/60"
       >
         Music discovery
       </motion.p>

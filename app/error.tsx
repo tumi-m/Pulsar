@@ -57,8 +57,15 @@ export default function Error({
           onClick={() => {
             // Locally-stored state (a corrupt crate, a stale grid zoom) is a
             // plausible cause, so offer a clean slate as a last resort.
+            // Narrowly scoped: never wipe auth verifiers/tokens or the whole
+            // store — only PULSAR-namespaced UI keys.
             try {
-              localStorage.clear();
+              const drop: string[] = [];
+              for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && k.startsWith("pulsar")) drop.push(k);
+              }
+              drop.forEach((k) => localStorage.removeItem(k));
               sessionStorage.clear();
             } catch {
               /* storage unavailable */

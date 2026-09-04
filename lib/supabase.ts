@@ -5,8 +5,14 @@ import type { Release, AgentRelease } from "./types";
 const resolved = Promise.resolve({ data: [], error: null, count: 0 });
 const buildTimeStub: unknown = new Proxy(resolved, {
   get(target, prop) {
-    if (prop === "then" || prop === "catch" || prop === "finally") {
-      return (target as Promise<unknown>)[prop as "then"].bind(target);
+    if (prop === "then") {
+      return (target as Promise<unknown>).then.bind(target);
+    }
+    if (prop === "catch") {
+      return (target as Promise<unknown>).catch.bind(target);
+    }
+    if (prop === "finally") {
+      return (target as Promise<unknown>).finally.bind(target);
     }
     return () => buildTimeStub;
   },
@@ -53,20 +59,32 @@ export const supabaseAdmin = () =>
     auth: { persistSession: false },
   });
 
+export const MAX_RELEASES_LIMIT = 100;
+export const MAX_SEARCH_LIMIT = 60;
+
+function clampLimit(value: number | undefined, max: number): number | undefined {
+  if (value == null) return undefined;
+  if (!Number.isFinite(value) || value <= 0) return undefined;
+  return Math.min(Math.floor(value), max);
+}
+
 export async function getReleases(opts?: {
   limit?: number;
   mood?: string;
   date?: string;
 }): Promise<Release[]> {
+  const limit = clampLimit(opts?.limit, MAX_RELEASES_LIMIT);
+  const mood = opts?.mood?.trim().slice(0, 64) || undefined;
+  const date = opts?.date?.trim().slice(0, 32) || undefined;
   let query = supabase
     .from("releases")
     .select("*")
     .order("release_date", { ascending: false })
     .order("created_at", { ascending: false });
 
-  if (opts?.mood) query = query.eq("mood", opts.mood);
-  if (opts?.date) query = query.eq("release_date", opts.date);
-  if (opts?.limit) query = query.limit(opts.limit);
+  if (mood) query = query.eq("mood", mood);
+  if (date) query = query.eq("release_date", date);
+  if (limit) query = query.limit(limit);
 
   const { data, error } = await query;
   if (error) throw new Error(`Failed to fetch releases: ${error.message}`);
@@ -166,14 +184,15 @@ export async function searchReleases(q: string, limit = 60): Promise<Release[]> 
   if (!term) return [];
   // Supabase `.or()` with ilike patterns. Escape the pattern metacharacters a
   // user could type so a stray % or _ doesn't turn into a wildcard match-all.
-  const esc = term.replace(/[%_\\]/g, "");
+  const esc = term.replace(/([%_\\])/g, "\\$1");
   if (!esc) return [];
+  const safeLimit = clampLimit(limit, MAX_SEARCH_LIMIT) ?? MAX_SEARCH_LIMIT;
   const { data, error } = await supabase
     .from("releases")
     .select("*")
     .or(`artist.ilike.%${esc}%,title.ilike.%${esc}%,genre.ilike.%${esc}%`)
     .order("release_date", { ascending: false })
-    .limit(limit);
+    .limit(safeLimit);
   if (error) return [];
   return (data as Release[]) ?? [];
 }

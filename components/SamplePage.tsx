@@ -15,6 +15,7 @@ import {
   Check,
   Crosshair,
   Pencil,
+  Dna,
 } from "lucide-react";
 import Link from "next/link";
 import { Artwork } from "./Artwork";
@@ -23,6 +24,8 @@ import { useYouTubePlayer } from "@/lib/useYouTubePlayer";
 import { youtubeSearchUrl } from "@/lib/samples-media";
 import { Portal } from "./Portal";
 import { SampleGraph } from "./SampleGraph";
+import { relatedSongs } from "@/lib/samples-graph";
+import { parseCredits, type Credit } from "@/lib/credits";
 import type { Release } from "@/lib/types";
 
 export type RelationRole = "samples" | "sampledBy" | "covers" | "coveredBy" | "remixOf" | "remixedBy";
@@ -570,11 +573,14 @@ export function SamplePage({
   samples,
   onClose,
   releases,
+  onLookup,
 }: {
   subject: SampleSubject | null;
   samples: SampleRef[];
   onClose: () => void;
   releases?: Release[];
+  /** When provided, related tracks navigate to that song's breakdown. */
+  onLookup?: (artist: string, title: string) => void;
 }) {
   const [graphOpen, setGraphOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -610,6 +616,24 @@ export function SamplePage({
   const coveredBy = samples.filter((s) => s.role === "coveredBy");
   const remixOf = samples.filter((s) => s.role === "remixOf");
   const remixedBy = samples.filter((s) => s.role === "remixedBy");
+
+  // Related tracks — songs that share sample DNA (WhoSampled's "related" strip).
+  // Pure + cheap, so computed inline (no hook) after the null guard above.
+  const related = relatedSongs(subject.artist, subject.title, 6);
+
+  // Credits for the subject — prefer the release's pre-computed credits, else
+  // parse the artist + title on the spot (deterministic, keyless).
+  const subjectRelease = releases?.find(
+    (r) =>
+      r.artist.toLowerCase() === subject.artist.toLowerCase() &&
+      (r.title.toLowerCase() === subject.title.toLowerCase() ||
+        r.clean_title?.toLowerCase() === subject.title.toLowerCase())
+  );
+  const credits: Credit[] =
+    subjectRelease?.credits ?? parseCredits(subject.artist, subject.title).credits;
+  const featCredits = credits.filter((c) => c.role === "featured");
+  const prodCredits = credits.filter((c) => c.role === "producer");
+  const remixCredits = credits.filter((c) => c.role === "remixer");
 
   const playNode = (artist: string, title: string) => {
     // Open a YouTube tab for the node — quickest "hear the source" path.
@@ -718,8 +742,59 @@ export function SamplePage({
               {(covers.length > 0 || coveredBy.length > 0) && " · covers"}
               {(remixOf.length > 0 || remixedBy.length > 0) && " · remixes"}
             </p>
+            {(featCredits.length > 0 || prodCredits.length > 0 || remixCredits.length > 0) && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {featCredits.map((c) => (
+                  <span key={`f-${c.slug}`} className="rounded-full bg-neon-green/[0.12] px-2 py-0.5 text-[9px] font-bold text-neon-green">
+                    feat. {c.name}
+                  </span>
+                ))}
+                {prodCredits.map((c) => (
+                  <span key={`p-${c.slug}`} className="rounded-full bg-neon-violet/[0.12] px-2 py-0.5 text-[9px] font-bold text-neon-violet">
+                    prod. {c.name}
+                  </span>
+                ))}
+                {remixCredits.map((c) => (
+                  <span key={`r-${c.slug}`} className="rounded-full bg-neon-blue/[0.12] px-2 py-0.5 text-[9px] font-bold text-neon-blue">
+                    {c.name} remix
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
+
+        {/* ── Related tracks — shared sample DNA ── */}
+        {related.length > 0 && (
+          <div className="mb-5">
+            <p className="mb-2 flex items-center gap-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-star-white/40">
+              <Dna size={11} className="text-neon-green/70" /> Related tracks
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {related.map((r) => (
+                <button
+                  key={`${r.artist}-${r.title}`}
+                  onClick={() =>
+                    onLookup ? onLookup(r.artist, r.title) : playNode(r.artist, r.title)
+                  }
+                  className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-left transition-colors hover:border-neon-green/40 hover:bg-neon-green/[0.08]"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-[11px] font-bold text-star-white group-hover:text-star-white">
+                      {r.title}
+                    </span>
+                    <span className="block truncate text-[9px] text-star-white/45">{r.artist}</span>
+                  </span>
+                  {r.sharedSources.length > 0 && (
+                    <span className="flex-shrink-0 rounded-full bg-neon-green/15 px-1.5 py-0.5 text-[8px] font-bold text-neon-green">
+                      {r.sharedSources.length} shared
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ── Force-directed sample DNA graph, on demand ──
             It used to open by default and pushed every actual connection below

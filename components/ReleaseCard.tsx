@@ -151,7 +151,7 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
         className="block w-full outline-none focus-visible:ring-2 focus-visible:ring-star-white/40"
       >
         <div
-          className={`relative w-full overflow-hidden rounded-2xl ring-1 ring-star-white/[0.06] transition-[transform,box-shadow,ring-color] duration-300 ${
+          className={`relative w-full overflow-hidden rounded-xl ring-1 ring-star-white/[0.06] transition-[transform,box-shadow,ring-color] duration-300 ${
             size === 1 ? "aspect-[2/1]" : "aspect-square"
           } ${size > 0 ? "tile-float" : ""} ${
             revealed ? "scale-[1.03] ring-2 ring-neon-violet/50" : ""
@@ -226,7 +226,7 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
             <p className={`font-bold uppercase leading-tight text-star-white ${big ? "text-base" : "text-[11px]"} line-clamp-1`}>
               {release.title}
             </p>
-            <p className="truncate text-[10px] text-star-white/60">{release.artist}</p>
+            <p className="truncate text-[10px] text-star-white/70">{release.artist}</p>
             {release.label && (
               <p className="mt-0.5 truncate text-[8px] font-bold uppercase tracking-[0.2em] text-neon-green/70">
                 {release.label}

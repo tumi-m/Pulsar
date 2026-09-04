@@ -1,16 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
+
+function isAuthorized(req: NextRequest): boolean {
+  const secret = process.env.AGENT_TRIGGER_SECRET;
+  if (!secret) return false;
+  // Vercel Crons issue GET with no custom headers, so accept the secret as a
+  // query param as well as the Authorization header (manual/CI path).
+  const header = req.headers.get("authorization");
+  const param = new URL(req.url).searchParams.get("secret");
+  return header === `Bearer ${secret}` || param === secret;
+}
 
 export async function POST(req: NextRequest) {
   // Verify secret to prevent unauthorized triggers
-  const authHeader = req.headers.get("authorization");
-  const expectedSecret = `Bearer ${process.env.AGENT_TRIGGER_SECRET}`;
-
-  if (!process.env.AGENT_TRIGGER_SECRET || authHeader !== expectedSecret) {
+  if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  return runIngestResponse();
+}
+async function runIngestResponse() {
   try {
     // Reliable path: ingest fresh releases from the free Apple RSS feeds
     // into Supabase. Needs only the Supabase service key.
@@ -37,8 +48,12 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Health check
-export async function GET() {
+// Health check — doubles as the Vercel Cron entrypoint (crons issue GET).
+// Pass ?secret=$AGENT_TRIGGER_SECRET (or the Authorization header) to run ingest.
+export async function GET(req: NextRequest) {
+  if (isAuthorized(req)) {
+    return runIngestResponse();
+  }
   return NextResponse.json({
     status: "ok",
     service: "pulsar-agent",

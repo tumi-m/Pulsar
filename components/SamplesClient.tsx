@@ -2,20 +2,22 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import { Search, Loader2, AudioLines, Trophy, Sparkles, ArrowDownRight, Link2, BarChart3, Users, ArrowRight, ExternalLink } from "lucide-react";
+import { Search, Loader2, AudioLines, Trophy, Sparkles, ArrowDownRight, Link2, BarChart3, Users, ArrowRight, ExternalLink, Mic2 } from "lucide-react";
 import Link from "next/link";
 import { SamplePage, type SampleRef, type SampleSubject } from "./SamplePage";
-import { ConnectPanel, CanonPanel } from "./SamplesPanels";
+import { ConnectPanel, CanonPanel, ArtistPanel, PeoplePanel } from "./SamplesPanels";
 import { mostSampledSources, catalogSamplers } from "@/lib/samples-catalog";
 import { catalogSongs, connectSongs, mostSampledArtists, sourceDecades, type ConnectResult, type SongKey } from "@/lib/samples-graph";
 import type { Release } from "@/lib/types";
 
-type Tab = "lookup" | "connect" | "canon";
+type Tab = "lookup" | "connect" | "canon" | "artist" | "people";
 
 const TABS: { id: Tab; label: string; icon: typeof Search }[] = [
   { id: "lookup", label: "Lookup", icon: Search },
   { id: "connect", label: "Connect", icon: Link2 },
   { id: "canon", label: "The Canon", icon: BarChart3 },
+  { id: "artist", label: "Artist", icon: Mic2 },
+  { id: "people", label: "People", icon: Users },
 ];
 
 /**
@@ -201,6 +203,14 @@ export function SamplesClient({
         <CanonPanel artists={artists} decades={decades} />
       )}
 
+      {tab === "artist" && (
+        <ArtistPanel suggest={suggest} lookup={lookup} />
+      )}
+
+      {tab === "people" && (
+        <PeoplePanel releases={releases} />
+      )}
+
       {/* most sampled leaderboard */}
       <section className="mt-12">
         <h2 className="mb-3 flex items-center gap-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-star-white/40">
@@ -265,6 +275,7 @@ export function SamplesClient({
             samples={viewing.samples}
             releases={releases}
             onClose={() => setViewing(null)}
+            onLookup={(artist, title) => lookup(artist, title)}
           />
         )}
       </AnimatePresence>

@@ -6,6 +6,8 @@ import {
   mostSampledArtists,
   sourceDecades,
   catalogSongs,
+  artistProfile,
+  relatedSongs,
 } from "@/lib/samples-graph";
 import { SAMPLE_CATALOG } from "@/lib/samples-catalog";
 
@@ -125,5 +127,67 @@ describe("graph stats", () => {
     const keys = songs.map((s) => `${s.artist}::${s.title}`.toLowerCase());
     expect(new Set(keys).size).toBe(keys.length);
     expect(songs.length).toBeGreaterThan(150);
+  });
+});
+
+describe("artistProfile", () => {
+  it("lists everything an artist samples and everything that sampled them", () => {
+    const p = artistProfile("Kanye West");
+    // Kanye samples Daft Punk (Stronger) and is sampled by others.
+    expect(p.samples.some((e) => /daft punk/i.test(e.artist))).toBe(true);
+    expect(p.samplingCount).toBe(p.samples.length);
+    expect(p.sampledCount).toBe(p.sampledBy.length);
+    // Every edge carries a role and a real title.
+    for (const e of [...p.samples, ...p.sampledBy]) {
+      expect(e.title.trim().length).toBeGreaterThan(0);
+      expect(["samples", "sampledBy"]).toContain(e.role);
+    }
+  });
+
+  it("finds an artist who is only ever sampled (a source, never a sampler)", () => {
+    const p = artistProfile("James Brown");
+    expect(p.sampledBy.length).toBeGreaterThan(0);
+    // James Brown is a source in the catalog; his sampledCount must match.
+    expect(p.sampledCount).toBe(p.sampledBy.length);
+  });
+
+  it("returns empty arrays for an artist not in the graph", () => {
+    const p = artistProfile("Nobody Real At All");
+    expect(p.samples).toEqual([]);
+    expect(p.sampledBy).toEqual([]);
+    expect(p.songs).toEqual([]);
+    expect(p.sampledCount).toBe(0);
+    expect(p.samplingCount).toBe(0);
+  });
+
+  it("matches loosely (shorthand artist names still land)", () => {
+    // "Notorious B.I.G." is a substring of the catalog's "The Notorious B.I.G.".
+    const p = artistProfile("Notorious B.I.G.");
+    expect(p.samples.length).toBeGreaterThan(0);
+  });
+});
+
+describe("relatedSongs", () => {
+  it("returns songs that share sample DNA with the subject", () => {
+    // Kanye's "Stronger" samples Daft Punk; other songs also sample Daft Punk.
+    const rel = relatedSongs("Kanye West", "Stronger");
+    expect(rel.length).toBeGreaterThan(0);
+    for (const r of rel) {
+      expect(r.title.trim().length).toBeGreaterThan(0);
+      expect(r.artist.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it("never returns the subject itself", () => {
+    const rel = relatedSongs("Kanye West", "Stronger");
+    expect(rel.some((r) => /stronger/i.test(r.title) && /kanye/i.test(r.artist))).toBe(false);
+  });
+
+  it("returns [] for an unknown song", () => {
+    expect(relatedSongs("Nobody Real", "Untitled")).toEqual([]);
+  });
+
+  it("respects the limit", () => {
+    expect(relatedSongs("Kanye West", "Stronger", 3).length).toBeLessThanOrEqual(3);
   });
 });

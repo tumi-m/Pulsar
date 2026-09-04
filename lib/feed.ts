@@ -18,6 +18,21 @@ import { artistMatches } from "./match";
 import { boomplaySearchUrl } from "./utils";
 import { GRAMMY_ARTISTS_UNIQUE } from "./grammy-artists";
 import { WORLD_ARTISTS_FLAT } from "./world-artists";
+import { CATALOG } from "./catalog";
+import {
+  registerAtomicArtists,
+  parseCredits,
+} from "./credits";
+
+// Seed the atomic-name index once per server boot with every artist name the
+// app already knows. Only separator-containing names ("Earth, Wind & Fire",
+// "Mellow & Sleazy") are retained — they are the only ones that could ever be
+// mis-split, so indexing the rest would just waste memory.
+registerAtomicArtists([
+  ...GRAMMY_ARTISTS_UNIQUE,
+  ...WORLD_ARTISTS_FLAT,
+  ...CATALOG.map((r) => r.artist),
+]);
 
 // ── platform deep links ──────────────────────
 const sp = (q: string) => `https://open.spotify.com/search/${encodeURIComponent(q)}`;
@@ -91,6 +106,7 @@ function baseRelease(
   appleUrl: string | null
 ): Release {
   const q = `${artist} ${title}`;
+  const { credits, cleanTitle } = parseCredits(artist, title);
   return {
     id: stableId(artist, title),
     artist,
@@ -109,6 +125,8 @@ function baseRelease(
     boomplay: bp(q),
     created_at: releaseDate + "T00:00:00Z",
     curator_note: null,
+    credits,
+    clean_title: cleanTitle,
   };
 }
 

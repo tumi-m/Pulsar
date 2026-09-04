@@ -1,18 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getReleases, getTodaysReleases } from "@/lib/supabase";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const revalidate = 300; // 5 minutes
+
+const MAX_LIMIT = 100;
+
+function parseLimit(raw: string | null): number | undefined {
+  if (raw == null || raw === "") return undefined;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return Math.min(n, MAX_LIMIT);
+}
+
+function parseParam(raw: string | null): string | undefined {
+  if (raw == null) return undefined;
+  const v = raw.trim().slice(0, 64);
+  return v ? v : undefined;
+}
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const mood = searchParams.get("mood") ?? undefined;
-    const date = searchParams.get("date") ?? undefined;
+    const mood = parseParam(searchParams.get("mood"));
+    const date = parseParam(searchParams.get("date"));
     const today = searchParams.get("today");
-    const limit = searchParams.get("limit")
-      ? parseInt(searchParams.get("limit")!)
-      : undefined;
+    const limit = parseLimit(searchParams.get("limit"));
 
     let releases;
     if (today === "true") {
