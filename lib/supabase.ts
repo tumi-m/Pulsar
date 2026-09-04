@@ -151,6 +151,38 @@ export async function saveRelease(
   release: AgentRelease
 ): Promise<Release> {
   const db = supabaseAdmin();
+  // Case-insensitive dedupe before the upsert: the unique index is on
+  // (artist, title) with default collation, so "The Beatles" and "the
+  // beatles" are different rows to Postgres — but releaseExists (the agent's
+  // duplicate check) is .ilike, case-insensitive. Without this check the
+  // agent would be told "safe to add" for a case variant and insert a
+  // duplicate row forever. Resolve the existing row first; if found, update
+  // it by id instead of inserting.
+  const { count, error: checkErr } = await db
+    .from("releases")
+    .select("id", { count: "exact", head: true })
+    .ilike("artist", release.artist)
+    .ilike("title", release.title);
+  if (!checkErr && (count ?? 0) > 0) {
+    const { data: existing, error: findErr } = await db
+      .from("releases")
+      .select("id")
+      .ilike("artist", release.artist)
+      .ilike("title", release.title)
+      .order("created_at", { ascending: true })
+      .limit(1);
+    const row = (existing as { id: string }[] | null)?.[0];
+    if (!findErr && row) {
+      const { data, error } = await db
+        .from("releases")
+        .update(upsertPayload(release))
+        .eq("id", row.id)
+        .select()
+        .single();
+      if (error) throw new Error(`Failed to save release: ${error.message}`);
+      return data as Release;
+    }
+  }
   const { data, error } = await db
     .from("releases")
     .upsert(upsertPayload(release), { onConflict: "artist,title" })
