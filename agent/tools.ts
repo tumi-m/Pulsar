@@ -275,6 +275,8 @@ async function executeWebSearch(input: {
     }
 
     if (process.env.SERP_API_KEY) {
+      // SerpAPI requires the key as a query parameter (their only auth mode) —
+      // but never log this URL: it carries the secret.
       const res = await fetch(
         `https://serpapi.com/search.json?q=${encodeURIComponent(fullQuery)}&api_key=${process.env.SERP_API_KEY}&num=10`
       );
