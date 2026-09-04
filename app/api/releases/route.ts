@@ -39,6 +39,9 @@ export async function GET(req: NextRequest) {
       {
         headers: {
           "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+          // Netlify caches functions by PATH only unless this is set — without
+          // it ?mood=X and ?date=Y would all serve the same cached body.
+          "Netlify-Vary": "query",
         },
       }
     );

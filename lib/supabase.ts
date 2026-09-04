@@ -214,9 +214,12 @@ export async function releaseExists(artist: string, title: string): Promise<bool
 export async function searchReleases(q: string, limit = 60): Promise<Release[]> {
   const term = q.trim().slice(0, 120);
   if (!term) return [];
-  // Supabase `.or()` with ilike patterns. Escape the pattern metacharacters a
-  // user could type so a stray % or _ doesn't turn into a wildcard match-all.
-  const esc = term.replace(/([%_\\])/g, "\\$1");
+  // PostgREST .or() grammar uses commas and parentheses as control characters,
+  // and % / _ are LIKE wildcards. Strip ALL of them: the term is a search
+  // substring, so punctuation carries no signal and a crafted query like
+  // "a),title.eq.pwned(" could otherwise inject extra filter clauses.
+  // (Parentheses are the injection vector — commas split clauses.)
+  const esc = term.replace(/[%_\\,()"']/g, " ").trim();
   if (!esc) return [];
   const safeLimit = clampLimit(limit, MAX_SEARCH_LIMIT) ?? MAX_SEARCH_LIMIT;
   const { data, error } = await supabase
