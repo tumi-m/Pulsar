@@ -6,7 +6,7 @@ const sanitize = (term: string) => term.replace(/[%_\\,()"']/g, " ").trim();
 
 describe("searchReleases sanitizer", () => {
   it("strips PostgREST or() control characters", () => {
-    expect(sanitize('a),title.eq.pwned,(b')).toBe("a title.eq.pwned b");
+    expect(sanitize('a),title.eq.pwned,(b')).toBe("a  title.eq.pwned  b");
   });
 
   it("strips LIKE wildcards", () => {
@@ -14,7 +14,7 @@ describe("searchReleases sanitizer", () => {
   });
 
   it("strips quotes and backslashes", () => {
-    expect(sanitize('o"brien\\')).toBe("o brien ");
+    expect(sanitize('o"brien\\')).toBe("o brien");
   });
 
   it("keeps plain words intact", () => {
