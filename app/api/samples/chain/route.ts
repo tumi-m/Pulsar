@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { SampleRef, RelationRole } from "../route";
 import { traceChains } from "@/lib/samples-graph";
+import { guard } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 /**
  * GET /api/samples/chain?artist=...&title=...
@@ -91,6 +93,10 @@ async function samplesOf(artist: string, title: string): Promise<SampleRef[]> {
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 export async function GET(req: NextRequest) {
+  // Depth-4 MusicBrainz BFS fans out to dozens of upstream calls per hit.
+  const limited = guard(req, "chain", { limit: 30, windowMs: 3_600_000 });
+  if (limited) return limited;
+
   const { searchParams } = new URL(req.url);
   const artist = searchParams.get("artist")?.slice(0, 200) ?? "";
   const title = searchParams.get("title")?.slice(0, 200) ?? "";

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guard } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -14,6 +15,10 @@ function isAuthorized(req: NextRequest): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  // Ingest is a long Supabase write burst — don't let one IP spam it.
+  const limited = guard(req, "agent", { limit: 5, windowMs: 3_600_000 });
+  if (limited) return limited;
+
   // Verify secret to prevent unauthorized triggers
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
