@@ -36,7 +36,7 @@ interface Turn {
 
 export function AiChat({ releases }: AiChatProps) {
   const player = usePlayer();
-  const { current } = usePlayer();
+  const current = player.current;
   // null = closed, "choose" = the left/right picker, "chat" = the selector room
   const [view, setView] = useState<"choose" | "chat" | null>(null);
   const [text, setText] = useState("");

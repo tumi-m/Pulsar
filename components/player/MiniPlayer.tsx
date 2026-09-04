@@ -4,7 +4,7 @@ import { useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Play, Pause, Loader2, X, Maximize2 } from "lucide-react";
 import { Artwork } from "../Artwork";
-import { usePlayer } from "./PlayerProvider";
+import { usePlayer, useTransport } from "./PlayerProvider";
 
 /**
  * Compact transport strip for use INSIDE a panel.
@@ -26,8 +26,9 @@ export function MiniPlayer({
   onExpand?: () => void;
   className?: string;
 }) {
-  const { current, playing, loading, progress, elapsed, duration, hasAudio, error, toggle, stop, seek } =
+  const { current, playing, loading, hasAudio, error, toggle, stop, seek } =
     usePlayer();
+  const { progress, elapsed, duration } = useTransport();
   const barRef = useRef<HTMLDivElement>(null);
 
   const time = (s: number) =>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Play, Pause, X, Maximize2, Loader2, ChevronUp, Disc3, ListMusic, Sparkles } from "lucide-react";
-import { usePlayer } from "./PlayerProvider";
+import { usePlayer, useTransport } from "./PlayerProvider";
 import { Artwork } from "../Artwork";
 import { Visualizer } from "../Visualizer";
 import { CrateIcon } from "../CrateIcon";
@@ -17,8 +17,11 @@ import type { Release } from "@/lib/types";
  * full 3D visualizer.
  */
 export function NowPlayingBar() {
-  const { current, playing, loading, progress, elapsed, duration, hasAudio, error, toggle, stop, seek, ensureGraph, play } =
+  const { current, playing, loading, hasAudio, error, toggle, stop, seek, ensureGraph, play } =
     usePlayer();
+  // Hot per-tick values come from the transport context — reading them here
+  // keeps the 4×/s re-render scoped to this bar instead of every tile.
+  const { progress, elapsed, duration } = useTransport();
   const [expanded, setExpanded] = useState<Release | null>(null);
   const [inCrate, setInCrate] = useState(false);
   // "Where do you want to go?" sheet, opened by tapping the track info.

@@ -22,10 +22,6 @@ interface PlayerCtx {
   current: Release | null;
   playing: boolean;
   loading: boolean;
-  progress: number; // 0..1
-  /** Seconds elapsed / total, so the transport can show real times. */
-  elapsed: number;
-  duration: number;
   hasAudio: boolean;
   shuffle: boolean;
   /** Last playback error surfaced to the UI (null when healthy). */
@@ -47,6 +43,21 @@ interface PlayerCtx {
    *  The visualizer reads this so it reliably tracks the already-playing
    *  audio — critical on iOS/Safari where autoplay is blocked. */
   getAnalyser: () => AnalyserNode | null;
+}
+
+/**
+ * Hot transport values — updated ~4×/s by `timeupdate`.
+ *
+ * Kept in a SEPARATE context on purpose: context updates re-render every
+ * consumer of that context regardless of `memo`, so folding these into the
+ * main player context made every mounted tile re-render four times a second
+ * while a preview played. Only the transport bars read this.
+ */
+interface TransportCtx {
+  progress: number; // 0..1
+  /** Seconds elapsed / total, so the transport can show real times. */
+  elapsed: number;
+  duration: number;
 }
 
 /**
@@ -92,10 +103,18 @@ function describePlayFailure(audio: HTMLAudioElement, err: unknown): string {
 }
 
 const Ctx = createContext<PlayerCtx | null>(null);
+const Transport = createContext<TransportCtx | null>(null);
 
 export function usePlayer(): PlayerCtx {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("usePlayer must be used within PlayerProvider");
+  return ctx;
+}
+
+/** Hot transport values (progress/elapsed/duration) — transport bars only. */
+export function useTransport(): TransportCtx {
+  const ctx = useContext(Transport);
+  if (!ctx) throw new Error("useTransport must be used within PlayerProvider");
   return ctx;
 }
 
@@ -483,14 +502,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const transportValue = { progress, elapsed, duration };
+
   return (
     <Ctx.Provider
       value={{
-        current, playing, loading, progress, elapsed, duration, hasAudio, shuffle, error,
+        current, playing, loading, hasAudio, shuffle, error,
         play, playDirect, toggle, toggleShuffle, stop, seek, setNextProvider, ensureGraph, getAnalyser,
       }}
     >
-      {children}
+      <Transport.Provider value={transportValue}>{children}</Transport.Provider>
     </Ctx.Provider>
   );
 }
