@@ -75,14 +75,28 @@ function readCrates(): Crate[] {
     const raw = localStorage.getItem(CRATES_KEY);
     if (raw) {
       const arr = JSON.parse(raw);
-      if (Array.isArray(arr) && arr.length) return arr as Crate[];
+      if (Array.isArray(arr)) return arr as Crate[];
+      // An explicitly-invalid value (not an array) falls through to migration;
+      // an EMPTY array is returned as-is — it means the user deleted their
+      // crates, and re-running the legacy migration would resurrect them.
+    } else {
+      // No v2 key at all: first run — migrate the legacy single playlist into
+      // a default crate and PERSIST it so this runs exactly once.
+      const legacy = read(PLAY_KEY);
+      const migrated: Crate[] = [{ id: "default", name: "My Crate", releases: legacy }];
+      try {
+        localStorage.setItem(CRATES_KEY, JSON.stringify(migrated));
+      } catch {
+        /* storage full/blocked — migration stays in-memory, harmless */
+      }
+      return migrated;
     }
   } catch {
-    /* fall through to migration */
+    /* fall through to default */
   }
-  // First run: migrate the legacy single playlist into a default crate.
-  const legacy = read(PLAY_KEY);
-  return [{ id: "default", name: "My Crate", releases: legacy }];
+  // Unparsable v2 value: don't resurrect legacy data over a corrupted real
+  // crate list — return the default crate and let the next write repair it.
+  return [{ id: "default", name: "My Crate", releases: [] }];
 }
 
 function writeCrates(crates: Crate[]): void {
