@@ -86,39 +86,118 @@ export function onAuthChange(fn: (userId: string | null) => void): () => void {
 const table = (name: string) => supabase.from(name) as any;
 
 /**
- * Mirror the entire local collection up to Supabase for `userId`.
- * Replaces the user's remote crates/favorites with the local ones (last
- * writer wins). Called after any collection change while signed in.
+ * Mirror the local collection up to Supabase for `userId`.
+ *
+ * MERGE, never replace: remote rows are upserted on the existing unique
+ * constraints (crates.name per user, favorites/crate_items per release id),
+ * and local-only deletions are reconciled explicitly by id list. A crashed
+ * push can never wipe the remote collection the way delete-all+reinsert
+ * could — every step is additive or an exact keyed delete.
  */
 export async function pushCollection(userId: string): Promise<void> {
   if (!syncConfigured()) return;
   try {
-    // Favorites
+    // ── Favorites ────────────────────────────────────────────────
     const favs = getFavorites();
-    await table("favorites").delete().eq("user_id", userId);
-    if (favs.length) {
-      await table("favorites").insert(
-        favs.map((release) => ({ user_id: userId, release }))
+    const favIds = favs.map((r) => r.id);
+    // Remote rows not present locally were removed on this device → delete.
+    const { data: remoteFavIds } = await table("favorites")
+      .select("release->>'id' as rid")
+      .eq("user_id", userId);
+    const localFavSet = new Set(favIds);
+    const staleFavs = (remoteFavIds ?? [])
+      .map((r: { rid?: string }) => r.rid)
+      .filter((id?: string) => id && !localFavSet.has(id));
+    if (staleFavs.length) {
+      await table("favorites")
+        .delete()
+        .eq("user_id", userId)
+        .in("release->>'id'", staleFavs);
+    }
+    for (const chunk of chunked(favs, 500)) {
+      const { error } = await table("favorites").upsert(
+        chunk.map((release) => ({ user_id: userId, release })),
+        { onConflict: "user_id,release->>'id'", ignoreDuplicates: false }
       );
+      if (error) console.warn("[sync] favorites upsert:", error.message);
     }
 
-    // Crates + items
+    // ── Crates ───────────────────────────────────────────────────
     const crates = getCrates();
-    await table("crates").delete().eq("user_id", userId);
-    for (const crate of crates) {
-      const { data } = await table("crates")
-        .insert({ user_id: userId, name: crate.name })
-        .select("id")
-        .single();
-      const crateId = (data as { id?: string } | null)?.id;
-      if (!crateId || !crate.releases.length) continue;
-      await table("crate_items").insert(
-        crate.releases.map((release) => ({ crate_id: crateId, release }))
-      );
+    const { data: remoteCrates } = await table("crates")
+      .select("id, name")
+      .eq("user_id", userId);
+    const remoteCrateRows = (remoteCrates ?? []) as { id: string; name: string }[];
+
+    // Upsert crate metadata keyed by (user_id, name). Local crate ids are
+    // client-generated, so reuse the remote id when the name matches — that
+    // keeps crate_items linked across devices.
+    const remoteByName = new Map(remoteCrateRows.map((c) => [c.name, c]));
+    const crateIdFor = new Map<string, string>();
+    for (const c of crates) {
+      const remote = remoteByName.get(c.name);
+      const id = remote?.id ?? c.id;
+      crateIdFor.set(c.id, id);
     }
-  } catch {
-    /* offline / RLS — local copy is authoritative; the next sign-in re-syncs */
+    const staleCrates = remoteCrateRows.filter((c) => {
+      // Remote crate whose name no longer exists locally (renamed/deleted).
+      return !crates.some((c2) => crateIdFor.get(c2.id) === c.id);
+    });
+    if (staleCrates.length) {
+      await table("crates")
+        .delete()
+        .in("id", staleCrates.map((c) => c.id))
+        .eq("user_id", userId);
+    }
+    for (const chunk of chunked(crates, 100)) {
+      const { error } = await table("crates").upsert(
+        chunk.map((c) => ({
+          id: crateIdFor.get(c.id) ?? c.id,
+          user_id: userId,
+          name: c.name,
+        })),
+        { onConflict: "id" }
+      );
+      if (error) console.warn("[sync] crates upsert:", error.message);
+    }
+
+    // ── Crate items ──────────────────────────────────────────────
+    for (const c of crates) {
+      const crateId = crateIdFor.get(c.id) ?? c.id;
+      const { data: remoteItems } = await table("crate_items")
+        .select("release->>'id' as rid")
+        .eq("crate_id", crateId);
+      const localSet = new Set(c.releases.map((r) => r.id));
+      const staleItems = (remoteItems ?? [])
+        .map((r: { rid?: string }) => r.rid)
+        .filter((id?: string) => id && !localSet.has(id));
+      if (staleItems.length) {
+        await table("crate_items")
+          .delete()
+          .eq("crate_id", crateId)
+          .in("release->>'id'", staleItems);
+      }
+      for (const chunk of chunked(c.releases, 500)) {
+        const { error } = await table("crate_items").upsert(
+          chunk.map((release) => ({ crate_id: crateId, release })),
+          { onConflict: "crate_id,release->>'id'" }
+        );
+        if (error) console.warn("[sync] crate_items upsert:", error.message);
+      }
+    }
+  } catch (err) {
+    console.warn(
+      "[sync] push failed (offline/RLS) — local copy stays authoritative:",
+      err instanceof Error ? err.message : err
+    );
   }
+}
+
+/** Split a list into fixed-size batches (Supabase payload safety). */
+function chunked<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
 }
 
 // ── Pull: Supabase → local ─────────────────────────────────────────
