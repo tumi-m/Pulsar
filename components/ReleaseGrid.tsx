@@ -234,6 +234,27 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     detailOpenRef.current = detailOpen;
   }, [detailOpen]);
 
+  // `/?play=<release id>` — the release page's "Play in PULSAR" CTA lands
+  // here. Find the release in the grid catalogue, open its detail sheet,
+  // and start the preview once. Runs once on mount.
+  const playedFromParamRef = useRef(false);
+  useEffect(() => {
+    if (playedFromParamRef.current) return;
+    const id = new URLSearchParams(window.location.search).get("play");
+    if (!id) return;
+    playedFromParamRef.current = true;
+    const target = releases.find((r) => r.id === id);
+    if (!target) return;
+    // Deferred to a microtask: this effect runs during hydration, and the
+    // synchronous setState inside it cascades renders on first paint.
+    setTimeout(() => {
+      setSelectedRelease(target);
+      player.play(target);
+    }, 0);
+    // Clean the URL so a refresh doesn't replay it.
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [releases, player]);
+
   // Tell the navbar when album mode is open so its header can go symmetrical.
   useEffect(() => {
     window.dispatchEvent(new CustomEvent("pulsar-detail-open", { detail: detailOpen }));
@@ -330,18 +351,24 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   // ranked track that hasn't played yet (no repeats until the pool is dry).
   useEffect(() => {
     player.setNextProvider((cur) => {
-      if (cur) playedRef.current.add(cur.id);
+      if (cur) {
+        // Track displays share the album's id prefix — count the ALBUM as
+        // played, not just the individual track, so shuffle doesn't pick
+        // another track off the same album right away.
+        playedRef.current.add(cur.id.split("#")[0]);
+      }
       const pool = rankedForYou.slice(0, Math.max(20, Math.min(120, rankedForYou.length)));
-      let fresh = pool.filter((r) => r.id !== cur?.id && !playedRef.current.has(r.id));
+      const baseOf = (r: Release) => r.id.split("#")[0];
+      let fresh = pool.filter((r) => !playedRef.current.has(baseOf(r)));
       if (!fresh.length) {
-        // Whole pool heard — start a new cycle (still skip the current track).
+        // Whole pool heard — start a new cycle (still skip the current album).
         playedRef.current.clear();
-        if (cur) playedRef.current.add(cur.id);
-        fresh = pool.filter((r) => r.id !== cur?.id);
+        if (cur) playedRef.current.add(baseOf(cur));
+        fresh = pool.filter((r) => baseOf(r) !== (cur ? baseOf(cur) : ""));
       }
       if (!fresh.length) return null;
       const next = fresh[Math.floor(Math.random() * fresh.length)];
-      playedRef.current.add(next.id);
+      playedRef.current.add(baseOf(next));
       // If the visualizer is open, follow the new track's art.
       if (visualizingRef.current) setVisualizing(next);
       return next;

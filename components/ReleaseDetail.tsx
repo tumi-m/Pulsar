@@ -88,8 +88,15 @@ function TrackRow({
   const rowRef = useRef<HTMLDivElement | null>(null);
   const [samples, setSamples] = useState<SampleRef[] | null>(null);
 
-  const trackDisplay: Release = { ...release, title: track.title };
-  const isThis = player.current?.artist === release.artist && player.current?.title === track.title;
+  // Unique identity for this track — the album's id alone is shared by every
+  // row of the tracklist, which used to make shuffle mark the whole album
+  // played and made "open release" open the track as if it were the album.
+  const trackDisplay: Release = {
+    ...release,
+    id: `${release.id}#${track.number}`,
+    title: track.title,
+  };
+  const isThis = player.current?.id === trackDisplay.id;
   const playingThis = isThis && player.playing;
   const hasSample = Boolean(samples && samples.length > 0);
 

@@ -322,15 +322,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       // covers the case where it didn't, or where its attempt failed.
       const unlocking = unlockedRef.current ? null : unlockAudio();
 
-      // Same track → just toggle. Compare id AND title so that an album track
-      // (which shares the album's id via playDirect) doesn't short-circuit a
-      // real album play into a mute pause toggle.
-      if (
-        current?.id === release.id &&
-        current?.title === release.title &&
-        current?.artist === release.artist &&
-        hasAudio
-      ) {
+      // Same track → just toggle. Track displays carry a unique id
+      // (`${albumId}#${trackNumber}`), so id equality is exact identity —
+      // an album play after a track play correctly switches instead of
+      // collapsing into a pause toggle.
+      if (current?.id === release.id && hasAudio) {
         if (audio.paused) audio.play().catch(() => {});
         else audio.pause();
         return;
@@ -404,8 +400,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     (display: Release, previewUrl: string) => {
       const audio = audioRef.current;
       if (!audio) return;
-      const reqId = ++reqIdRef.current;
-      void reqId;
+      // Supersede guard: an async play() flow in flight (play()'s fetch →
+      // prime → play chain) must not clobber this direct assignment. Bumping
+      // the shared request id invalidates any stale continuation.
+      reqIdRef.current++;
       setCurrent(display);
       setLoading(false);
       setHasAudio(true);

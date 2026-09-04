@@ -112,10 +112,16 @@ export function NowPlayingBar() {
                     <button
                       onClick={() => {
                         setMenuOpen(false);
-                        // ReleaseGrid owns the detail sheet; it opens the full
-                        // project (resolving the parent album for a single).
+                        // ReleaseGrid owns the detail sheet. A track display's
+                        // id is `${albumId}#${n}` — strip the track suffix so
+                        // this opens the ALBUM, not the track as a release.
+                        const albumId = current.id.split("#")[0];
+                        const target =
+                          albumId !== current.id
+                            ? { ...current, id: albumId }
+                            : current;
                         window.dispatchEvent(
-                          new CustomEvent("pulsar-open-release", { detail: current })
+                          new CustomEvent("pulsar-open-release", { detail: target })
                         );
                       }}
                       className="flex min-h-[48px] w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.06]"
