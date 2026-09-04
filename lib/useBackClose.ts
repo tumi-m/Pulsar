@@ -4,7 +4,8 @@ import { useEffect, useRef } from "react";
 
 /**
  * Closes an overlay with the Android hardware Back button (and the browser's
- * back gesture) instead of navigating away from the site.
+ * back gesture) instead of navigating away from the site, or with the Escape
+ * key — the standard keyboard dismissal desktop users expect.
  *
  * Pushes a history entry when the overlay opens and closes it on `popstate`.
  * When the overlay is dismissed some other way (a close button, the scrim) the
@@ -22,6 +23,14 @@ export function useBackClose(active: boolean, onClose: () => void) {
   useEffect(() => {
     if (!active || typeof window === "undefined") return;
 
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        closeRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+
     // Marked so we can tell our own entry apart from real navigation.
     window.history.pushState({ pulsarOverlay: true }, "");
     let poppedByUser = false;
@@ -33,6 +42,7 @@ export function useBackClose(active: boolean, onClose: () => void) {
     window.addEventListener("popstate", onPop);
 
     return () => {
+      window.removeEventListener("keydown", onKey);
       window.removeEventListener("popstate", onPop);
       // Closed by a button/scrim rather than Back — remove the entry we added.
       if (!poppedByUser && window.history.state?.pulsarOverlay) {

@@ -318,7 +318,7 @@ function SampleCard({
           {catalogHit && (
             <Link
               href={`/release/${catalogHit.id}`}
-              className="rounded-full border border-neon-blue/40 bg-neon-blue/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-neon-blue transition-colors hover:bg-neon-blue/20"
+              className="relative -my-2 rounded-full border border-neon-blue/40 bg-neon-blue/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-neon-blue transition-colors hover:bg-neon-blue/20 before:absolute before:inset-[-6px] before:content-['']"
               title="This record is in the Pulsar catalog"
             >
               In catalog ↗

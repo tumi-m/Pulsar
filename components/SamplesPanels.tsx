@@ -345,7 +345,7 @@ export function ArtistPanel({
                           </span>
                         </span>
                         {e.note && (
-                          <span className="hidden max-w-[40%] flex-shrink-0 truncate text-[10px] italic text-star-white/35 md:block">
+                          <span className="hidden max-w-[40%] flex-shrink-0 truncate text-[10px] italic text-star-white/55 md:block">
                             {e.note}
                           </span>
                         )}
@@ -377,7 +377,7 @@ export function ArtistPanel({
                           </span>
                         </span>
                         {e.note && (
-                          <span className="hidden max-w-[40%] flex-shrink-0 truncate text-[10px] italic text-star-white/35 md:block">
+                          <span className="hidden max-w-[40%] flex-shrink-0 truncate text-[10px] italic text-star-white/55 md:block">
                             {e.note}
                           </span>
                         )}

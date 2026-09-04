@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Play, Pause, X, Maximize2, Loader2, ChevronUp, Disc3, ListMusic, Sparkles } from "lucide-react";
 import { usePlayer, useTransport } from "./PlayerProvider";
 import { Artwork } from "../Artwork";
@@ -17,6 +17,7 @@ import type { Release } from "@/lib/types";
  * full 3D visualizer.
  */
 export function NowPlayingBar() {
+  const reduce = useReducedMotion();
   const { current, playing, loading, hasAudio, error, toggle, stop, seek, ensureGraph, play } =
     usePlayer();
   // Hot per-tick values come from the transport context — reading them here
@@ -234,8 +235,8 @@ export function NowPlayingBar() {
                 {fmt(duration)}
               </span>
 
-              {/* equalizer flourish while playing */}
-              {playing && !scrubbing && (
+              {/* equalizer flourish while playing (off under reduced motion) */}
+              {playing && !scrubbing && !reduce && (
                 <div className="hidden items-end gap-0.5 md:flex" aria-hidden>
                   {[0, 1, 2, 3].map((i) => (
                     <motion.span

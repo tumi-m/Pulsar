@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence, useDragControls } from "framer-motion";
+import { motion, AnimatePresence, useDragControls, useReducedMotion } from "framer-motion";
 import { Sparkles, X, Play, Pause, Loader2, LayoutGrid, MessagesSquare, ArrowUp, RotateCcw } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";
@@ -49,6 +49,7 @@ export function AiChat({ releases }: AiChatProps) {
   useScrollLock(Boolean(view));
   useBackClose(Boolean(view), () => setView(null));
   const dragControls = useDragControls();
+  const reduce = useReducedMotion();
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -502,8 +503,9 @@ export function AiChat({ releases }: AiChatProps) {
                             key={i}
                             className="w-1 rounded-full bg-neon-violet"
                             initial={{ height: 6 }}
-                            animate={{ height: [6, 18, 6] }}
-                            transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.12, ease: "easeInOut" }}
+                            // Reduced motion: a static dot still says "working".
+                            animate={reduce ? undefined : { height: [6, 18, 6] }}
+                            transition={reduce ? undefined : { duration: 0.9, repeat: Infinity, delay: i * 0.12, ease: "easeInOut" }}
                           />
                         ))}
                       </div>

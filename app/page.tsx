@@ -96,7 +96,7 @@ export default async function HomePage() {
           <span className="font-mono text-[10px] tracking-[0.22em] text-star-white/35">
             PULSAR — DAILY MUSIC DISCOVERY
           </span>
-          <span className="font-mono text-[10px] tracking-[0.22em] text-star-white/20">
+          <span className="font-mono text-[10px] tracking-[0.22em] text-star-white/40">
             UPDATED DAILY · {new Date().getFullYear()}
           </span>
         </div>

@@ -143,7 +143,7 @@ function TrackRow({
         }}
         disabled={!track.previewUrl}
         aria-label={playingThis ? "Pause" : "Play track"}
-        className="flex h-6 w-6 flex-shrink-0 items-center justify-center text-star-white/45 transition-colors group-hover:text-star-white disabled:opacity-30"
+        className="relative -my-3 flex h-6 w-6 flex-shrink-0 items-center justify-center text-star-white/45 transition-colors group-hover:text-star-white disabled:opacity-30 before:absolute before:inset-[-9px] before:content-['']"
       >
         <span className="group-hover:hidden">
           {playingThis ? (
@@ -167,7 +167,7 @@ function TrackRow({
           onClick={() => onOpenSample({ artist: release.artist, title: track.title, artwork_url: release.artwork_url }, samples!)}
           aria-label="View sample breakdown"
           title="Contains a sample — see the breakdown"
-          className="flex flex-shrink-0 items-center gap-1 rounded-full border border-neon-violet/40 bg-neon-violet/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] text-neon-violet transition-transform hover:scale-105 active:scale-95"
+          className="relative -my-3 flex flex-shrink-0 items-center gap-1 rounded-full border border-neon-violet/40 bg-neon-violet/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] text-neon-violet transition-transform hover:scale-105 active:scale-95 before:absolute before:inset-[-10px] before:content-['']"
           style={{ boxShadow: "0 0 12px rgba(155,93,229,0.35)" }}
         >
           <AudioLines size={10} />
@@ -180,7 +180,7 @@ function TrackRow({
         onClick={() => onOpenLyrics({ artist: release.artist, title: track.title })}
         aria-label="View lyrics"
         title="Lyrics"
-        className="flex h-6 w-6 flex-shrink-0 items-center justify-center text-star-white/25 transition-colors hover:text-neon-blue"
+        className="relative -my-3 flex h-6 w-6 flex-shrink-0 items-center justify-center text-star-white/45 transition-colors hover:text-neon-blue before:absolute before:inset-[-9px] before:content-['']"
       >
         <Mic2 size={13} />
       </button>
@@ -310,11 +310,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
       return VISUAL_MODES[(i + dir + VISUAL_MODES.length) % VISUAL_MODES.length].id;
     });
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  // Escape is handled by useBackClose (shared across every overlay).
 
   // The now-playing bar can ask us to jump straight to the discography.
   useEffect(() => {
@@ -638,7 +634,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                             }}
                             aria-label="Expand visualiser"
                             title="Expand"
-                            className="flex h-6 w-6 items-center justify-center rounded-full border border-white/20 text-star-white/70 transition-colors hover:border-white/50 hover:text-star-white"
+                            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 text-star-white/70 transition-colors hover:border-white/50 hover:text-star-white"
                           >
                             <Maximize2 size={12} strokeWidth={2.5} />
                           </button>
@@ -646,7 +642,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                             onClick={() => setShowVisual(false)}
                             aria-label="Hide visualiser"
                             title="Hide"
-                            className="flex h-6 w-6 items-center justify-center rounded-full border border-white/20 text-star-white/70 transition-colors hover:border-white/50 hover:text-star-white"
+                            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 text-star-white/70 transition-colors hover:border-white/50 hover:text-star-white"
                           >
                             <X size={12} strokeWidth={2.5} />
                           </button>
@@ -667,7 +663,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                             <button
                               onClick={() => cycleVisual(-1)}
                               aria-label="Previous visualisation"
-                              className="flex h-6 w-6 items-center justify-center rounded-full text-star-white/70 hover:bg-white/10 hover:text-star-white"
+                              className="flex h-8 w-8 items-center justify-center rounded-full text-star-white/70 hover:bg-white/10 hover:text-star-white"
                             >
                               <ChevronLeft size={15} />
                             </button>
@@ -677,7 +673,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                             <button
                               onClick={() => cycleVisual(1)}
                               aria-label="Next visualisation"
-                              className="flex h-6 w-6 items-center justify-center rounded-full text-star-white/70 hover:bg-white/10 hover:text-star-white"
+                              className="flex h-8 w-8 items-center justify-center rounded-full text-star-white/70 hover:bg-white/10 hover:text-star-white"
                             >
                               <ChevronRight size={15} />
                             </button>

@@ -335,7 +335,7 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
               onClick={(e) => e.stopPropagation()}
               aria-label={p.hint}
               title={p.label}
-              className={`flex items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95 ${
+              className={`relative flex items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95 before:absolute before:inset-[-8px] before:content-[''] ${
                 showDsp ? "pointer-events-auto" : ""
               } ${big ? "h-9 w-9" : "h-7 w-7"}`}
               style={{ backgroundColor: `${p.color}2e`, color: p.color }}

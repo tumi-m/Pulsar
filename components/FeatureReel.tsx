@@ -58,12 +58,17 @@ export function FeatureReel() {
             key={k}
             onClick={() => setI(k)}
             aria-label={`Feature ${k + 1}`}
-            className="h-1 rounded-full transition-all duration-300"
-            style={{
-              width: k === i ? 14 : 4,
-              backgroundColor: k === i ? f.color : "rgba(232,232,244,0.22)",
-            }}
-          />
+            className="relative flex h-3 items-center justify-center"
+          >
+            {/* The visible dot is tiny; the 24×12px hit area is not. */}
+            <span
+              className="block h-1 rounded-full transition-all duration-300"
+              style={{
+                width: k === i ? 14 : 4,
+                backgroundColor: k === i ? f.color : "rgba(232,232,244,0.22)",
+              }}
+            />
+          </button>
         ))}
       </div>
     </div>

@@ -65,7 +65,11 @@ export function CratePicker() {
                 <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-star-white/40">Add to crate</p>
                 <p className="truncate text-sm font-bold text-star-white">{release.title}</p>
               </div>
-              <button onClick={close} aria-label="Close" className="text-star-white/50 hover:text-star-white">
+              <button
+                onClick={close}
+                aria-label="Close"
+                className="relative -m-2 flex h-8 w-8 items-center justify-center text-star-white/50 hover:text-star-white"
+              >
                 <X size={16} />
               </button>
             </div>
