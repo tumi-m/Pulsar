@@ -1,10 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import type { Release } from "@/lib/types";
 import { usePlayer } from "./player/PlayerProvider";
-import { GpuVisual } from "./GpuVisual";
-import { WmpVisual, type WmpMode } from "./WmpVisual";
+import type { WmpMode } from "./WmpVisual";
+
+// The visual engines are heavy (WebGL2 shaders / Canvas2D rAF loops) and never
+// render on the server — code-split them out of the main bundle.
+const GpuVisual = dynamic(() => import("./GpuVisual").then((m) => m.GpuVisual), {
+  ssr: false,
+});
+const WmpVisual = dynamic(() => import("./WmpVisual").then((m) => m.WmpVisual), {
+  ssr: false,
+});
 
 export type VisualMode =
   | "bars"

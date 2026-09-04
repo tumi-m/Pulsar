@@ -66,7 +66,7 @@ async function getPageData(): Promise<{
  * server-side search (see docs/IMPROVEMENT_PLAN.md, P4) rather than shipping it
  * all up front.
  */
-const MAX_CLIENT_RELEASES = 2000;
+const MAX_CLIENT_RELEASES = 600;
 
 export default async function HomePage() {
   const { dbReleases, liveFeed } = await getPageData();

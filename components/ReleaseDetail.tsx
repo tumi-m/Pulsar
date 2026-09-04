@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useDragControls } from "framer-motion";
+import dynamic from "next/dynamic";
 import { useScrollLock } from "@/lib/useScrollLock";
 import { useBackClose } from "@/lib/useBackClose";
 import { Portal } from "./Portal";
@@ -12,8 +13,19 @@ import { Artwork } from "./Artwork";
 import { PLATFORMS } from "./platforms";
 import { usePlayer } from "./player/PlayerProvider";
 import { VisualCanvas, VISUAL_MODES, type VisualMode } from "./VisualCanvas";
-import { SamplePage, type SampleRef, type SampleSubject } from "./SamplePage";
-import { LyricsPanel, type LyricsSubject } from "./LyricsPanel";
+import { type SampleRef, type SampleSubject } from "./SamplePage";
+import { type LyricsSubject } from "./LyricsPanel";
+
+// The lyrics sheet only mounts on demand — keep it out of the main bundle.
+const LyricsPanel = dynamic(
+  () => import("./LyricsPanel").then((m) => m.LyricsPanel),
+  { ssr: false }
+);
+// The sample-breakdown sheet (YouTube player + graph) also mounts on demand.
+const SamplePage = dynamic(
+  () => import("./SamplePage").then((m) => m.SamplePage),
+  { ssr: false }
+);
 
 interface Track {
   number: number;
