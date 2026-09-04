@@ -424,7 +424,12 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     return list;
   }, [releases, activeGenre, activeType, activeLabel, view, recProfile, query, serverResults]);
 
-  const shown = filtered.slice(0, visible);
+  // `shown` identity: `filtered.slice` allocates a fresh array every render,
+  // which made every `useMemo` below recompute (tileSizes is an O(n log n)
+  // scoring pass over up to ~2000 items) on *any* grid re-render — scroll
+  // state, hover, anything. Derive sizes/sections from a count-stable memo
+  // instead: `shown` only changes when the filter set or page truly changes.
+  const shown = useMemo(() => filtered.slice(0, visible), [filtered, visible]);
   const searching = query.trim().length > 0;
   // In search mode, keep every tile the same size so results pack tightly with
   // no empty gaps; otherwise use the taste-driven dynamic sizing.
@@ -444,9 +449,33 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   // popularity or relevance would emit a header on nearly every row.
   const grouping = gridGrouping({ cols, view, searching, detailOpen });
 
+  // ── Render window ────────────────────────────────────────────
+  // Infinite scroll only grows `visible`, so the DOM used to grow without
+  // bound while scrolling a long catalogue (contentVisibility hides the
+  // paint cost, but thousands of live tiles still cost memory + layout).
+  // Keep at most WINDOW tiles mounted: as the user scrolls down we drop the
+  // top of the list from the DOM (it re-mounts on scroll up — cheap, memoised
+  // tiles, and artwork is browser-cached). The date-section layout still
+  // gets every tile for grouping; only rendering is windowed.
+  const WINDOW = 240; // tiles kept mounted around the read position
+  const [windowStart, setWindowStart] = useState(0);
+  useEffect(() => {
+    setWindowStart((s) => {
+      const maxStart = Math.max(0, shown.length - WINDOW);
+      return Math.min(s, maxStart);
+    });
+  }, [shown.length]);
+  const advanceWindow = useCallback(() => {
+    setWindowStart((s) => Math.min(s + PAGE, Math.max(0, shown.length - WINDOW)));
+  }, [shown.length]);
+  const visibleShown = useMemo(
+    () => (shown.length <= WINDOW ? shown : shown.slice(windowStart, windowStart + WINDOW)),
+    [shown, windowStart]
+  );
+
   const dateSections = useMemo(
-    () => (grouping === "none" ? null : buildDateSections(shown, grouping)),
-    [shown, grouping],
+    () => (grouping === "none" ? null : buildDateSections(visibleShown, grouping)),
+    [visibleShown, grouping],
   );
 
   const resetPage = () => setVisible(PAGE);
@@ -458,7 +487,11 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     if (!el || !hasMore) return;
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) setVisible((v) => v + PAGE);
+        if (entries[0]?.isIntersecting) {
+          setVisible((v) => v + PAGE);
+          // Also slide the render window down so the DOM stays bounded.
+          advanceWindow();
+        }
       },
       { rootMargin: "800px 0px" } // prefetch well before the bottom
     );
@@ -468,7 +501,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     // IntersectionObserver only fires on a *transition*, so if the sentinel is
     // still inside the 800px band after loading (a short filtered list), it
     // would otherwise never fire again and "Loading more" would stall forever.
-  }, [hasMore, filtered.length, visible]);
+  }, [hasMore, filtered.length, visible, advanceWindow]);
 
   // In the half-page detail (tracklist) mode the grid keeps a fixed, calmer
   // column count; in the main browse view columns come from pinch-zoom (`cols`).
@@ -827,7 +860,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                   style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
                 >
                   {section.items.map((release, j) => {
-                    const i = section.from + j; // global index → stable sizing
+                    const i = windowStart + section.from + j; // absolute index → stable sizing
                     return (
                       <ReleaseCard
                         key={release.id}
@@ -859,7 +892,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 : { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, touchAction: "pan-y" }
             }
           >
-            {shown.map((release, i) => (
+            {visibleShown.map((release, i) => (
               <ReleaseCard
                 key={release.id}
                 release={release}
