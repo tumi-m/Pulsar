@@ -136,7 +136,7 @@ async function fetchJSON(url: string): Promise<unknown | null> {
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(8000),
-      next: { revalidate: 1800 }, // refresh at most every 30 min
+      next: { revalidate: 300 }, // match the page ISR window — one truth for freshness
     });
     if (!res.ok) return null;
     return await res.json();
@@ -199,11 +199,18 @@ async function enrichRealDates(list: FeedRelease[]): Promise<void> {
   const CAP = 2500;
   const targets = need.slice(0, CAP);
   const CONC = 32;
+  // Wall-clock budget: without this, a cold render can spend minutes inside
+  // this stage alone (up to 2,500 fetches × 8s timeout at 32-way concurrency)
+  // and time out the whole serverless render. Missed albums stay undated and
+  // are picked up on the next revalidation, when their detail responses are
+  // already in the fetch cache.
+  const DEADLINE = Date.now() + 10_000;
   let idx = 0;
   let filled = 0;
 
   const worker = async () => {
     while (idx < targets.length) {
+      if (Date.now() > DEADLINE) return;
       const r = targets[idx++];
       const detail = (await fetchJSON(
         `https://api.deezer.com/album/${r._dz}`
@@ -248,16 +255,18 @@ async function fromDeezer(): Promise<Release[]> {
 
 // ── Source 1b: every genre's chart + editorial (thousands of albums) ──
 async function fromDeezerGenres(): Promise<Release[]> {
-  const genres = (await fetchJSON("https://api.deezer.com/genre")) as {
-    data?: { id: number; name: string }[];
-  } | null;
-  const ids = (genres?.data ?? []).map((g) => g.id).filter((id) => id > 0).slice(0, 29);
+  const ids = await deezerGenreIds();
   const out: Release[] = [];
   // Deezer caps a page at 100, so walk several pages per genre. This is what
-  // takes the catalogue from hundreds into the thousands.
+  // takes the catalogue from hundreds into the thousands. Bounded by a worker
+  // pool: 29 genres × 5 pages is 145 requests, and an unbounded Promise.all
+  // would spike 100+ simultaneous sockets.
   const PAGES = [0, 100, 200, 300];
-  await Promise.all(
-    ids.map(async (id) => {
+  const CONC = 20;
+  let idx = 0;
+  const worker = async () => {
+    while (idx < ids.length) {
+      const id = ids[idx++];
       const reqs: Promise<{ data?: DeezerAlbum[] } | null>[] = [
         fetchJSON(`https://api.deezer.com/chart/${id}/albums?limit=100`) as Promise<{ data?: DeezerAlbum[] } | null>,
       ];
@@ -275,19 +284,25 @@ async function fromDeezerGenres(): Promise<Release[]> {
           if (r) out.push(r);
         }
       }
-    })
-  );
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(CONC, ids.length) }, worker));
   return out;
+}
+
+/** Fetch (and cache) the Deezer genre list → up to 29 usable genre ids. */
+async function deezerGenreIds(): Promise<number[]> {
+  const genres = (await fetchJSON("https://api.deezer.com/genre")) as {
+    data?: { id: number; name: string }[];
+  } | null;
+  return (genres?.data ?? []).map((g) => g.id).filter((id) => id > 0).slice(0, 29);
 }
 
 // ── Source 1e: top artists per genre → their catalogues ──────────────
 // Deezer exposes the leading artists in every genre; pulling each one's albums
 // adds thousands of real releases across the whole spectrum of music.
 async function fromGenreArtists(): Promise<Release[]> {
-  const genres = (await fetchJSON("https://api.deezer.com/genre")) as {
-    data?: { id: number; name: string }[];
-  } | null;
-  const ids = (genres?.data ?? []).map((g) => g.id).filter((id) => id > 0).slice(0, 29);
+  const ids = await deezerGenreIds();
 
   // Collect the top artists across every genre first.
   const artistIds = new Set<number>();
@@ -330,7 +345,7 @@ async function fromGenreArtists(): Promise<Release[]> {
 const AFRICA_ARTISTS = [
   // Afrobeats / Nigeria & West Africa
   "Burna Boy", "Wizkid", "Davido", "Tems", "Rema", "Asake", "Ayra Starr",
-  "Fireboy DML", "Omah Lay", "Tiwa Savage", "Yemi Alade", "Mr Eazi",
+  "Fireboy DML", "Omah Lay", "Tiwa Savage", "Yemi Alade",
   "Wande Coal", "Olamide", "Adekunle Gold", "Simi", "CKay", "Joeboy",
   "Ruger", "Kizz Daniel", "Patoranking", "Flavour", "Mr Eazi",
   // Amapiano / South Africa
@@ -348,21 +363,37 @@ const AFRICA_ARTISTS = [
   "Youssou N'Dour", "Salif Keita", "Diamond Platnumz", "Sauti Sol",
 ];
 
-async function fromAfrica(): Promise<Release[]> {
+/**
+ * Search a fixed artist list, bounded by a worker pool — an unbounded
+ * Promise.all over 100+ names opens 100+ sockets at once and invites 429s
+ * that fetchJSON silently converts to holes in the catalogue.
+ */
+async function searchArtistList(names: string[], transform?: (r: FeedRelease) => void): Promise<Release[]> {
   const out: Release[] = [];
-  await Promise.all(
-    AFRICA_ARTISTS.map(async (name) => {
+  const CONC = 20;
+  let idx = 0;
+  const worker = async () => {
+    while (idx < names.length) {
+      const name = names[idx++];
       const q = encodeURIComponent(`artist:"${name}"`);
       const data = (await fetchJSON(
         `https://api.deezer.com/search/album?q=${q}&limit=40&order=RANKING`
       )) as { data?: DeezerAlbum[] } | null;
       for (const a of data?.data ?? []) {
         const r = mapDeezer(a, null);
-        if (r) out.push(r);
+        if (r) {
+          transform?.(r);
+          out.push(r);
+        }
       }
-    })
-  );
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(CONC, names.length) }, worker));
   return out;
+}
+
+async function fromAfrica(): Promise<Release[]> {
+  return searchArtistList(AFRICA_ARTISTS);
 }
 
 // ── Source 1d: Gospel & worship (global + South African) ─────────────
@@ -385,37 +416,22 @@ const GOSPEL_ARTISTS = [
 ];
 
 async function fromGospel(): Promise<Release[]> {
-  const out: Release[] = [];
-  await Promise.all(
-    GOSPEL_ARTISTS.map(async (name) => {
-      const q = encodeURIComponent(`artist:"${name}"`);
-      const data = (await fetchJSON(
-        `https://api.deezer.com/search/album?q=${q}&limit=40&order=RANKING`
-      )) as { data?: DeezerAlbum[] } | null;
-      for (const a of data?.data ?? []) {
-        const r = mapDeezer(a, null);
-        if (!r) continue;
-        // Deezer's album search is FUZZY — `artist:"Zaza"` happily returns
-        // house compilations by nobody of the sort. This loop used to stamp
-        // every hit as gospel regardless, which is how "Club Ibiza, Vol. 2
-        // (Chillhouse Vibes)" and "The View (50 Deephouse Grooves)" ended up
-        // in the Gospel bucket. Require the album to actually be by the
-        // artist we asked for.
-        if (!artistMatches(name, r.artist)) continue;
-        r.genre = "Gospel";
-        r.tags = ["gospel"];
-        // Mood is deliberately NOT forced. Blanket-tagging the entire gospel
-        // sweep "euphoric" meant every one of these records scored a mood hit
-        // on any request mentioning joy, a party or celebration — which is
-        // exactly how a search for "euphoric house to dance to" came back
-        // full of mislabelled gospel compilations. Gospel spans jubilant
-        // praise and quiet worship; whatever mapDeezer inferred is closer to
-        // the truth than one blanket answer.
-        out.push(r);
-      }
-    })
+  return searchArtistList(GOSPEL_ARTISTS, (r) => {
+    r.genre = "Gospel";
+    r.tags = ["gospel"];
+    // Mood is deliberately NOT forced. Blanket-tagging the entire gospel
+    // sweep "euphoric" meant every one of these records scored a mood hit
+    // on any request mentioning joy, a party or celebration — which is
+    // exactly how a search for "euphoric house to dance to" came back
+    // full of mislabelled gospel compilations. Gospel spans jubilant
+    // praise and quiet worship; whatever mapDeezer inferred is closer to
+    // the truth than one blanket answer.
+  }).then((rows) =>
+    // Deezer's album search is FUZZY — `artist:"Zaza"` happily returns
+    // house compilations by nobody of the sort. Require the album to
+    // actually be by the artist we asked for.
+    rows.filter((r) => GOSPEL_ARTISTS.some((name) => artistMatches(name, r.artist)))
   );
-  return out;
 }
 
 // ── Source 1f: Grammy winners' complete discographies ────────────────
