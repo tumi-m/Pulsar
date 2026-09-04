@@ -19,7 +19,7 @@ export function loadAiMode(): AiMode {
 export function saveAiMode(m: AiMode) {
   try {
     localStorage.setItem(AI_KEY, m);
-    window.dispatchEvent(new CustomEvent("pulsar-ai-mode-change", { detail: m }));
+    // (pulsar-ai-mode-change retired — no live listener; mode is read on mount.)
   } catch {
     /* noop */
   }

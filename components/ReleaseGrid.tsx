@@ -260,10 +260,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     window.dispatchEvent(new CustomEvent("pulsar-detail-open", { detail: detailOpen }));
   }, [detailOpen]);
 
-  // Tell the navbar / visualizer whether we're in visualiser mode.
-  useEffect(() => {
-    window.dispatchEvent(new CustomEvent("pulsar-visualizing", { detail: Boolean(visualizing) }));
-  }, [visualizing]);
+  // (No pulsar-visualizing listener anywhere — channel retired.)
 
   // bumps whenever the user favorites/crates something → recompute recs
   const [collectionVersion, setCollectionVersion] = useState(0);
@@ -286,12 +283,8 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       setView("latest");
       setShowQuiz(true);
     };
-    const onSearch = (e: Event) => {
-      setQuery((e as CustomEvent<string>).detail);
-      setVisible(PAGE);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    };
-    const onCloseDetail = () => setSelectedRelease(null);
+    // (No onSearch/onCloseDetail — those event channels were dead: nothing
+    // dispatches pulsar-search or pulsar-close-detail anymore.)
     // The now-playing bar can send the user into the album sheet, or straight
     // into the artist's discography, for whatever is currently playing.
     const onOpenRelease = (e: Event) => setSelectedRelease((e as CustomEvent<Release>).detail);
@@ -303,8 +296,6 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     };
     window.addEventListener("pulsar-open-release", onOpenRelease);
     window.addEventListener("pulsar-open-discography", onOpenDiscography);
-    window.addEventListener("pulsar-close-detail", onCloseDetail);
-    window.addEventListener("pulsar-search", onSearch);
     window.addEventListener("pulsar-collection-change", onChange);
     window.addEventListener("pulsar-format-change", onFormat);
     window.addEventListener("pulsar-type-change", onType);
@@ -314,8 +305,6 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       window.removeEventListener("pulsar-format-change", onFormat);
       window.removeEventListener("pulsar-type-change", onType);
       window.removeEventListener("pulsar-retake-quiz", onRetake);
-      window.removeEventListener("pulsar-search", onSearch);
-      window.removeEventListener("pulsar-close-detail", onCloseDetail);
       window.removeEventListener("pulsar-open-release", onOpenRelease);
       window.removeEventListener("pulsar-open-discography", onOpenDiscography);
     };
