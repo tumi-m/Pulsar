@@ -17,7 +17,7 @@ interface PhysicalMediaProps {
  * Renders the album art as a 3D physical object — NeXT/macOS-inspired
  * beveled hardware. Each format frames the same <Artwork> differently.
  */
-export function PhysicalMedia({ src, artist, title, format, hovered, big }: PhysicalMediaProps) {
+export function PhysicalMedia({ src, artist, title, format, hovered, big: _big }: PhysicalMediaProps) {
   const art = (className = "") => (
     <Artwork src={src} artist={artist} title={title} className={`object-cover ${className}`} />
   );

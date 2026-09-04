@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface RunResult {
@@ -221,12 +222,12 @@ export default function AdminPage() {
 
         {/* Back link */}
         <div className="mt-8 text-center">
-          <a
+          <Link
             href="/"
             className="text-[11px] font-mono text-dust/40 tracking-widest hover:text-dust transition-colors"
           >
             ← BACK TO PULSAR
-          </a>
+          </Link>
         </div>
       </div>
     </div>

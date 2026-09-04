@@ -57,7 +57,7 @@ export function SampleGraph({
   const nodesRef = useRef<GraphNode[]>([]);
   const edgesRef = useRef<GraphEdge[]>([]);
   const rafRef = useRef<number>(0);
-  const [tick, setTick] = useState(0); // re-render trigger
+  const [, setTick] = useState(0); // re-render trigger (value never read)
   const [ready, setReady] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -215,7 +215,6 @@ export function SampleGraph({
       const data: ChainResponse = await res.json();
       const existing = new Map(nodesRef.current.map((n) => [`${n.artist}::${n.title}`.toLowerCase(), n]));
       const idMap = new Map<string, GraphNode>();
-      let added = 0;
       for (const n of data.nodes) {
         if (n.level === 0) {
           idMap.set(n.id, node); // the root of this sub-chain IS the clicked node
@@ -236,7 +235,6 @@ export function SampleGraph({
         nodesRef.current.push(newNode);
         existing.set(key, newNode);
         idMap.set(n.id, newNode);
-        added++;
       }
       for (const e of data.edges) {
         const a = idMap.get(e.from);

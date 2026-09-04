@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { stableId, mapDeezer, getLiveFeed } from "@/lib/feed";
-import type { Release } from "@/lib/types";
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

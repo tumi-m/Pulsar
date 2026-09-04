@@ -365,7 +365,6 @@ export function GpuVisual({
       gl.deleteShader(vs);
       gl.deleteShader(fs);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [release]);
 
   if (failed) {

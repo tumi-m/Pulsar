@@ -157,12 +157,23 @@ class TidalAuthError extends Error {}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Minimal shapes of the TIDAL JSON:API responses this code reads. */
+interface TidalResource {
+  type?: string;
+  id?: string;
+  attributes?: {
+    name?: string;
+    artistName?: string;
+    artists?: { name?: string }[];
+  };
+}
+
 async function api(
   path: string,
   token: string,
   init?: RequestInit,
   attempt = 0
-): Promise<any> {
+): Promise<Record<string, unknown>> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
@@ -207,7 +218,7 @@ async function api(
     }
     throw new Error(`TIDAL API ${res.status} at ${path}${detail ? ` — ${detail}` : ""}`);
   }
-  return res.status === 204 ? null : res.json();
+  return res.status === 204 ? {} : ((await res.json()) as Record<string, unknown>);
 }
 
 const normalise = (s: string) =>
@@ -234,7 +245,7 @@ export async function trackIdsForRelease(r: Release, token: string): Promise<str
       token
     );
     // JSON:API: matches arrive in `included`, typed.
-    const included: any[] = found?.included ?? [];
+    const included = ((found?.included as TidalResource[] | undefined) ?? []) as TidalResource[];
     const tracks = included.filter((i) => i?.type === "tracks");
     const hit = tracks.find((t) =>
       tidalArtistMatches(r.artist, t?.attributes?.artists?.[0]?.name ?? t?.attributes?.artistName)
@@ -291,7 +302,8 @@ export const tidalProvider: DspProvider = {
       }),
     });
 
-    const playlistId = playlist?.data?.id;
+    const playlistData = playlist?.data as { id?: string } | undefined;
+    const playlistId = playlistData?.id;
     if (!playlistId) throw new Error("TIDAL didn't return a playlist id.");
 
     const seen = new Set<string>();

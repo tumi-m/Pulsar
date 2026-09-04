@@ -5,7 +5,7 @@ import { motion, AnimatePresence, useDragControls, useReducedMotion } from "fram
 import { Sparkles, X, Play, Pause, Loader2, LayoutGrid, MessagesSquare, ArrowUp, RotateCcw } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";
-import { parse, buildList, resolveGenres, MOOD_WORDS, GENRE_WORDS, type Parsed } from "@/lib/selector";
+import { parse, buildList, resolveGenres, type Parsed } from "@/lib/selector";
 import type { GenreBucket } from "@/lib/utils";
 import { usePlayer } from "./player/PlayerProvider";
 import { togglePlaylist, inPlaylist } from "@/lib/collection";

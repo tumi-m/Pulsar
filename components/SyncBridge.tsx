@@ -68,7 +68,7 @@ export function SyncBridge() {
       unsub();
       if (pushTimer) clearTimeout(pushTimer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   return null;

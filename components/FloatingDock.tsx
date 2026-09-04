@@ -152,7 +152,6 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
         flash(err instanceof Error ? err.message : `${label} export failed`);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

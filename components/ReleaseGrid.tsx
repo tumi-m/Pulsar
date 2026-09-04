@@ -21,8 +21,6 @@ import {
   computeCols,
   gridGrouping,
   buildDateSections,
-  GRID_MIN,
-  GRID_MAX,
 } from "@/lib/grid";
 import { loadFormat, saveFormat, type MediaFormat } from "@/lib/format";
 import {
@@ -59,11 +57,10 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   const [showRefine, setShowRefine] = useState(false);
   const [showGenres, setShowGenres] = useState(false);
   const [query, setQuery] = useState("");
-  // Server-side search results reach beyond the homepage's ~2000-release
+  // Server-side search results reach beyond the homepage's ~600-release
   // payload into the full Supabase archive (which grows daily). Only fetched
   // when the local query is too thin to be useful.
   const [serverResults, setServerResults] = useState<Release[]>([]);
-  const [serverSearching, setServerSearching] = useState(false);
 
   // ── iOS Photos-style pinch-to-zoom grid density ──────────────
   // Pinch OUT → fewer, bigger tiles; pinch IN → more tiles per row. `zoom` is a
@@ -96,16 +93,13 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     const q = query.trim();
     if (q.length < 2) {
       setServerResults([]);
-      setServerSearching(false);
       return;
     }
-    setServerSearching(true);
     const handle = setTimeout(() => {
       fetch(`/api/search?q=${encodeURIComponent(q)}`)
         .then((r) => (r.ok ? r.json() : { releases: [] }))
         .then((d) => setServerResults((d.releases ?? []) as Release[]))
-        .catch(() => setServerResults([]))
-        .finally(() => setServerSearching(false));
+        .catch(() => setServerResults([]));
     }, 350);
     return () => clearTimeout(handle);
   }, [query]);
@@ -311,8 +305,11 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   }, []);
 
   // The recommender profile: quiz taste + learned affinities from actions.
+  // `collectionVersion` is intentionally referenced (not read) so each
+  // favorites/crate change recomputes the profile — it's the refresh signal.
   const recProfile = useMemo(
     () => learnedProfile(profile, getFavorites(), getPlaylist()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [profile, collectionVersion]
   );
 

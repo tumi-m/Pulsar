@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import { Search, Loader2, AudioLines, Trophy, Sparkles, ArrowDownRight, Link2, BarChart3, Users, ArrowRight, ExternalLink, Mic2 } from "lucide-react";
+import { Search, Loader2, AudioLines, Trophy, Sparkles, ArrowDownRight, Link2, BarChart3, Users, ExternalLink, Mic2 } from "lucide-react";
 import Link from "next/link";
 import { SamplePage, type SampleRef, type SampleSubject } from "./SamplePage";
 import { ConnectPanel, CanonPanel, ArtistPanel, PeoplePanel } from "./SamplesPanels";
 import { mostSampledSources, catalogSamplers } from "@/lib/samples-catalog";
-import { catalogSongs, connectSongs, mostSampledArtists, sourceDecades, type ConnectResult, type SongKey } from "@/lib/samples-graph";
+import { catalogSongs, mostSampledArtists, sourceDecades, type SongKey } from "@/lib/samples-graph";
 import type { Release } from "@/lib/types";
 
 type Tab = "lookup" | "connect" | "canon" | "artist" | "people";
@@ -39,7 +39,7 @@ export function SamplesClient({
   const [tab, setTab] = useState<Tab>("lookup");
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ subject: SampleSubject; samples: SampleRef[] } | null>(null);
+  const [, setResult] = useState<{ subject: SampleSubject; samples: SampleRef[] } | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [viewing, setViewing] = useState<{ subject: SampleSubject; samples: SampleRef[] } | null>(null);
 
