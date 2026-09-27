@@ -825,8 +825,40 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
 
         {/* grid */}
         {shown.length === 0 ? (
-          <div className="flex flex-col items-center justify-center px-6 py-32 text-center">
-            <p className="font-mono text-sm tracking-widest text-star-white/30">NOTHING HERE YET</p>
+          /* "NOTHING HERE YET" was all this said, whether you'd searched for a
+             typo, stacked three filters, or genuinely reached the end. It named
+             neither the cause nor a way out, so the only obvious move was to
+             reload. Say which it is, and offer the undo. */
+          <div className="flex flex-col items-center justify-center gap-3 px-6 py-24 text-center">
+            <p className="font-mono text-sm tracking-widest text-star-white/45">
+              {query.trim() ? "NO MATCHES" : "NOTHING HERE YET"}
+            </p>
+            {query.trim() ? (
+              <p className="max-w-xs text-sm leading-relaxed text-star-white/50">
+                Nothing matched{" "}
+                <span className="font-semibold text-star-white/80">“{query.trim()}”</span>
+                {activeGenre || refineActive ? " with your filters applied." : "."}
+              </p>
+            ) : activeGenre || refineActive ? (
+              <p className="max-w-xs text-sm leading-relaxed text-star-white/50">
+                No releases match these filters.
+              </p>
+            ) : null}
+            {(query.trim() || activeGenre || refineActive) && (
+              <button
+                onClick={() => {
+                  setQuery("");
+                  setActiveGenre(null);
+                  setActiveLabel(null);
+                  setView("latest");
+                  setFormat("vinyl");
+                  resetPage();
+                }}
+                className="min-h-9 rounded-full border border-star-white/25 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-star-white/80 transition-colors hover:border-star-white/60 hover:text-star-white"
+              >
+                Clear search &amp; filters
+              </button>
+            )}
           </div>
         ) : dateSections ? (
           /* Photos-style dated sections — pinched in far enough that a flat

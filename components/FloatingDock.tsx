@@ -679,9 +679,16 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                   <p className="text-sm font-bold uppercase tracking-widest text-star-white/40">
                     Empty {panel === "favorites" ? "loved" : "crate"}
                   </p>
-                  <p className="text-xs text-star-white/35">
-                    Hover any album and tap the {panel === "favorites" ? "♥ heart" : "＋ plus"} to
-                    add it here.
+                  {/* The instruction said "hover any album" — read almost
+                      always on a phone, where there is no hover and the
+                      controls are shown outright. It described a gesture the
+                      reader could not perform. */}
+                  <p className="max-w-[16rem] text-xs leading-relaxed text-star-white/35">
+                    {isTouch ? "Tap the " : "Hover any album and tap the "}
+                    <span className="text-star-white/60">
+                      {panel === "favorites" ? "♥ heart" : "＋ plus"}
+                    </span>
+                    {isTouch ? " on any album" : ""} to add it here.
                   </p>
                 </div>
               ) : (

@@ -141,6 +141,11 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
   const allSuggestionsEmpty =
     suggestions.length > 0 && suggestions.every((s) => s.connections === 0);
 
+  // Typing something the catalogue has never heard of produced no suggestions
+  // and no message — the panel looked exactly as it had before you typed, so
+  // the search read as broken rather than as empty-handed.
+  const noSuggestions = query.trim().length >= 2 && suggestions.length === 0;
+
   const busyFor = (artist: string, title: string) => busy === `${artist}::${title}`;
 
   return (
@@ -248,6 +253,24 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
                 <p className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center text-[11px] leading-relaxed text-star-white/45">
                   None of those have documented samples yet. The connections below are
                   the ones worth digging into.
+                </p>
+              )}
+
+              {noSuggestions && !notFound && !busy && (
+                <p className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center text-[11.5px] leading-relaxed text-star-white/50">
+                  Nothing in the catalogue matches{" "}
+                  <span className="font-semibold text-star-white/75">
+                    &ldquo;{query.trim()}&rdquo;
+                  </span>
+                  . Try the artist&rsquo;s name on its own, or{" "}
+                  <a
+                    href={`https://www.whosampled.com/search/?q=${encodeURIComponent(query.trim())}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-neon-violet hover:underline"
+                  >
+                    look it up on WhoSampled <ExternalLink size={10} />
+                  </a>
                 </p>
               )}
 
