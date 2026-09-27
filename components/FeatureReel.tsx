@@ -58,9 +58,11 @@ export function FeatureReel() {
             key={k}
             onClick={() => setI(k)}
             aria-label={`Feature ${k + 1}`}
-            className="relative flex h-3 items-center justify-center"
+            className="relative flex h-6 w-6 items-center justify-center"
           >
-            {/* The visible dot is tiny; the 24×12px hit area is not. */}
+            {/* The visible dot is tiny; the hit area is not. This used to be
+                `h-3` with no width of its own, so the button collapsed to the
+                4px dot — the comment described a target that wasn't there. */}
             <span
               className="block h-1 rounded-full transition-all duration-300"
               style={{

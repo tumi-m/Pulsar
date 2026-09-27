@@ -62,6 +62,13 @@ export function Navbar() {
       initial={{ opacity: 0, y: 0 }}
       animate={{ opacity: 1, y: hidden ? -64 : 0 }}
       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      // The header only slides out of sight — it stays at full opacity, so its
+      // buttons remained clickable and, worse, tabbable while off-screen: a
+      // keyboard visitor scrolling down would focus Selector, Samples and
+      // Crate with nothing visible on the page. `inert` takes the whole bar out
+      // of the tab order and out of hit-testing while it's away, and gives it
+      // back the moment a scroll up brings it down.
+      inert={hidden}
       className={`
         fixed inset-x-0 top-0 z-40 h-14 transform-gpu px-5 md:px-10
         transition-colors duration-500
@@ -117,7 +124,7 @@ export function Navbar() {
         <button
           onClick={() => window.dispatchEvent(new CustomEvent("pulsar-ai-activate"))}
           aria-label="Selector — pick music by chat or visual survey"
-          className="flex items-center gap-2 rounded-full px-4 py-2 transition-transform hover:scale-105 active:scale-95"
+          className="flex min-h-9 items-center gap-2 rounded-full px-4 py-2 transition-transform hover:scale-105 active:scale-95"
           style={{
             background: "linear-gradient(120deg, #9b5de5, #ff5fa2 60%, #ffb347)",
             boxShadow: "0 4px 16px rgba(155,93,229,0.45)",
@@ -130,7 +137,7 @@ export function Navbar() {
           onClick={() => window.dispatchEvent(new CustomEvent("pulsar-open-samples"))}
           aria-label="Samples — songs built from other records"
           title="Samples"
-          className="flex items-center gap-2 rounded-full border border-neon-violet/40 bg-neon-violet/15 px-4 py-2 transition-all hover:scale-105 hover:border-neon-violet/70 hover:bg-neon-violet/25 active:scale-95"
+          className="flex min-h-9 items-center gap-2 rounded-full border border-neon-violet/40 bg-neon-violet/15 px-4 py-2 transition-all hover:scale-105 hover:border-neon-violet/70 hover:bg-neon-violet/25 active:scale-95"
           style={{ boxShadow: "0 0 16px rgba(155,93,229,0.28)" }}
         >
           <AudioLines size={15} className="text-neon-violet" />
@@ -144,7 +151,7 @@ export function Navbar() {
           onClick={() => window.dispatchEvent(new CustomEvent("pulsar-open-crate", { detail: "playlist" }))}
           aria-label="Open your crate"
           data-crate-target=""
-          className="flex items-center gap-2 rounded-full border border-[#c08a4e]/40 bg-[#c08a4e]/10 px-4 py-2 transition-all hover:scale-105 hover:border-[#c08a4e]/70 hover:bg-[#c08a4e]/20 active:scale-95"
+          className="flex min-h-9 items-center gap-2 rounded-full border border-[#c08a4e]/40 bg-[#c08a4e]/10 px-4 py-2 transition-all hover:scale-105 hover:border-[#c08a4e]/70 hover:bg-[#c08a4e]/20 active:scale-95"
         >
           <CrateIcon size={16} filled className="text-[#d69a5c]" />
           <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#e0b070]">Crate</span>

@@ -339,7 +339,7 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
           each linking straight to this release on that service */}
       {dsps.length > 0 && (
         <div
-          className={`pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-center justify-around gap-1 rounded-b-2xl px-2 py-2 transition-all duration-300 ${
+          className={`pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-center justify-around gap-0.5 rounded-b-2xl px-1.5 py-2 transition-all duration-300 sm:gap-1 sm:px-2 ${
             showDsp ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
           }`}
           style={{
@@ -355,12 +355,22 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
               onClick={(e) => e.stopPropagation()}
               aria-label={p.hint}
               title={p.label}
-              className={`relative flex items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95 before:absolute before:inset-[-8px] before:content-[''] ${
+              // shrink-0 matters: six badges on the narrowest tile overflowed
+              // the row, and flex resolved that by squashing them from 28px
+              // circles into 23px ellipses. They now hold their shape and the
+              // row is sized to fit all six instead.
+              className={`relative flex shrink-0 items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95 before:absolute before:inset-[-8px] before:content-[''] ${
                 showDsp ? "pointer-events-auto" : ""
-              } ${big ? "h-9 w-9" : "h-7 w-7"}`}
+              } ${big ? "h-9 w-9" : "h-6 w-6 sm:h-7 sm:w-7"}`}
               style={{ backgroundColor: `${p.color}2e`, color: p.color }}
             >
-              <span className={big ? "[&>svg]:h-5 [&>svg]:w-5" : "[&>svg]:h-4 [&>svg]:w-4"}>
+              <span
+                className={
+                  big
+                    ? "[&>svg]:h-5 [&>svg]:w-5"
+                    : "[&>svg]:h-3.5 [&>svg]:w-3.5 sm:[&>svg]:h-4 sm:[&>svg]:w-4"
+                }
+              >
                 <p.Icon />
               </span>
             </a>

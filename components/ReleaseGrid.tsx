@@ -622,7 +622,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
             <button
               onClick={() => setShowGenres((v) => !v)}
               aria-expanded={showGenres}
-              className={`flex flex-shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.1em] transition-colors sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.16em] ${
+              className={`flex min-h-9 flex-shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-[0.1em] transition-colors sm:min-h-0 sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.16em] ${
                 activeGenre
                   ? "border-[#4aa3ff]/60 bg-[#4aa3ff]/15 text-[#a9d5ff]" // filter active → reminder
                   : "border-star-white/15 text-star-white/60 hover:border-star-white/40 hover:text-star-white"
@@ -634,7 +634,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
             <button
               onClick={() => setShowRefine((v) => !v)}
               aria-expanded={showRefine}
-              className={`flex flex-shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.1em] transition-colors sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.2em] ${
+              className={`flex min-h-9 flex-shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-[0.1em] transition-colors sm:min-h-0 sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.2em] ${
                 refineActive
                   ? "border-[#4aa3ff]/60 bg-[#4aa3ff]/15 text-[#a9d5ff]" // filter active → reminder
                   : showRefine
