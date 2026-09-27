@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Search, AudioLines, Clock, Loader2, Trophy, Sparkles, ExternalLink, ArrowRight } from "lucide-react";
 import { Portal } from "./Portal";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { useDialog } from "@/lib/useDialog";
 import { useBackClose } from "@/lib/useBackClose";
 import { SamplePage, readMarks, type SampleRef, type SampleSubject } from "./SamplePage";
 import { mostSampledSources, catalogSamplers, lookupCatalog } from "@/lib/samples-catalog";
@@ -31,6 +32,7 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
   const [viewing, setViewing] = useState<{ subject: SampleSubject; samples: SampleRef[] } | null>(null);
 
   useScrollLock(open);
+  const dialogRef = useDialog<HTMLDivElement>(open);
   useBackClose(open, () => setOpen(false));
 
   const leaders = useMemo(() => mostSampledSources(8), []);
@@ -146,6 +148,9 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
       <AnimatePresence>
         {open && (
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-label="Samples — songs built from other records"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

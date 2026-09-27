@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useDragControls } from "framer-motion";
 import dynamic from "next/dynamic";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { useDialog } from "@/lib/useDialog";
 import { useBackClose } from "@/lib/useBackClose";
 import { Portal } from "./Portal";
 import { X, Check, Link as LinkIcon, Play, Pause, ChevronLeft, ChevronRight, Maximize2, Share2, Mic2, AudioLines } from "lucide-react";
@@ -212,6 +213,9 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
   const player = usePlayer();
   // Lock the page behind the sheet on mobile (no scroll-bleed / jump).
   useScrollLock(Boolean(release));
+  // aria-modal stays false below: on desktop this is a side panel and the grid
+  // beside it is still meant to be used, so Tab must be able to leave.
+  const dialogRef = useDialog<HTMLDivElement>(Boolean(release));
   // Android Back / browser back closes the sheet instead of leaving the site.
   useBackClose(Boolean(release), onClose);
   // Drag-to-dismiss only from the grab handle / title bar, so scrolling the
@@ -419,6 +423,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
             }}
             className="fixed inset-x-0 bottom-0 z-40 flex h-[72dvh] transform-gpu flex-col rounded-t-2xl border border-b-0 border-white/15 bg-[#0a0a14]/70 backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-16 lg:bottom-3 lg:h-auto lg:w-1/2 lg:rounded-l-2xl lg:border lg:border-r-0"
             style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35), 0 -20px 60px rgba(0,0,0,0.5)" }}
+            ref={dialogRef}
             role="dialog"
             aria-modal="false"
             aria-label={`${release.title} by ${release.artist}`}

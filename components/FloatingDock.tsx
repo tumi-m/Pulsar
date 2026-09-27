@@ -21,6 +21,7 @@ import { PhysicalMedia } from "./PhysicalMedia";
 import { PLATFORMS } from "./platforms";
 import { usePlayer } from "./player/PlayerProvider";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { useDialog } from "@/lib/useDialog";
 import { useBackClose } from "@/lib/useBackClose";
 import { Portal } from "./Portal";
 import { useIsTouch } from "@/lib/useIsTouch";
@@ -50,6 +51,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   const [panel, setPanel] = useState<Panel>(null);
   // Lock background scroll while the crate sheet is open (mobile).
   useScrollLock(Boolean(panel));
+  const dialogRef = useDialog<HTMLDivElement>(Boolean(panel));
   useBackClose(Boolean(panel), () => setPanel(null));
   // Hover never fires on touch, so play / favourite / share / remove would be
   // permanently hidden on a phone — reveal them instead.
@@ -425,6 +427,9 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               className="fixed inset-0 z-[54] bg-void/80 backdrop-blur-md"
             />
             <motion.div
+              ref={dialogRef}
+              role="dialog"
+              aria-label="Your crate"
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}

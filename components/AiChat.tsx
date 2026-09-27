@@ -12,6 +12,7 @@ import { usePlayer } from "./player/PlayerProvider";
 import { togglePlaylist, inPlaylist } from "@/lib/collection";
 import { Artwork } from "./Artwork";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { useDialog } from "@/lib/useDialog";
 import { useBackClose } from "@/lib/useBackClose";
 import { Portal } from "./Portal";
 import { PLATFORMS } from "./platforms";
@@ -48,6 +49,8 @@ export function AiChat({ releases }: AiChatProps) {
   // not a dropdown.
   const [isMobile, setIsMobile] = useState(false);
   useScrollLock(Boolean(view));
+  // The Selector covers the page at every size, so it is modal on desktop too.
+  const dialogRef = useDialog<HTMLDivElement>(Boolean(view), { modal: true, focusKey: view });
   useBackClose(Boolean(view), () => setView(null));
   const dragControls = useDragControls();
   const reduce = useReducedMotion();
@@ -262,6 +265,10 @@ export function AiChat({ releases }: AiChatProps) {
               by an animated transform. */}
           <div className="pointer-events-none fixed inset-0 z-[58] flex items-end justify-center sm:items-center sm:p-6">
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Selector — find music by describing it"
             initial={isMobile ? { y: "100%" } : { opacity: 0, y: 16, scale: 0.97 }}
             animate={isMobile ? { y: 0 } : { opacity: 1, y: 0, scale: 1 }}
             exit={isMobile ? { y: "100%" } : { opacity: 0, y: 12, scale: 0.97 }}
@@ -528,6 +535,10 @@ export function AiChat({ releases }: AiChatProps) {
                 <div className="relative z-10 border-t border-white/[0.08] p-3 pt-2.5 sm:p-4 sm:pt-3">
                   <div className="flex items-end gap-2 rounded-2xl border border-star-white/[0.12] bg-star-white/[0.04] p-2 transition-colors focus-within:border-neon-violet/50">
                     <textarea
+                      // Opening a conversation should put the cursor where you
+                      // type, not on the Close button that happens to come
+                      // first in the DOM.
+                      data-dialog-autofocus
                       value={text}
                       onChange={(e) => setText(e.target.value)}
                       onKeyDown={(e) => {
