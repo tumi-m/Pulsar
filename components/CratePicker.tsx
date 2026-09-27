@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Plus } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { getCrates, createCrate, toggleInCrate, inCrate, type Crate } from "@/lib/collection";
+import { flyToCrate } from "@/lib/flyToCrate";
 import { CrateIcon } from "./CrateIcon";
 import { useScrollLock } from "@/lib/useScrollLock";
 import { useBackClose } from "@/lib/useBackClose";
@@ -80,8 +81,11 @@ export function CratePicker() {
                 return (
                   <button
                     key={c.id}
-                    onClick={() => {
-                      toggleInCrate(c.id, release);
+                    onClick={(e) => {
+                      const added = toggleInCrate(c.id, release);
+                      // Only on ADD. Flying artwork into the crate to say
+                      // "removed" would be actively misleading.
+                      if (added) flyToCrate(e.currentTarget, release.artwork_url);
                       refresh();
                       setTick((t) => t + 1);
                     }}
@@ -112,7 +116,8 @@ export function CratePicker() {
                 e.preventDefault();
                 if (!newName.trim()) return;
                 const c = createCrate(newName);
-                toggleInCrate(c.id, release);
+                const added = toggleInCrate(c.id, release);
+                if (added) flyToCrate(e.currentTarget, release.artwork_url);
                 setNewName("");
                 refresh();
                 setTick((t) => t + 1);

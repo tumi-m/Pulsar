@@ -138,9 +138,12 @@ export function Navbar() {
             Samples
           </span>
         </button>
+        {/* data-crate-target is where flyToCrate() lands a saved record. A data
+            attribute, so the animation never has to import this component. */}
         <button
           onClick={() => window.dispatchEvent(new CustomEvent("pulsar-open-crate", { detail: "playlist" }))}
           aria-label="Open your crate"
+          data-crate-target=""
           className="flex items-center gap-2 rounded-full border border-[#c08a4e]/40 bg-[#c08a4e]/10 px-4 py-2 transition-all hover:scale-105 hover:border-[#c08a4e]/70 hover:bg-[#c08a4e]/20 active:scale-95"
         >
           <CrateIcon size={16} filled className="text-[#d69a5c]" />

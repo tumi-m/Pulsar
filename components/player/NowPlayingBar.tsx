@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Play, Pause, X, Maximize2, Loader2, ChevronUp, Disc3, ListMusic, Sparkles } from "lucide-react";
 import { usePlayer, useTransport } from "./PlayerProvider";
+import { LevelMeter } from "./LevelMeter";
 import { Artwork } from "../Artwork";
 import { Visualizer } from "../Visualizer";
 import { CrateIcon } from "../CrateIcon";
@@ -18,7 +19,7 @@ import type { Release } from "@/lib/types";
  */
 export function NowPlayingBar() {
   const reduce = useReducedMotion();
-  const { current, playing, loading, hasAudio, error, toggle, stop, seek, ensureGraph, play } =
+  const { current, playing, loading, hasAudio, error, toggle, stop, seek, ensureGraph, getAnalyser, play } =
     usePlayer();
   // Hot per-tick values come from the transport context — reading them here
   // keeps the 4×/s re-render scoped to this bar instead of every tile.
@@ -215,6 +216,19 @@ export function NowPlayingBar() {
               >
                 <span className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-md">
                   <Artwork src={current.artwork_url} artist={current.artist} title={current.title} sizes="44px" />
+                  {/* The only thing in Pulsar that moves in time with what's
+                      playing. Sits over the artwork's foot so it reads as part
+                      of the record rather than as another control. */}
+                  {playing && (
+                    <span className="pointer-events-none absolute inset-x-1 bottom-1 h-3">
+                      <LevelMeter
+                        playing={playing}
+                        getAnalyser={getAnalyser}
+                        bars={5}
+                        className="h-full w-full text-neon-blue drop-shadow-[0_0_6px_rgba(0,212,255,0.55)]"
+                      />
+                    </span>
+                  )}
                   <span className="absolute inset-0 flex items-center justify-center bg-void/55 opacity-0 transition-opacity group-hover:opacity-100">
                     <ChevronUp size={16} className="text-white" />
                   </span>

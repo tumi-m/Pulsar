@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, useDragControls, useReducedMotion } from "framer-motion";
 import { Sparkles, X, Play, Pause, Loader2, LayoutGrid, MessagesSquare, ArrowUp, RotateCcw } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";
 import { parse, buildList, resolveGenres, type Parsed } from "@/lib/selector";
+import { staggerParent, fadeUp } from "@/lib/motion";
 import type { GenreBucket } from "@/lib/utils";
 import { usePlayer } from "./player/PlayerProvider";
 import { togglePlaylist, inPlaylist } from "@/lib/collection";
@@ -591,6 +592,10 @@ function TurnBlock({
   // three-column desktop grids, so the last row is never a lone orphan.
   const [visible, setVisible] = useState(12);
   const shown = turn.results.slice(0, visible);
+  const reduce = useReducedMotion();
+  // One variant object for every row — a fresh object per row would make
+  // framer re-evaluate the whole list on each render.
+  const rowVariants = useMemo(() => fadeUp(reduce, 10), [reduce]);
   const chips = [
     ...turn.signals.moods.map((v) => ({ kind: "moods" as const, v, color: "rgba(155,93,229,0.5)" })),
     ...turn.signals.genres.map((v) => ({ kind: "genres" as const, v, color: "rgba(74,163,255,0.5)" })),
@@ -637,13 +642,24 @@ function TurnBlock({
               browsable set, so they get a grid: two columns once there's room,
               three on a large display. Each cell keeps the same internal layout
               that already fits a 390px phone, so nothing has to reflow. */}
-          <div className="grid grid-cols-1 gap-1.5 lg:grid-cols-2 2xl:grid-cols-3">
+          {/* Results arrive together, so they reveal together — staggered, which
+              reads as the Selector laying cards down rather than the list
+              blinking into existence. staggerParent shrinks the per-item delay
+              as the list grows so twelve results still finish inside ~400ms;
+              under reduced motion the variants don't move at all. */}
+          <motion.div
+            variants={staggerParent(reduce, shown.length)}
+            initial="hidden"
+            animate="show"
+            className="grid grid-cols-1 gap-1.5 lg:grid-cols-2 2xl:grid-cols-3"
+          >
             {shown.map((r) => {
               const isThis = current?.artist === r.artist && current?.title === r.title;
               const links = PLATFORMS.filter((p) => r[p.key]);
               return (
-                <div
+                <motion.div
                   key={r.id}
+                  variants={rowVariants}
                   className="group flex items-start gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-2.5 transition-colors hover:border-white/15 hover:bg-white/[0.06] sm:gap-4 sm:p-3"
                 >
                   {/* 30-second preview. The play badge used to be
@@ -739,10 +755,10 @@ function TurnBlock({
                   </div>
 
                   <CrateToggle release={r} />
-                </div>
+                </motion.div>
               );
             })}
-          </div>
+          </motion.div>
           <div className="mt-2 flex items-center justify-between gap-2 px-1">
             {/* Say which stage produced this order. "Ranked" means the model
                 actually judged these records; "DeepSeek" alone means it only
