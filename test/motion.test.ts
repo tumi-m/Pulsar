@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import type { TargetAndTransition, Variant } from "framer-motion";
 import { EASE, DUR, SPRING, fadeUp, pop, staggerParent, sheet, ms } from "@/lib/motion";
 
 /**
@@ -11,9 +12,25 @@ import { EASE, DUR, SPRING, fadeUp, pop, staggerParent, sheet, ms } from "@/lib/
  * impossible, and it is invisible in review.
  */
 
-/** Does a variant move the element, as opposed to merely fading it? */
-function moves(v: Record<string, unknown>): boolean {
-  return ["x", "y", "scale", "rotate"].some((k) => k in v);
+/**
+ * Does a variant move the element, as opposed to merely fading it?
+ *
+ * Typed against framer's own `Variant` rather than a loose record: the
+ * factories return framer types, and widening them here would have hidden the
+ * mismatch that broke `tsc --noEmit` while tests and build both stayed green.
+ */
+function moves(v: Variant | undefined): boolean {
+  const t = target(v);
+  return !!t && ["x", "y", "scale", "rotate"].some((k) => k in t);
+}
+
+/**
+ * A framer `Variant` is either a target object or a resolver function. Only the
+ * object form carries readable values, so narrow once here rather than casting
+ * at each assertion.
+ */
+function target(v: Variant | undefined): TargetAndTransition | undefined {
+  return !v || typeof v === "function" ? undefined : (v as TargetAndTransition);
 }
 
 describe("reduced motion is honoured by every helper", () => {
@@ -22,14 +39,14 @@ describe("reduced motion is honoured by every helper", () => {
     expect(moves(r.hidden)).toBe(false);
     expect(moves(r.show)).toBe(false);
     // It must still become visible — reduced motion is not "hide the content".
-    expect(r.hidden.opacity).toBe(0);
-    expect(r.show.opacity).toBe(1);
+    expect(target(r.hidden)?.opacity).toBe(0);
+    expect(target(r.show)?.opacity).toBe(1);
   });
 
   it("pop does not scale", () => {
     const r = pop(true);
     expect(moves(r.hidden)).toBe(false);
-    expect(r.show.opacity).toBe(1);
+    expect(target(r.show)?.opacity).toBe(1);
   });
 
   it("staggerParent emits no per-child delay", () => {
@@ -40,8 +57,8 @@ describe("reduced motion is honoured by every helper", () => {
   it("sheet neither slides nor scales, on either form factor", () => {
     for (const mobile of [true, false]) {
       const s = sheet(true, mobile);
-      expect(moves(s.initial), `mobile=${mobile}`).toBe(false);
-      expect(moves(s.animate), `mobile=${mobile}`).toBe(false);
+      expect(moves(s.initial as Variant), `mobile=${mobile}`).toBe(false);
+      expect(moves(s.animate as Variant), `mobile=${mobile}`).toBe(false);
     }
   });
 
@@ -61,8 +78,8 @@ describe("reduced motion is honoured by every helper", () => {
 describe("motion is allowed to move when nobody objected", () => {
   it("fadeUp translates and settles at rest", () => {
     const r = fadeUp(false, 12);
-    expect(r.hidden.y).toBe(12);
-    expect(r.show.y).toBe(0);
+    expect(target(r.hidden)?.y).toBe(12);
+    expect(target(r.show)?.y).toBe(0);
   });
 
   it("sheet slides up from the bottom on mobile, and scales on desktop", () => {
@@ -73,8 +90,10 @@ describe("motion is allowed to move when nobody objected", () => {
 
 describe("stagger stays quick as lists grow", () => {
   const delayFor = (count: number) => {
-    const t = staggerParent(false, count).show.transition as { staggerChildren: number };
-    return t.staggerChildren;
+    const t = target(staggerParent(false, count).show)?.transition as
+      | { staggerChildren: number }
+      | undefined;
+    return t?.staggerChildren ?? 0;
   };
 
   it("caps total reveal time rather than the per-item delay", () => {

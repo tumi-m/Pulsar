@@ -104,8 +104,15 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
   // DSP deep links available for this release (shown full-colour on 3s dwell).
   const dsps = PLATFORMS.filter((p) => Boolean(release[p.key]));
 
-  // No artwork could be resolved → don't show this release at all.
-  if (artHidden) return null;
+  // A release with no resolvable cover used to remove itself from the grid
+  // entirely. That was only survivable while the fallback chain was broken and
+  // never reported failure; once it worked, a single iTunes hiccup could empty
+  // a fifth of the page. The record is still worth showing — <Artwork> has a
+  // designed letter tile carrying the artist and title, and every control on
+  // the card (play, crate, DSP links) works without a cover. All that is
+  // suppressed is the physical-media dwell, which frames a sleeve around art
+  // that doesn't exist.
+  const canShowPhysical = armed && !artHidden;
 
   return (
     <motion.div
@@ -163,16 +170,29 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
               : undefined,
           }}
         >
-          {/* default: plain album cover */}
-          <Artwork
-            src={release.artwork_url}
-            artist={release.artist}
-            title={release.title}
-            className={`object-cover transition-opacity duration-300 ${armed ? "opacity-0" : "opacity-100"}`}
-            onUnavailable={() => setArtHidden(true)}
-          />
+          {/* default: plain album cover.
+
+              The dwell fade lives on this wrapper, not on the <Artwork>'s
+              className: passing `opacity-100` in there put two conflicting
+              opacity utilities on one element, and Tailwind's source order let
+              the outer one win. That silently defeated Artwork's own fade-up —
+              every cover snapped in, and a cover that had failed to decode was
+              forced to full opacity, showing the browser's broken-image glyph
+              instead of staying hidden behind the placeholder. */}
+          <div
+            className={`absolute inset-0 transition-opacity duration-300 ${
+              canShowPhysical ? "opacity-0" : "opacity-100"
+            }`}
+          >
+            <Artwork
+              src={release.artwork_url}
+              artist={release.artist}
+              title={release.title}
+              onUnavailable={() => setArtHidden(true)}
+            />
+          </div>
           {/* physical object appears only after a 3-second dwell */}
-          {armed && (
+          {canShowPhysical && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -184,7 +204,7 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
                 artist={release.artist}
                 title={release.title}
                 format={format}
-                hovered={armed}
+                hovered={canShowPhysical}
                 big={big}
               />
             </motion.div>
