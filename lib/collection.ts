@@ -193,7 +193,10 @@ export const inPlaylist = (id: string) => inAnyCrate(id);
 /** Toggle in the first ("active") crate — the quick one-tap crate action. */
 export function togglePlaylist(release: Release): boolean {
   const crates = readCrates();
-  const target = crates[0];
+  // Zero crates is a legitimate state (the user deleted them all, or a sync
+  // pull emptied the list). `crates[0].id` then threw, so the one-tap add —
+  // and the Selector's "add all to crate" — died silently. Make one instead.
+  const target = crates[0] ?? createCrate("My Crate");
   return toggleInCrate(target.id, release);
 }
 
@@ -202,4 +205,38 @@ export function removeFromPlaylist(id: string): void {
   const crates = readCrates();
   for (const c of crates) c.releases = c.releases.filter((r) => r.id !== id);
   writeCrates(crates);
+}
+
+
+/**
+ * Combine the local collection with the one pulled from the server on sign-in.
+ *
+ * SyncBridge used to write the remote copy straight over localStorage — "if
+ * they have one, it becomes local truth". But pullCollection returns a remote
+ * copy as soon as ANY favourite exists, and crates were never reaching the
+ * server (see lib/sync.ts), so the remote copy's crate list was always empty:
+ * signing in deleted every crate on the device, the one thing the feature
+ * exists to protect. Even with sync working, anything saved while signed out
+ * would have been thrown away.
+ *
+ * Nothing is ever removed here. Favourites are a union by release id; crates
+ * match by name and take the union of their releases; crates that exist on
+ * only one side are kept. Local order wins where both have an item.
+ */
+export function mergeCollections(
+  local: { favorites: Release[]; crates: Crate[] },
+  remote: { favorites: Release[]; crates: Crate[] }
+): { favorites: Release[]; crates: Crate[] } {
+  const unionById = (a: Release[], b: Release[]) => {
+    const seen = new Set(a.map((r) => r.id));
+    return [...a, ...b.filter((r) => !seen.has(r.id))];
+  };
+
+  const crates: Crate[] = local.crates.map((c) => ({ ...c, releases: [...c.releases] }));
+  for (const rc of remote.crates) {
+    const match = crates.find((c) => c.name.trim().toLowerCase() === rc.name.trim().toLowerCase());
+    if (match) match.releases = unionById(match.releases, rc.releases);
+    else crates.push({ ...rc, releases: [...rc.releases] });
+  }
+  return { favorites: unionById(local.favorites, remote.favorites), crates };
 }

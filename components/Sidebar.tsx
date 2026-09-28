@@ -24,6 +24,24 @@ import {
  * Theme, and Taste. Opens on the "pulsar-toggle-sidebar" event fired by
  * the navbar menu button.
  */
+/**
+ * A labelled group in the menu.
+ *
+ * Declared at module level on purpose. It used to be defined INSIDE Sidebar,
+ * which makes it a brand-new component type on every render — so React
+ * unmounted and remounted every section whenever any state changed. Typing in
+ * the sign-in email field sets state, so the input was replaced after each
+ * keystroke and lost focus: you could type one character at a time.
+ */
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="border-t border-ink/[0.06] px-5 py-5">
+      <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.3em] text-ink-400">{label}</p>
+      {children}
+    </div>
+  );
+}
+
 export function Sidebar() {
   const [open, setOpen] = useState(false);
   const [format, setFormat] = useState<MediaFormat>("vinyl");
@@ -69,13 +87,6 @@ export function Sidebar() {
     window.dispatchEvent(new CustomEvent("pulsar-open-crate", { detail: which }));
     setOpen(false);
   };
-
-  const Section = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <div className="border-t border-ink/[0.06] px-5 py-5">
-      <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.3em] text-ink/35">{label}</p>
-      {children}
-    </div>
-  );
 
   return (
     <AnimatePresence>

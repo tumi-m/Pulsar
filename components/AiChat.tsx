@@ -299,11 +299,11 @@ export function AiChat({ releases }: AiChatProps) {
             >
               <div
                 className="aurora-blob absolute -top-32 left-1/2 h-80 w-[36rem] -translate-x-1/2 rounded-full opacity-60 blur-3xl"
-                style={{ background: "radial-gradient(closest-side, rgba(242,102,44,0.4), rgba(255,95,162,0.2) 55%, transparent)" }}
+                style={{ background: "radial-gradient(closest-side, rgba(242,102,44,0.4), rgba(255,206,10,0.2) 55%, transparent)" }}
               />
               <div
                 className="aurora-blob absolute -bottom-40 -right-24 h-72 w-72 rounded-full opacity-40 blur-3xl"
-                style={{ background: "radial-gradient(closest-side, rgba(74,163,255,0.35), transparent)" }}
+                style={{ background: "radial-gradient(closest-side, rgba(78,134,199,0.35), transparent)" }}
               />
             </div>
             {/* drag grabber — mobile only; the sole drag-to-dismiss target so
@@ -317,8 +317,10 @@ export function AiChat({ releases }: AiChatProps) {
             </div>
 
             {view === "choose" ? (
-              /* ── left / right choice before entering ── */
-              <div className="relative z-10 p-5 sm:p-6">
+              /* ── left / right choice before entering ──
+                 flex-1 + my-auto on the grid: on desktop the two choices sat at
+                 the top of an 800px panel with ~70% of it empty beneath them. */
+              <div className="relative z-10 flex flex-1 flex-col p-5 sm:p-6">
                 <div className="mb-1 flex items-start justify-between">
                   <div className="flex items-center gap-2.5">
                     <span
@@ -345,11 +347,11 @@ export function AiChat({ releases }: AiChatProps) {
                     <X size={16} />
                   </button>
                 </div>
-                <div className="mt-5 grid grid-cols-2 gap-3 lg:mt-8 lg:gap-5">
+                <div className="mt-5 grid grid-cols-2 gap-3 sm:my-auto lg:mx-auto lg:w-full lg:max-w-4xl lg:gap-6">
                   <motion.button
                     whileTap={{ scale: 0.96 }}
                     onClick={chooseSurvey}
-                    className="group relative flex flex-col items-center gap-3 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-center transition-all hover:border-sony/50 hover:bg-sony/[0.07] lg:gap-4 lg:p-9"
+                    className="group relative flex flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border border-chrome-700/60 bg-deck-700/70 p-5 text-center shadow-key transition-[border-color,background-color,box-shadow] hover:border-sony/50 hover:bg-sony/[0.07] active:shadow-keyed lg:min-h-[19rem] lg:gap-4 lg:p-9"
                   >
                     <span
                       className="pointer-events-none absolute -inset-8 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
@@ -358,11 +360,11 @@ export function AiChat({ releases }: AiChatProps) {
                     <span
                       className="relative flex h-14 w-14 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110"
                       style={{
-                        background: "linear-gradient(135deg, rgba(242,102,44,0.9), rgba(107,63,175,0.7))",
+                        background: "var(--grad-transport)",
                         boxShadow: "0 8px 22px rgba(242,102,44,0.4), inset 0 1px 0 rgba(255,255,255,0.35)",
                       }}
                     >
-                      <LayoutGrid size={24} className="text-white" />
+                      <LayoutGrid size={24} className="text-deck" />
                     </span>
                     <span className="relative text-[13px] font-bold uppercase tracking-wide text-ink">
                       Visual Survey
@@ -374,17 +376,17 @@ export function AiChat({ releases }: AiChatProps) {
                   <motion.button
                     whileTap={{ scale: 0.96 }}
                     onClick={() => setView("chat")}
-                    className="group relative flex flex-col items-center gap-3 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-center transition-all hover:border-tps/50 hover:bg-tps/[0.07] lg:gap-4 lg:p-9"
+                    className="group relative flex flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border border-chrome-700/60 bg-deck-700/70 p-5 text-center shadow-key transition-[border-color,background-color,box-shadow] hover:border-tps/50 hover:bg-tps/[0.07] active:shadow-keyed lg:min-h-[19rem] lg:gap-4 lg:p-9"
                   >
                     <span
                       className="pointer-events-none absolute -inset-8 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-                      style={{ background: "radial-gradient(50% 50% at 50% 30%, rgba(74,163,255,0.25), transparent 70%)" }}
+                      style={{ background: "radial-gradient(50% 50% at 50% 30%, rgba(78,134,199,0.25), transparent 70%)" }}
                     />
                     <span
                       className="relative flex h-14 w-14 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110"
                       style={{
-                        background: "linear-gradient(135deg, rgba(74,163,255,0.9), rgba(38,110,214,0.7))",
-                        boxShadow: "0 8px 22px rgba(74,163,255,0.4), inset 0 1px 0 rgba(255,255,255,0.35)",
+                        background: "linear-gradient(135deg, #6f9fd6, #3f6ea8)",
+                        boxShadow: "0 8px 22px rgba(78,134,199,0.4), inset 0 1px 0 rgba(255,255,255,0.35)",
                       }}
                     >
                       <MessagesSquare size={24} className="text-white" />
@@ -609,8 +611,8 @@ function TurnBlock({
   const rowVariants = useMemo(() => fadeUp(reduce, 10), [reduce]);
   const chips = [
     ...turn.signals.moods.map((v) => ({ kind: "moods" as const, v, color: "rgba(242,102,44,0.5)" })),
-    ...turn.signals.genres.map((v) => ({ kind: "genres" as const, v, color: "rgba(74,163,255,0.5)" })),
-    ...turn.signals.decades.map((v) => ({ kind: "decades" as const, v, color: "rgba(255,179,71,0.5)" })),
+    ...turn.signals.genres.map((v) => ({ kind: "genres" as const, v, color: "rgba(78,134,199,0.5)" })),
+    ...turn.signals.decades.map((v) => ({ kind: "decades" as const, v, color: "rgba(255,206,10,0.5)" })),
   ];
 
   return (

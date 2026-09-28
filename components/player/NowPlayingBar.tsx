@@ -64,6 +64,32 @@ export function NowPlayingBar() {
       ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`
       : "0:00";
 
+  // Dismiss on a press anywhere outside the menu, or Escape. This used to be a
+  // `fixed inset-0` scrim rendered inside the bar — but the bar's
+  // backdrop-filter (and framer's transform) make it the containing block for
+  // fixed descendants, so the "full-screen" scrim was clamped to the bar's own
+  // 92px. Clicking anywhere on the page left the menu open. A document
+  // listener can't be trapped by an ancestor.
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const menuToggleRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (menuRef.current?.contains(t) || menuToggleRef.current?.contains(t)) return;
+      setMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown, true);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
+
   // Close it whenever the track changes so it never describes the wrong song.
   useEffect(() => setMenuOpen(false), [current?.id]);
 
@@ -104,15 +130,8 @@ export function NowPlayingBar() {
             <AnimatePresence>
               {menuOpen && (
                 <>
-                  <motion.button
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    aria-label="Close menu"
-                    onClick={() => setMenuOpen(false)}
-                    className="fixed inset-0 -z-10 cursor-default bg-deck/60 backdrop-blur-sm"
-                  />
                   <motion.div
+                    ref={menuRef}
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 12 }}
@@ -238,6 +257,7 @@ export function NowPlayingBar() {
             <div className="mx-auto flex max-w-screen-2xl items-center gap-3 px-4 py-2.5 md:px-8">
               {/* artwork + meta — tapping opens the "where to?" menu */}
               <button
+                ref={menuToggleRef}
                 onClick={() => setMenuOpen((v) => !v)}
                 aria-expanded={menuOpen}
                 aria-label={`${current.title} by ${current.artist} — open options`}

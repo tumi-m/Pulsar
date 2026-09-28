@@ -159,19 +159,27 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[57] flex flex-col bg-[#07070d]/[0.98] backdrop-blur-2xl lg:inset-x-auto lg:bottom-auto lg:right-4 lg:top-20 lg:max-h-[calc(100dvh-7rem)] lg:w-[min(44vw,560px)] lg:rounded-2xl lg:border lg:border-white/[0.12]"
+            // On desktop the panel stops above the transport. It used to run to
+            // 7rem from the bottom whatever was playing, which put it over the
+            // bar's play, crate and close keys — nothing could be paused while
+            // Samples was open.
+            className="fixed inset-0 z-[57] flex flex-col bg-[#0b0d10]/[0.98] backdrop-blur-2xl lg:inset-x-auto lg:bottom-auto lg:right-4 lg:top-20 lg:max-h-[calc(100dvh_-_7rem_-_var(--player-h,0px))] lg:w-[min(44vw,560px)] lg:rounded-2xl lg:border lg:border-white/[0.12]"
           >
             {/* header */}
             <div className="relative flex items-center gap-3 border-b border-white/10 px-4 py-3">
               <span
                 className="pointer-events-none absolute inset-0 opacity-60"
-                style={{ background: "radial-gradient(80% 100% at 0% 0%, rgba(242,102,44,0.28), transparent 60%)" }}
+                style={{ background: "radial-gradient(80% 100% at 0% 0%, rgba(78,134,199,0.28), transparent 60%)" }}
               />
-              <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-sony/20 text-sony">
+              {/* Samples is exploration — information — so its identity is the
+                  housing blue, matching its key in the header. After the palette
+                  swap it was all transport orange, the colour reserved for "the
+                  thing to press". Timestamps use the LCD green: they're readouts. */}
+              <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-tps/20 text-tps">
                 <AudioLines size={17} />
               </span>
               <div className="relative min-w-0 flex-1">
-                <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-sony/80">
+                <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-tps/80">
                   Samples mode
                 </p>
                 <h3 className="truncate text-base font-bold uppercase tracking-tight text-ink">
@@ -201,7 +209,7 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
                   aria-label="Search a song or artist"
                   className="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-ink/35 focus:outline-none"
                 />
-                {busy && <Loader2 size={15} className="animate-spin text-sony" />}
+                {busy && <Loader2 size={15} className="animate-spin text-tps" />}
               </div>
 
               {/* Catalogue + graph suggestions, each labelled with what it will
@@ -217,7 +225,7 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
                       }
                       className={`flex min-h-[52px] w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition-colors ${
                         connections > 0
-                          ? "border-sony/30 bg-sony/[0.06] hover:bg-sony/[0.12]"
+                          ? "border-tps/30 bg-tps/[0.06] hover:bg-tps/[0.12]"
                           : "border-white/10 hover:bg-white/[0.06]"
                       }`}
                     >
@@ -232,9 +240,9 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
                         <span className="block truncate text-[11px] text-ink/50">{r.artist}</span>
                       </span>
                       {busyFor(r.artist, r.title) ? (
-                        <Loader2 size={14} className="flex-shrink-0 animate-spin text-sony" />
+                        <Loader2 size={14} className="flex-shrink-0 animate-spin text-tps" />
                       ) : connections > 0 ? (
-                        <span className="flex-shrink-0 rounded-full bg-sony/20 px-2 py-1 text-[10px] font-bold text-sony">
+                        <span className="flex-shrink-0 rounded-full bg-tps/20 px-2 py-1 text-[10px] font-bold text-tps">
                           {connections} sample{connections === 1 ? "" : "s"}
                         </span>
                       ) : (
@@ -267,7 +275,7 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
                     href={`https://www.whosampled.com/search/?q=${encodeURIComponent(query.trim())}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sony hover:underline"
+                    className="inline-flex items-center gap-1 text-tps hover:underline"
                   >
                     look it up on WhoSampled <ExternalLink size={10} />
                   </a>
@@ -283,7 +291,7 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
                     href={`https://www.whosampled.com/search/?q=${encodeURIComponent(query)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sony hover:underline"
+                    className="inline-flex items-center gap-1 text-tps hover:underline"
                   >
                     Try WhoSampled <ExternalLink size={10} />
                   </a>
@@ -293,16 +301,16 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
               {/* ── browse: the records everyone keeps lifting from ── */}
               <section className="mt-6">
                 <p className="mb-2 flex items-center gap-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-ink/40">
-                  <Trophy size={11} className="text-sony/70" /> Most sampled sources
+                  <Trophy size={11} className="text-tps/70" /> Most sampled sources
                 </p>
                 <div className="space-y-1">
                   {leaders.map((row, i) => (
                     <button
                       key={`${row.artist}-${row.title}`}
                       onClick={() => lookup(row.artist, row.title)}
-                      className="flex min-h-[52px] w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-left transition-colors hover:border-sony/40 hover:bg-sony/[0.08]"
+                      className="flex min-h-[52px] w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-left transition-colors hover:border-tps/40 hover:bg-tps/[0.08]"
                     >
-                      <span className="w-5 flex-shrink-0 text-center font-mono text-[13px] font-bold text-sony/80">
+                      <span className="w-5 flex-shrink-0 text-center font-mono text-[13px] font-bold text-tps/80">
                         {i + 1}
                       </span>
                       <span className="min-w-0 flex-1">
@@ -315,9 +323,9 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
                         </span>
                       </span>
                       {busyFor(row.artist, row.title) ? (
-                        <Loader2 size={14} className="flex-shrink-0 animate-spin text-sony" />
+                        <Loader2 size={14} className="flex-shrink-0 animate-spin text-tps" />
                       ) : (
-                        <span className="flex-shrink-0 rounded-full bg-sony/15 px-2 py-1 text-[10px] font-bold text-sony">
+                        <span className="flex-shrink-0 rounded-full bg-tps/15 px-2 py-1 text-[10px] font-bold text-tps">
                           {row.count}×
                         </span>
                       )}
@@ -367,7 +375,7 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
                         <p className="truncate text-[11px] text-ink/50">
                           samples {m.sample}
                         </p>
-                        <p className="mt-1 font-mono text-[10px] text-sony">{m.mark}</p>
+                        <p className="mt-1 font-mono text-[10px] text-lcd">{m.mark}</p>
                       </div>
                     ))}
                   </div>

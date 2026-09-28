@@ -206,6 +206,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const audio = audioRef.current;
     if (!audio || unlockedRef.current) return Promise.resolve();
 
+    // Never prime over a real track. This assigned the silent clip
+    // unconditionally, so every path that called it with a preview already
+    // loaded — play()'s pre-check, playDirect's retry, the Retry button, and
+    // the document-wide tap listener — replaced the preview it was meant to
+    // rescue and then "resumed" silence. That is the "tap to retry does
+    // nothing" failure. When a track is loaded, the gesture's job is simply to
+    // let the caller play THAT element, which unlocks it in the same act.
+    const loaded = audio.getAttribute("src");
+    if (loaded && loaded !== SILENT_WAV) return Promise.resolve();
+
     // Priming is asynchronous, and play() assigns the REAL preview URL while
     // this promise is still pending. The teardown below must therefore never
     // touch an element that has moved on: clearing the src here deleted the
@@ -276,7 +286,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (next) playRef.current?.(next);
       }
     };
-    const onPlay = () => setPlaying(true);
+    const onPlay = () => {
+      setPlaying(true);
+      // Whatever started it, a playing track has no business sitting under a
+      // "didn't load — retry" line.
+      setError(null);
+    };
     const onPause = () => setPlaying(false);
     // Surface load/decode failures instead of failing silently. The audio
     // element's `error` event fires when the (proxied) MP3 502s or is
@@ -327,8 +342,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       // an album play after a track play correctly switches instead of
       // collapsing into a pause toggle.
       if (current?.id === release.id && hasAudio) {
-        if (audio.paused) audio.play().catch(() => {});
-        else audio.pause();
+        if (audio.paused) {
+          // This is also where the Retry button lands. It used to swallow the
+          // rejection, so a failed retry changed nothing on screen, and a
+          // successful one left the error pinned under a playing track.
+          audio.play().then(
+            () => setError(null),
+            (err) => {
+              setError(describePlayFailure(audio, err));
+              setPlaying(false);
+            }
+          );
+        } else audio.pause();
         return;
       }
 
@@ -481,10 +506,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   );
 
   const stop = useCallback(() => {
+    // Supersede any play() still waiting on its preview lookup. Without this,
+    // closing the player during the spinner let the fetch land afterwards and
+    // start audio with no transport on screen — nothing to pause it with short
+    // of reloading the page.
+    reqIdRef.current++;
+    primeTokenRef.current++;
     const audio = audioRef.current;
     if (audio) {
       audio.pause();
       audio.currentTime = 0;
+      audio.removeAttribute("src");
+      audio.load();
     }
     setCurrent(null);
     setPlaying(false);

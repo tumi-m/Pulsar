@@ -861,7 +861,11 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                     No discography found
                   </p>
                 ) : (
-                  <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto overscroll-contain p-4 sm:grid-cols-3">
+                  // Bottom padding clears the transport: this overlay sits at
+                  // z-[45], under the z-50 player bar, and unlike its sibling
+                  // sheet it never padded for it — so the discography's last row
+                  // was permanently hidden behind the bar.
+                  <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto overscroll-contain p-4 pb-[calc(var(--player-h,0px)_+_1rem)] sm:grid-cols-3">
                     {discog.map((r) => (
                       <button key={r.id} onClick={() => onOpen?.(r)} className="group block text-left">
                         <div className="relative aspect-square w-full overflow-hidden rounded-lg ring-1 ring-white/10 transition-transform active:scale-95 group-hover:scale-[1.03]">

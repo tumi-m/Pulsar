@@ -117,7 +117,7 @@ export async function pushCollection(userId: string): Promise<void> {
     for (const chunk of chunked(favs, 500)) {
       const { error } = await table("favorites").upsert(
         chunk.map((release) => ({ user_id: userId, release })),
-        { onConflict: "user_id,release->>'id'", ignoreDuplicates: false }
+        { onConflict: "user_id,release_id", ignoreDuplicates: false } // needs migration 0004
       );
       if (error) console.warn("[sync] favorites upsert:", error.message);
     }
@@ -149,23 +149,41 @@ export async function pushCollection(userId: string): Promise<void> {
         .in("id", staleCrates.map((c) => c.id))
         .eq("user_id", userId);
     }
-    for (const chunk of chunked(crates, 100)) {
-      const { error } = await table("crates").upsert(
-        chunk.map((c) => ({
-          id: crateIdFor.get(c.id) ?? c.id,
-          user_id: userId,
-          name: c.name,
-        })),
-        { onConflict: "id" }
-      );
-      if (error) console.warn("[sync] crates upsert:", error.message);
+    // Crates the server already has (matched by name) keep their uuid. New
+    // ones are INSERTED WITHOUT AN ID so Postgres generates one: this used to
+    // upsert with the client id — "crate-lx3k2-1" — into a `uuid` primary key,
+    // which Postgres rejects, and the error went to console.warn. No crate
+    // ever reached the server, so cross-device crates never worked at all.
+    const unsynced = crates.filter((c) => !remoteByName.has(c.name));
+    for (const chunk of chunked(unsynced, 100)) {
+      const { data: created, error } = await table("crates")
+        .insert(chunk.map((c) => ({ user_id: userId, name: c.name })))
+        .select("id, name");
+      if (error) {
+        console.warn("[sync] crates insert:", error.message);
+        for (const c of chunk) crateIdFor.delete(c.id); // don't push items for a crate that doesn't exist
+        continue;
+      }
+      // Pair each returned row back to its local crate by name, first-come,
+      // so two local crates with the same name each get their own uuid.
+      const pending = [...chunk];
+      for (const row of (created ?? []) as { id: string; name: string }[]) {
+        const i = pending.findIndex((c) => c.name === row.name);
+        if (i !== -1) crateIdFor.set(pending.splice(i, 1)[0].id, row.id);
+      }
     }
 
     // ── Crate items ──────────────────────────────────────────────
     for (const c of crates) {
-      const crateId = crateIdFor.get(c.id) ?? c.id;
+      const crateId = crateIdFor.get(c.id);
+      // A client id means the crate never made it to the server; its items
+      // would only violate the foreign key.
+      if (!crateId || crateId === c.id) continue;
       const { data: remoteItems } = await table("crate_items")
-        .select("release->>'id' as rid")
+        // PostgREST's own syntax — alias:column->>key. The SQL form
+        // "release->>'id' as rid" is a parse error, so remoteItems was always
+        // null and stale items were never removed.
+        .select("rid:release->>id")
         .eq("crate_id", crateId);
       const localSet = new Set(c.releases.map((r) => r.id));
       const staleItems = (remoteItems ?? [])
@@ -180,7 +198,7 @@ export async function pushCollection(userId: string): Promise<void> {
       for (const chunk of chunked(c.releases, 500)) {
         const { error } = await table("crate_items").upsert(
           chunk.map((release) => ({ crate_id: crateId, release })),
-          { onConflict: "crate_id,release->>'id'" }
+          { onConflict: "crate_id,release_id" } // needs migration 0004
         );
         if (error) console.warn("[sync] crate_items upsert:", error.message);
       }

@@ -296,9 +296,9 @@ function SampleCard({
           background: isSamples
             ? "radial-gradient(40% 40% at 15% 0%, rgba(242,102,44,0.5), transparent 70%)"
             : isCovers
-              ? "radial-gradient(40% 40% at 15% 0%, rgba(69,240,160,0.45), transparent 70%)"
+              ? "radial-gradient(40% 40% at 15% 0%, rgba(126,217,174,0.45), transparent 70%)"
               : isRemix
-                ? "radial-gradient(40% 40% at 15% 0%, rgba(255,95,162,0.45), transparent 70%)"
+                ? "radial-gradient(40% 40% at 15% 0%, rgba(255,206,10,0.45), transparent 70%)"
                 : "radial-gradient(40% 40% at 15% 0%, rgba(78,134,199,0.45), transparent 70%)",
         }}
       />

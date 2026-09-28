@@ -147,50 +147,68 @@ export function upsertPayload(release: AgentRelease): Record<string, unknown> {
   return payload;
 }
 
-export async function saveRelease(
-  release: AgentRelease
-): Promise<Release> {
-  const db = supabaseAdmin();
-  // Case-insensitive dedupe before the upsert: the unique index is on
-  // (artist, title) with default collation, so "The Beatles" and "the
-  // beatles" are different rows to Postgres — but releaseExists (the agent's
-  // duplicate check) is .ilike, case-insensitive. Without this check the
-  // agent would be told "safe to add" for a case variant and insert a
-  // duplicate row forever. Resolve the existing row first; if found, update
-  // it by id instead of inserting.
-  const { count, error: checkErr } = await db
-    .from("releases")
-    .select("id", { count: "exact", head: true })
-    .ilike("artist", release.artist)
-    .ilike("title", release.title);
-  if (!checkErr && (count ?? 0) > 0) {
-    const { data: existing, error: findErr } = await db
-      .from("releases")
-      .select("id")
-      .ilike("artist", release.artist)
-      .ilike("title", release.title)
-      .order("created_at", { ascending: true })
-      .limit(1);
-    const row = (existing as { id: string }[] | null)?.[0];
-    if (!findErr && row) {
-      const { data, error } = await db
-        .from("releases")
-        .update(upsertPayload(release))
-        .eq("id", row.id)
-        .select()
-        .single();
-      if (error) throw new Error(`Failed to save release: ${error.message}`);
-      return data as Release;
-    }
-  }
+type Db = ReturnType<typeof supabaseAdmin>;
+
+/** The oldest row matching case-insensitively, or null. Errors read as "none". */
+async function findExistingId(db: Db, release: AgentRelease): Promise<string | null> {
   const { data, error } = await db
     .from("releases")
-    .upsert(upsertPayload(release), { onConflict: "artist,title" })
+    .select("id")
+    .ilike("artist", release.artist)
+    .ilike("title", release.title)
+    .order("created_at", { ascending: true })
+    .limit(1);
+  if (error) return null;
+  return (data as { id: string }[] | null)?.[0]?.id ?? null;
+}
+
+async function updateById(db: Db, id: string, release: AgentRelease): Promise<Release> {
+  const { data, error } = await db
+    .from("releases")
+    .update(upsertPayload(release))
+    .eq("id", id)
     .select()
     .single();
-
   if (error) throw new Error(`Failed to save release: ${error.message}`);
   return data as Release;
+}
+
+/**
+ * Insert a release, or update the row it duplicates.
+ *
+ * This used to finish with `.upsert(..., { onConflict: "artist,title" })`.
+ * Migration 0003 replaced the plain (artist, title) unique constraint with a
+ * unique EXPRESSION index on (lower(artist), lower(title)) — and Postgres can
+ * only infer an ON CONFLICT target from an index whose columns match it
+ * exactly. With the constraint gone, `ON CONFLICT (artist, title)` raises
+ * 42P10 ("no unique or exclusion constraint matching the ON CONFLICT
+ * specification") at plan time, whether or not any row conflicts. Every NEW
+ * release failed to save; only updates to rows that already existed worked,
+ * which is why the nightly run could report "found N, saved none" while the
+ * site looked healthy.
+ *
+ * The case-insensitive lookup below was already the real dedupe, so the
+ * write is now a plain insert. The lower() unique index stays as the backstop:
+ * if a concurrent writer lands a case variant between our lookup and our
+ * insert, Postgres raises 23505 and we update that row instead. This works
+ * whether or not 0003 has been applied.
+ */
+export async function saveRelease(release: AgentRelease, db: Db = supabaseAdmin()): Promise<Release> {
+  const existing = await findExistingId(db, release);
+  if (existing) return updateById(db, existing, release);
+
+  const { data, error } = await db
+    .from("releases")
+    .insert(upsertPayload(release))
+    .select()
+    .single();
+  if (!error) return data as Release;
+
+  if ((error as { code?: string }).code === "23505") {
+    const raced = await findExistingId(db, release);
+    if (raced) return updateById(db, raced, release);
+  }
+  throw new Error(`Failed to save release: ${error.message}`);
 }
 
 export async function releaseExists(artist: string, title: string): Promise<boolean> {

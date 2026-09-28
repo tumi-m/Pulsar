@@ -16,6 +16,7 @@ import {
   togglePlaylist,
   removeFromPlaylist,
   removeFromCrate,
+  mergeCollections,
 } from "@/lib/collection";
 import type { Release } from "@/lib/types";
 
@@ -160,5 +161,56 @@ describe("collection-change event", () => {
     toggleInCrate(getCrates()[0].id, r("2"));
     window.removeEventListener("pulsar-collection-change", handler);
     expect(handler.mock.calls.length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("an empty crate list is a state, not a crash", () => {
+  it("togglePlaylist creates a crate when there are none", () => {
+    localStorage.setItem("pulsar_crates_v2", "[]");
+    expect(() => togglePlaylist(r("9"))).not.toThrow();
+    const crates = getCrates();
+    expect(crates).toHaveLength(1);
+    expect(inCrate(crates[0].id, "9")).toBe(true);
+  });
+});
+
+describe("mergeCollections — signing in never deletes anything", () => {
+  const crate = (name: string, ids: string[]) => ({ id: `c-${name}`, name, releases: ids.map(r) });
+
+  it("keeps every local crate when the server has favourites but no crates", () => {
+    // Exactly the state crate sync left the server in: favourites uploaded,
+    // crates rejected. Overwriting with this wiped the device.
+    const merged = mergeCollections(
+      { favorites: [r("1")], crates: [crate("Road trip", ["a", "b"]), crate("Late", ["c"])] },
+      { favorites: [r("1"), r("2")], crates: [] }
+    );
+    expect(merged.crates.map((c) => c.name)).toEqual(["Road trip", "Late"]);
+    expect(merged.crates[0].releases.map((x) => x.id)).toEqual(["a", "b"]);
+  });
+
+  it("unions favourites by id, local order first", () => {
+    const merged = mergeCollections(
+      { favorites: [r("2"), r("1")], crates: [] },
+      { favorites: [r("1"), r("3")], crates: [] }
+    );
+    expect(merged.favorites.map((x) => x.id)).toEqual(["2", "1", "3"]);
+  });
+
+  it("merges crates with the same name (case-insensitively) and keeps one-sided crates", () => {
+    const merged = mergeCollections(
+      { favorites: [], crates: [crate("Road Trip", ["a"])] },
+      { favorites: [], crates: [crate("road trip", ["a", "b"]), crate("Gym", ["g"])] }
+    );
+    expect(merged.crates).toHaveLength(2);
+    expect(merged.crates[0].releases.map((x) => x.id)).toEqual(["a", "b"]);
+    expect(merged.crates[1].name).toBe("Gym");
+  });
+
+  it("does not mutate either input", () => {
+    const local = { favorites: [r("1")], crates: [crate("A", ["a"])] };
+    const remote = { favorites: [r("2")], crates: [crate("A", ["b"])] };
+    const snapshot = JSON.stringify({ local, remote });
+    mergeCollections(local, remote);
+    expect(JSON.stringify({ local, remote })).toBe(snapshot);
   });
 });
