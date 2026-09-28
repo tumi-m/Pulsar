@@ -531,7 +531,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       <div
         className={`transition-[padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
           detailOpen ? "lg:pr-[50vw]" : ""
-        } ${player.current ? "pb-[178px]" : "pb-[110px]"}`}
+        } pb-[calc(var(--player-h,0px)_+_110px)]`}
       >
         {/* ── search block — rests below the letterhead at the top, and
             elegantly FOLLOWS the user to the bottom (above the player, no gap)
@@ -541,30 +541,31 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
           transition={{ type: "spring", stiffness: 220, damping: 32 }}
           className={`fixed left-0 right-0 z-40 flex flex-col-reverse items-center gap-2 px-4 ${
             detailOpen
-              ? `opacity-0 pointer-events-none lg:right-[50vw] lg:opacity-100 lg:pointer-events-auto ${
-                  player.current ? "bottom-[72px]" : "bottom-3"
-                }`
+              ? "opacity-0 pointer-events-none lg:right-[50vw] lg:opacity-100 lg:pointer-events-auto bottom-[calc(var(--player-h,0px)_+_12px)]"
               : atTop
                 ? "top-[178px] opacity-100 md:top-[248px]"
-                : `opacity-100 ${player.current ? "bottom-[72px]" : "bottom-3"}`
+                : "opacity-100 bottom-[calc(var(--player-h,0px)_+_12px)]"
           }`}
         >
           {/* ONE compact, immersive control row: menu · search · genre · refine.
               Only as wide as its contents → maximal screen real estate. */}
           <div
-            className="flex max-w-[94vw] items-center gap-2 rounded-full border border-white/[0.12] p-1.5"
+            className="flex max-w-[94vw] items-center gap-2 rounded-2xl border border-chrome-700/60 p-1.5"
+            // The deck's control strip: brushed metal under a polished lip,
+            // still translucent enough to feel like it floats over the grid.
             style={{
-              background: "rgba(10,10,18,0.6)",
-              backdropFilter: "blur(22px) saturate(170%)",
-              WebkitBackdropFilter: "blur(22px) saturate(170%)",
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.28), 0 12px 32px rgba(0,0,0,0.55)",
+              background:
+                "repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 3px)," +
+                "linear-gradient(180deg, rgba(40,48,57,0.82), rgba(20,25,30,0.86))",
+              backdropFilter: "blur(22px) saturate(140%)",
+              WebkitBackdropFilter: "blur(22px) saturate(140%)",
+              boxShadow: "inset 0 1px 0 rgba(231,235,238,0.2), 0 12px 32px rgba(0,0,0,0.55)",
             }}
           >
             <button
               onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
               aria-label="Open menu"
-              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-white/20 text-ink/90 transition-transform hover:scale-105 active:scale-95"
-              style={{ background: "rgba(255,255,255,0.1)" }}
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[10px] border border-chrome-700/70 bg-deck-600 text-ink-100 shadow-key transition-[box-shadow,transform] active:translate-y-px active:shadow-keyed"
             >
               <span className="flex flex-col gap-[3px]">
                 <span className="h-[2px] w-4 rounded-full bg-current" />
@@ -575,17 +576,20 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
 
             {/* search — flexes to fill, shrinking so genre/refine always fit */}
             <div
-              className={`search-rainbow min-w-0 flex-1 rounded-full p-[1.5px] transition-opacity duration-300 sm:w-[300px] sm:flex-none md:w-[380px] ${
+              className={`search-rainbow min-w-0 flex-1 rounded-[11px] p-[1.5px] transition-opacity duration-300 sm:w-[300px] sm:flex-none md:w-[380px] ${
                 atTop ? "opacity-100" : "opacity-[0.6]"
               }`}
             >
+              {/* The field was 10% white over the animated gradient, so the
+                  "ring" was the whole pill and the placeholder was white text
+                  on yellow — barely legible at any point in the cycle. It is
+                  now an opaque recessed window, and the gradient is what it was
+                  always meant to be: a thin lit bezel round the edge. */}
               <div
-                className="flex w-full items-center gap-2 rounded-full px-3 py-1.5"
+                className="flex w-full items-center gap-2 rounded-[10px] px-3 py-1.5"
                 style={{
-                  background: "rgba(255,255,255,0.1)",
-                  backdropFilter: "blur(18px) saturate(180%)",
-                  WebkitBackdropFilter: "blur(18px) saturate(180%)",
-                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.45)",
+                  background: "linear-gradient(180deg, #0e1216 0%, #161b21 100%)",
+                  boxShadow: "inset 0 1px 3px rgba(0,0,0,0.85), inset 0 -1px 0 rgba(231,235,238,0.05)",
                 }}
               >
                 <svg viewBox="0 0 20 20" className="h-4 w-4 flex-shrink-0 text-ink/70" fill="none" stroke="currentColor" strokeWidth="2">
@@ -605,7 +609,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                     resetPage();
                   }}
                   placeholder="Search artists, albums…"
-                  className="w-full bg-transparent text-sm font-medium text-white placeholder:text-ink/55 focus:outline-none"
+                  className="w-full bg-transparent text-sm font-medium text-ink placeholder:text-ink-400 focus:outline-none"
                 />
                 {query && (
                   <button
@@ -622,10 +626,10 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
             <button
               onClick={() => setShowGenres((v) => !v)}
               aria-expanded={showGenres}
-              className={`flex min-h-9 flex-shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-[0.1em] transition-colors sm:min-h-0 sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.16em] ${
+              className={`flex min-h-9 flex-shrink-0 items-center gap-1 rounded-[10px] border px-3 py-1 text-[9px] font-bold uppercase tracking-[0.1em] shadow-key transition-[color,background-color,border-color,box-shadow,transform] active:translate-y-px active:shadow-keyed sm:min-h-0 sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.16em] ${
                 activeGenre
-                  ? "border-[#4e86c7]/60 bg-[#4e86c7]/15 text-[#bcd4f0]" // filter active → reminder
-                  : "border-ink/15 text-ink/60 hover:border-ink/40 hover:text-ink"
+                  ? "border-tps/60 bg-tps/20 text-[#bcd4f0]" // filter engaged → lit, like a held key
+                  : "border-chrome-700/60 bg-deck-600 text-ink-400 hover:text-ink"
               }`}
             >
               {activeGenre ?? "Genre"}
@@ -634,16 +638,17 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
             <button
               onClick={() => setShowRefine((v) => !v)}
               aria-expanded={showRefine}
-              className={`flex min-h-9 flex-shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-[0.1em] transition-colors sm:min-h-0 sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.2em] ${
+              className={`flex min-h-9 flex-shrink-0 items-center gap-1 rounded-[10px] border px-3 py-1 text-[9px] font-bold uppercase tracking-[0.1em] shadow-key transition-[color,background-color,border-color,box-shadow,transform] active:translate-y-px active:shadow-keyed sm:min-h-0 sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.2em] ${
                 refineActive
-                  ? "border-[#4e86c7]/60 bg-[#4e86c7]/15 text-[#bcd4f0]" // filter active → reminder
+                  ? "border-tps/60 bg-tps/20 text-[#bcd4f0]" // filter engaged → lit, like a held key
                   : showRefine
-                    ? "border-ink/40 bg-ink/[0.06] text-ink"
-                    : "border-ink/15 text-ink/50 hover:border-ink/40 hover:text-ink"
+                    ? "border-chrome-500/60 bg-deck-700 text-ink shadow-keyed"
+                    : "border-chrome-700/60 bg-deck-600 text-ink-400 hover:text-ink"
               }`}
             >
               Refine
-              {refineActive && <span className="h-1 w-1 rounded-full bg-[#4e86c7]" />}
+              {/* the engaged-filter lamp */}
+              {refineActive && <span className="h-1.5 w-1.5 rounded-full bg-lcd shadow-[0_0_6px_rgba(126,217,174,0.8)]" />}
               <span className={`transition-transform ${showRefine ? "rotate-180" : ""}`}>⌄</span>
             </button>
           </div>
@@ -869,17 +874,20 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 <div className="sticky top-14 z-[6] px-[13px] py-2 md:px-[21px]">
                   <motion.h2
                     layout
-                    className="inline-flex items-baseline gap-2 rounded-full border border-white/10 px-3 py-1"
+                    // A cassette spine label: J-card paper, a ruled edge, the
+                    // date in the heavy caps you'd write it in, and the count
+                    // where the tape length goes. The one light surface in the
+                    // grid, so the eye finds the sections while scrolling.
+                    className="inline-flex items-baseline gap-2.5 rounded-[5px] border-l-[3px] border-sony py-1 pl-2.5 pr-3"
                     style={{
-                      background: "rgba(10,10,18,0.72)",
-                      backdropFilter: "blur(14px) saturate(160%)",
-                      WebkitBackdropFilter: "blur(14px) saturate(160%)",
+                      background: "linear-gradient(180deg, rgba(239,228,204,0.96), rgba(226,213,184,0.96))",
+                      boxShadow: "0 1px 0 rgba(255,255,255,0.5) inset, 0 4px 14px rgba(0,0,0,0.45)",
                     }}
                   >
-                    <span className="text-[13px] font-bold tracking-tight text-ink">
+                    <span className="text-[12px] font-black uppercase tracking-[0.08em] text-deck">
                       {section.label}
                     </span>
-                    <span className="text-[10px] font-mono text-ink/40">
+                    <span className="font-mono text-[10px] font-bold tabular-nums text-tape/70">
                       {section.items.length}
                     </span>
                   </motion.h2>

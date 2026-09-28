@@ -328,7 +328,7 @@ export function AiChat({ releases }: AiChatProps) {
                         boxShadow: "0 6px 18px rgba(242,102,44,0.5), inset 0 1px 0 rgba(255,255,255,0.4)",
                       }}
                     >
-                      <Sparkles size={16} className="text-white" />
+                      <Sparkles size={16} className="text-deck" />
                     </span>
                     <div>
                       <p className="text-sm font-black uppercase tracking-[0.2em] text-ink">The Selector</p>
@@ -411,7 +411,7 @@ export function AiChat({ releases }: AiChatProps) {
                         boxShadow: "0 6px 18px rgba(242,102,44,0.5), inset 0 1px 0 rgba(255,255,255,0.4)",
                       }}
                     >
-                      <Sparkles size={14} className="text-white" />
+                      <Sparkles size={14} className="text-deck" />
                     </span>
                     <div className="min-w-0">
                       <p className="truncate text-[13px] font-black uppercase tracking-[0.2em] text-ink">
@@ -470,7 +470,7 @@ export function AiChat({ releases }: AiChatProps) {
                           boxShadow: "0 10px 30px rgba(242,102,44,0.45), inset 0 1px 0 rgba(255,255,255,0.4)",
                         }}
                       >
-                        <MessagesSquare size={26} className="text-white" />
+                        <MessagesSquare size={26} className="text-deck" />
                       </span>
                       <p className="text-lg font-black uppercase tracking-[0.18em] text-ink">
                         What should the room sound like?
@@ -503,7 +503,7 @@ export function AiChat({ releases }: AiChatProps) {
                         className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-2xl"
                         style={{ background: "var(--grad-transport)" }}
                       >
-                        <Sparkles size={14} className="text-white" />
+                        <Sparkles size={14} className="text-deck" />
                       </span>
                       <div className="flex items-end gap-1" aria-label="Thinking">
                         {[0, 1, 2, 3].map((i) => (
@@ -559,7 +559,7 @@ export function AiChat({ releases }: AiChatProps) {
                       onClick={() => run()}
                       disabled={thinking || !text.trim()}
                       aria-label="Send"
-                      className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-white transition-opacity disabled:opacity-35"
+                      className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-deck transition-opacity disabled:opacity-35"
                       style={{
                         background: "var(--grad-transport)",
                         boxShadow: "0 4px 14px rgba(242,102,44,0.4)",

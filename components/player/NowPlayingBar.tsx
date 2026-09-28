@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Play, Pause, X, Maximize2, Loader2, ChevronUp, Disc3, ListMusic, Sparkles } from "lucide-react";
 import { usePlayer, useTransport } from "./PlayerProvider";
@@ -27,6 +27,27 @@ export function NowPlayingBar() {
   const [inCrate, setInCrate] = useState(false);
   // "Where do you want to go?" sheet, opened by tapping the track info.
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Publish the bar's real height as --player-h so floating UI can sit above it.
+  // It changes with the status line, safe-area inset and breakpoint, so it is
+  // measured rather than assumed.
+  const barRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const root = document.documentElement;
+    const el = barRef.current;
+    if (!current || !el) {
+      root.style.setProperty("--player-h", "0px");
+      return;
+    }
+    const publish = () => root.style.setProperty("--player-h", `${Math.ceil(el.offsetHeight)}px`);
+    publish();
+    const ro = new ResizeObserver(publish);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      root.style.setProperty("--player-h", "0px");
+    };
+  }, [current]);
   // Scrub state — while dragging we show the dragged position, not the audio's,
   // so the bar doesn't fight the user's finger.
   const [scrubbing, setScrubbing] = useState(false);
@@ -64,6 +85,7 @@ export function NowPlayingBar() {
       <AnimatePresence>
         {current && (
           <motion.div
+            ref={barRef}
             initial={{ y: 80, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 80, opacity: 0 }}

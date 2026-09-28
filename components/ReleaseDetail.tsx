@@ -561,7 +561,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
             {/* scrollable body */}
             {/* pad past the now-playing bar (z-50) so the last rows are never
                 hidden underneath it */}
-            <div className={`flex-1 overflow-y-auto ${player.current ? "pb-[76px]" : ""}`}>
+            <div className="flex-1 overflow-y-auto pb-[var(--player-h,0px)]">
               {release.curator_note && (
                 <p className="border-b border-ink/5 px-5 py-4 text-sm italic leading-relaxed text-ink/60">
                   {release.curator_note}

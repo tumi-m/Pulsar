@@ -47,7 +47,7 @@ type Panel = "favorites" | "playlist" | null;
  * "crate" panel where the collection is displayed as physical media.
  */
 export function FloatingDock({ format, onOpen }: FloatingDockProps) {
-  const { current, shuffle, toggleShuffle, play } = usePlayer();
+  const { shuffle, toggleShuffle, play } = usePlayer();
   const [panel, setPanel] = useState<Panel>(null);
   // Lock background scroll while the crate sheet is open (mobile).
   useScrollLock(Boolean(panel));
@@ -335,13 +335,8 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
         className={`fixed right-4 z-40 flex flex-col items-end gap-2 transition-all duration-300 ${
           detailOpen || panel ? "pointer-events-none translate-x-6 opacity-0" : "opacity-100"
         } ${
-          navHidden
-            ? current
-              ? "bottom-[200px]"
-              : "bottom-[128px]"
-            : current
-              ? "bottom-24"
-              : "bottom-5"
+          // Offsets from the transport's measured height, not a guess at it.
+          navHidden ? "bottom-[calc(var(--player-h,0px)_+_128px)]" : "bottom-[calc(var(--player-h,0px)_+_20px)]"
         }`}
       >
         {/* Curator flies in when the navbar hides. Shuffle also lives here on
@@ -365,7 +360,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                   boxShadow: "0 6px 18px rgba(242,102,44,0.5), inset 0 1px 0 rgba(255,255,255,0.3)",
                 }}
               >
-                <Sparkles size={22} className="text-white" />
+                <Sparkles size={22} className="text-deck" />
               </motion.button>
               )}
               <motion.button

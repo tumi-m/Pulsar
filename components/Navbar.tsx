@@ -124,24 +124,29 @@ export function Navbar() {
         <button
           onClick={() => window.dispatchEvent(new CustomEvent("pulsar-ai-activate"))}
           aria-label="Selector — pick music by chat or visual survey"
-          className="flex min-h-9 items-center gap-2 rounded-full px-4 py-2 transition-transform hover:scale-105 active:scale-95"
+          // The one lit key in the header. Orange means "the thing to press",
+          // so it has to be the only orange up here.
+          className="flex min-h-9 items-center gap-2 rounded-[11px] border border-[#b84516] px-4 py-2 shadow-key transition-[box-shadow,transform,filter] hover:brightness-110 active:translate-y-px active:shadow-keyed"
           style={{
             background: "var(--grad-transport)",
-            boxShadow: "0 4px 16px rgba(242,102,44,0.45)",
+            boxShadow:
+              "inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 0 rgba(0,0,0,0.3), 0 4px 16px rgba(242,102,44,0.4)",
           }}
         >
-          <Sparkles size={14} className="text-white" />
-          <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white">Selector</span>
+          <Sparkles size={14} className="text-deck" />
+          <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-deck">Selector</span>
         </button>
         <button
           onClick={() => window.dispatchEvent(new CustomEvent("pulsar-open-samples"))}
           aria-label="Samples — songs built from other records"
           title="Samples"
-          className="flex min-h-9 items-center gap-2 rounded-full border border-sony/40 bg-sony/15 px-4 py-2 transition-all hover:scale-105 hover:border-sony/70 hover:bg-sony/25 active:scale-95"
-          style={{ boxShadow: "0 0 16px rgba(242,102,44,0.28)" }}
+          // Housing blue, not orange: after the palette swap this sat beside
+          // Selector in the same colour, two keys claiming the same meaning.
+          // Samples is exploration — information — which is what blue is for.
+          className="flex min-h-9 items-center gap-2 rounded-[11px] border border-tps/45 bg-tps/15 px-4 py-2 shadow-key transition-[box-shadow,transform,background-color] hover:bg-tps/25 active:translate-y-px active:shadow-keyed"
         >
-          <AudioLines size={15} className="text-sony" />
-          <span className="hidden text-[11px] font-bold uppercase tracking-[0.2em] text-sony sm:inline">
+          <AudioLines size={15} className="text-[#9dc0e8]" />
+          <span className="hidden text-[11px] font-bold uppercase tracking-[0.2em] text-[#bcd4f0] sm:inline">
             Samples
           </span>
         </button>
@@ -151,7 +156,7 @@ export function Navbar() {
           onClick={() => window.dispatchEvent(new CustomEvent("pulsar-open-crate", { detail: "playlist" }))}
           aria-label="Open your crate"
           data-crate-target=""
-          className="flex min-h-9 items-center gap-2 rounded-full border border-[#c08a4e]/40 bg-[#c08a4e]/10 px-4 py-2 transition-all hover:scale-105 hover:border-[#c08a4e]/70 hover:bg-[#c08a4e]/20 active:scale-95"
+          className="flex min-h-9 items-center gap-2 rounded-[11px] border border-[#c08a4e]/45 bg-[#c08a4e]/[0.12] px-4 py-2 shadow-key transition-[box-shadow,transform,background-color] hover:bg-[#c08a4e]/20 active:translate-y-px active:shadow-keyed"
         >
           <CrateIcon size={16} filled className="text-[#d69a5c]" />
           <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#e0b070]">Crate</span>

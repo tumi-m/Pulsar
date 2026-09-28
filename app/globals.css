@@ -123,6 +123,13 @@
   --z-modal: 70;      /* modals, export sheet */
   --z-toast: 80;      /* toasts */
   --z-noise: 1000;    /* film grain (non-interactive) */
+
+  /* Live height of the now-playing transport, set by NowPlayingBar from a
+     ResizeObserver; 0 when nothing is loaded. Anything that floats above the
+     bar offsets from this instead of hard-coding a guess — there were four
+     guesses (72, 76, 96, 200px), and when the status line showed they were
+     all wrong: the search strip sat 27px underneath the bar, half buried. */
+  --player-h: 0px;
 }
 
 /* ─── Focus visibility ─────────────────────────── */

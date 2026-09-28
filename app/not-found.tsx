@@ -23,7 +23,7 @@ export default function NotFound() {
       </p>
       <Link
         href="/"
-        className="mt-2 inline-block min-h-[44px] rounded-full px-6 py-2.5 text-[11px] font-bold uppercase tracking-widest text-white transition-transform hover:scale-105 active:scale-95"
+        className="mt-2 inline-block min-h-[44px] rounded-full px-6 py-2.5 text-[11px] font-bold uppercase tracking-widest text-deck transition-transform hover:scale-105 active:scale-95"
         style={{
           background: "var(--grad-transport)",
           boxShadow: "0 6px 18px rgba(242,102,44,0.4)",
