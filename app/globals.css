@@ -382,6 +382,151 @@ body {
 }
 
 /* ─── Artwork loading sheen ──────────────────── */
+/* ─── J-card: the cover a record gets when it has no cover ─────────
+   Drawn as a cassette rather than as an error: a graphite shell, a J-card
+   label with the maker's colour stripe, and a tape window with two reels.
+   The record is real and playable; it simply shipped without artwork, the
+   way a home-dubbed tape does.
+
+   Sized entirely from its container (cqw/cqh), because the same component
+   renders at 36px in the build overlay, 44px in the transport and 460px in a
+   wide grid tile — and a wide tile turns sideways, label beside window.
+
+   `.jcard` is ONLY the container. Everything measured in cq units lives on
+   `.jcard-shell` inside it: an element cannot query its own size, so cq units
+   on the container itself silently fall back to the viewport — which is what
+   the first version did, padding a 180px tile by 7% of the screen height. */
+.jcard {
+  container-type: size;
+  position: absolute;
+  inset: 0;
+}
+.jcard-shell {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5cqh;
+  padding: 9cqh 8cqw;
+  background:
+    radial-gradient(circle at 5cqw 5cqh, rgba(255,255,255,0.16) 0 1.1cqw, transparent 1.5cqw),
+    radial-gradient(circle at 95cqw 5cqh, rgba(255,255,255,0.16) 0 1.1cqw, transparent 1.5cqw),
+    radial-gradient(circle at 5cqw 95cqh, rgba(255,255,255,0.16) 0 1.1cqw, transparent 1.5cqw),
+    radial-gradient(circle at 95cqw 95cqh, rgba(255,255,255,0.16) 0 1.1cqw, transparent 1.5cqw),
+    linear-gradient(160deg, #262e37 0%, #181d23 55%, #101317 100%);
+}
+.jcard-label {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0 6cqw 5cqh;
+  border-radius: 3cqw;
+  /* Faint blue rules, like the lines a J-card gives you to write the
+     tracklist on. They start below the stripe and give a large label a
+     reason to be large, instead of reading as an empty cream panel. */
+  background:
+    repeating-linear-gradient(
+      180deg,
+      transparent 0 calc(9cqh - 1px),
+      rgba(78, 134, 199, 0.2) calc(9cqh - 1px) 9cqh
+    ) 0 22% / 100% 100% no-repeat,
+    linear-gradient(180deg, #f2e9d3 0%, #e3d5b4 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+/* The maker's stripe across the top of the label — the bit of a TDK or
+   Maxell card everyone remembers. */
+.jcard-label::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 16%;
+  background: var(--jcard-accent, #f2662c);
+  box-shadow: 0 2px 0 rgba(18, 22, 26, 0.18);
+}
+.jcard-title {
+  color: #12161a;
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 1.02;
+  letter-spacing: 0.01em;
+  font-size: clamp(7px, 8.5cqw, 26px);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.jcard-artist {
+  margin-top: 1.5cqh;
+  color: rgba(18, 22, 26, 0.62);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: clamp(6px, 4.8cqw, 14px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.jcard-initial {
+  display: none;
+  color: #12161a;
+  font-weight: 900;
+  font-size: 30cqh;
+  line-height: 1;
+}
+.jcard-window {
+  position: relative;
+  flex: 0 0 22cqh;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #07090b, #111519);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+/* Two reels: cream hub with its spindle hole, then wound oxide. */
+.jcard-window::before,
+.jcard-window::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  height: 76%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #0b0d10 0 9%,
+    #efe4cc 10% 24%,
+    #0b0d10 25% 30%,
+    #3a2a20 31% 70%,
+    transparent 71%
+  );
+}
+.jcard-window::before { left: 28%; }
+.jcard-window::after { left: 72%; }
+
+/* Wide tiles turn sideways: label on the left, window standing on the right. */
+@container (aspect-ratio >= 3 / 2) {
+  .jcard-shell { flex-direction: row; gap: 4cqw; padding: 10cqh 5cqw; }
+  .jcard-title { font-size: clamp(8px, 9cqh, 26px); }
+  .jcard-artist { font-size: clamp(6px, 5cqh, 14px); }
+  .jcard-window { flex: 0 0 22cqw; border-radius: 5cqh; }
+  .jcard-window::before, .jcard-window::after { height: auto; width: 70%; left: 50%; }
+  .jcard-window::before { top: 29%; }
+  .jcard-window::after { top: 71%; }
+}
+
+/* Thumbnails: no room for type, so the label carries the initial instead. */
+@container (max-width: 96px) {
+  .jcard-shell { padding: 10cqh 9cqw; gap: 7cqh; }
+  .jcard-title, .jcard-artist { display: none; }
+  .jcard-label { justify-content: center; align-items: center; padding: 16% 0 0; }
+  .jcard-initial { display: block; }
+  .jcard-window { flex-basis: 24cqh; }
+}
+
 @keyframes artSheen {
   0%   { transform: translateX(-120%); }
   100% { transform: translateX(220%); }

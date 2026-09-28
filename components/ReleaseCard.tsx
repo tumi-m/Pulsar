@@ -212,9 +212,13 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
 
           {/* fresh-drop pill — more visible than a dot */}
           {isFresh && !armed && (
+            // A shop sticker on the case: Sports-Walkman yellow, dark type,
+            // a couple of degrees off square. Yellow is the palette's "new",
+            // and at 7px white-on-translucent it was the least legible text
+            // on the tile.
             <span
-              className="absolute right-1.5 top-1.5 z-10 rounded-full border border-white/40 bg-deck/55 px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.18em] text-white backdrop-blur-sm"
-              style={{ boxShadow: "0 0 12px rgba(237,241,244,0.35)" }}
+              className="absolute right-1.5 top-1.5 z-10 -rotate-3 rounded-[3px] bg-sport px-1.5 py-0.5 text-[7px] font-black uppercase tracking-[0.16em] text-deck"
+              style={{ boxShadow: "0 1px 0 rgba(255,255,255,0.45) inset, 0 2px 6px rgba(0,0,0,0.5)" }}
             >
               Fresh
             </span>

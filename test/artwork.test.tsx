@@ -180,3 +180,38 @@ describe("Artwork keeps its existing error handling", () => {
     expect(letterTile()).toBeInTheDocument();
   });
 });
+
+describe("the J-card fallback", () => {
+  it("renders as one labelled image, not as loose text", async () => {
+    const { jcardAccent } = await import("@/components/Artwork");
+    render(<Artwork src="/api/artwork?artist=X&title=Y" artist="Fontaines D.C." title="Romance" />);
+    fireEvent.error(screen.getByAltText("Fontaines D.C. — Romance"));
+    const card = screen.getByRole("img", { name: "Fontaines D.C. — Romance" });
+    expect(card).toHaveClass("jcard");
+    // Its stripe is the artist's accent, taken from the palette.
+    expect(card.style.getPropertyValue("--jcard-accent")).toBe(jcardAccent("fontaines d.c."));
+  });
+
+  it("keeps cq-unit sizing off the container element itself", async () => {
+    // An element can't query its own size: cq units on `.jcard` resolve against
+    // the viewport instead. The first version padded a 180px tile by 7% of the
+    // screen height and the reels swelled to fill it. Sizing belongs on the
+    // `.jcard-shell` inside the container.
+    const { readFileSync } = await import("node:fs");
+    const css = readFileSync(`${process.cwd()}/app/globals.css`, "utf8");
+    const rule = css.match(/\.jcard\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(rule).toMatch(/container-type:\s*size/);
+    expect(rule, "cq units on the container itself").not.toMatch(/cq[whib]|cqmin|cqmax/);
+  });
+
+  it("gives the same artist the same stripe, from the Walkman palette", async () => {
+    const { jcardAccent } = await import("@/components/Artwork");
+    const palette = ["#f2662c", "#4e86c7", "#ffce0a", "#7ed9ae", "#e23b2e"];
+    expect(jcardAccent("peggy gou")).toBe(jcardAccent("peggy gou"));
+    for (const a of ["a", "kendrick lamar", "jamie xx", "doechii", "charli xcx", ""])
+      expect(palette).toContain(jcardAccent(a));
+    // A handful of artists shouldn't all land on one colour.
+    const spread = new Set(["kendrick lamar", "jamie xx", "doechii", "charli xcx", "peggy gou", "fontaines d.c."].map(jcardAccent));
+    expect(spread.size).toBeGreaterThanOrEqual(3);
+  });
+});

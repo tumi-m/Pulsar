@@ -133,54 +133,44 @@ export function Artwork({
 }
 
 /**
- * A deterministic hue per artist, so a grid of records with no cover art reads
- * as a set of distinct sleeves rather than as two dozen identical grey squares.
- * Same artist, same colour, every session — it becomes recognisable.
+ * A stable Walkman accent per artist, so a run of records without covers reads
+ * as a shelf of different tapes rather than one tape repeated. Same artist, same
+ * stripe, every session. Drawn from the palette rather than an arbitrary hue, so
+ * a J-card never clashes with the deck around it.
  */
-function hueOf(seed: string): number {
+const JCARD_ACCENTS = ["#f2662c", "#4e86c7", "#ffce0a", "#7ed9ae", "#e23b2e"] as const;
+
+export function jcardAccent(seed: string): string {
   let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 360;
-  return h;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return JCARD_ACCENTS[h % JCARD_ACCENTS.length];
 }
 
 /**
- * The end of the fallback chain.
+ * The end of the fallback chain, drawn as a cassette.
  *
- * This is not an error state as far as the visitor is concerned — the record is
- * real, playable and crate-able, it just has no cover we could resolve. It used
- * to be drawn at `text-chrome-700/40`, which on the dark grid was close to invisible
- * and read as something half-loaded. Now it is a designed sleeve: a tinted
- * gradient, a printed-label ring, and the artist and title actually legible.
+ * Not an error state as far as the visitor is concerned — the record is real,
+ * playable and crate-able; it just has no cover we could resolve, like a
+ * home-dubbed tape. Layout lives in the .jcard rules in app/globals.css, which
+ * size everything from the container: the same element is a 36px thumbnail, a
+ * 176px tile and a 460px sideways tile.
  */
 function ArtworkFallback({ artist, title }: { artist: string; title: string }) {
-  const hue = hueOf(artist.toLowerCase());
   return (
     <div
-      className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 overflow-hidden px-3 text-center"
-      style={{
-        background: `linear-gradient(150deg, hsl(${hue} 34% 19%) 0%, hsl(${(hue + 45) % 360} 30% 12%) 58%, #0a0a12 100%)`,
-      }}
+      role="img"
+      aria-label={`${artist} — ${title}`}
+      className="jcard"
+      style={{ ["--jcard-accent" as string]: jcardAccent(artist.toLowerCase()) }}
     >
-      {/* the label ring — suggests a sleeve without pretending to be artwork */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute left-1/2 top-1/2 aspect-square w-[78%] -translate-x-1/2 -translate-y-1/2 rounded-full"
-        style={{
-          background: `radial-gradient(circle, transparent 38%, hsl(${hue} 40% 26% / 0.35) 39%, transparent 41%, transparent 62%, hsl(${hue} 40% 26% / 0.22) 63%, transparent 65%)`,
-        }}
-      />
-      <span
-        className="relative select-none text-4xl font-black leading-none text-white/75"
-        style={{ textShadow: "0 2px 12px rgba(0,0,0,0.5)" }}
-      >
-        {artist.charAt(0).toUpperCase()}
-      </span>
-      <span className="relative line-clamp-2 text-[10px] font-bold uppercase leading-tight tracking-[0.14em] text-white/70">
-        {title}
-      </span>
-      <span className="relative line-clamp-1 text-[9px] uppercase tracking-[0.12em] text-white/45">
-        {artist}
-      </span>
+      <div className="jcard-shell" aria-hidden>
+        <div className="jcard-label">
+          <span className="jcard-initial">{artist.charAt(0).toUpperCase()}</span>
+          <span className="jcard-title">{title}</span>
+          <span className="jcard-artist">{artist}</span>
+        </div>
+        <div className="jcard-window" />
+      </div>
     </div>
   );
 }
