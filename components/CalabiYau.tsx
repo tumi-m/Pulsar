@@ -28,9 +28,9 @@ export function CalabiYau({ size = 20 }: { size?: number }) {
       >
         <defs>
           <linearGradient id="cy-grad" x1="0" y1="-50" x2="0" y2="50" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#e8e8f4" />
-            <stop offset="55%" stopColor="#9b5de5" />
-            <stop offset="100%" stopColor="#00d4ff" />
+            <stop offset="0%" stopColor="#edf1f4" />
+            <stop offset="55%" stopColor="#f2662c" />
+            <stop offset="100%" stopColor="#4e86c7" />
           </linearGradient>
         </defs>
 

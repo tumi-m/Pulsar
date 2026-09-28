@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { useTheme } from "@/lib/useTheme";
 
 /**
  * The Pulsar letterhead. Kept deliberately compact — the search bar (with its
@@ -9,6 +10,7 @@ import { motion } from "framer-motion";
  * search read as one cohesive unit with no overlap.
  */
 export function HeroSection() {
+  const theme = useTheme();
   // When the album/tracklist panel opens (right half), re-center the Pulsar
   // letterhead over the visible left half.
   const [detailOpen, setDetailOpen] = useState(false);
@@ -38,9 +40,19 @@ export function HeroSection() {
         initial={{ opacity: 0, y: 14, filter: "blur(6px)" }}
         animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
         transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-        className="text-balance mx-auto max-w-3xl font-display text-5xl font-bold tracking-tight md:text-7xl"
+        // `w-fit` matters more than it looks: background-clip:text samples the
+        // gradient across the ELEMENT box, and this was `max-w-3xl` — 768px
+        // wide for a 210px word. Only the middle quarter of the gradient ever
+        // landed on a glyph, so both end stops were invisible at every size.
+        className="text-balance mx-auto w-fit max-w-3xl font-display text-5xl font-bold tracking-tight md:text-7xl"
         style={{
-          background: "linear-gradient(120deg, #ffe8c9 0%, #ff9d5c 22%, #ff5fa2 48%, #9b5de5 72%, #00d4ff 100%)",
+          // backgroundImage, NOT the `background` shorthand. Assigning the
+          // shorthand resets background-clip to border-box, and React rewrites
+          // only the style keys whose values changed — so the first paint was
+          // correct and the moment the stored theme arrived it set `background`
+          // alone, wiping the clip. The wordmark became a solid gradient
+          // rectangle with the text invisible, on every theme but the default.
+          backgroundImage: theme.hero,
           WebkitBackgroundClip: "text",
           backgroundClip: "text",
           WebkitTextFillColor: "transparent",
@@ -53,7 +65,7 @@ export function HeroSection() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.35, duration: 0.9 }}
-        className="eyebrow mx-auto mt-4 max-w-md text-star-white/60"
+        className="eyebrow mx-auto mt-4 max-w-md text-ink/60"
       >
         Music discovery
       </motion.p>

@@ -132,7 +132,7 @@ export function PlaylistBuildOverlay({
           {/* service badge riding the edge of the record */}
           <span
             className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full ring-2 ring-[#0b0b12]"
-            style={{ backgroundColor: color, color: "#04040a" }}
+            style={{ backgroundColor: color, color: "#0b0d10" }}
           >
             {Icon ? <Icon /> : null}
           </span>
@@ -164,7 +164,7 @@ export function PlaylistBuildOverlay({
           </div>
         )}
 
-        <p className="text-sm font-bold uppercase tracking-[0.22em] text-star-white">
+        <p className="text-sm font-bold uppercase tracking-[0.22em] text-ink">
           Building your playlist
         </p>
 
@@ -177,7 +177,7 @@ export function PlaylistBuildOverlay({
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: -12, opacity: 0 }}
               transition={{ duration: 0.25 }}
-              className="truncate text-[11px] text-star-white/55"
+              className="truncate text-[11px] text-ink/55"
             >
               {current ? `${current.artist} — ${current.title}` : `Matching on ${label}…`}
             </motion.p>
@@ -187,7 +187,7 @@ export function PlaylistBuildOverlay({
         {/* ── progress ───────────────────────────────── */}
         <div className="mt-5">
           <div className="mb-2 flex items-baseline justify-between px-0.5">
-            <span className="font-mono text-[11px] tabular-nums text-star-white/45">
+            <span className="font-mono text-[11px] tabular-nums text-ink/45">
               {done} / {total}
             </span>
             <motion.span
@@ -241,7 +241,7 @@ export function PlaylistBuildOverlay({
           </div>
         )}
 
-        <p className="mt-4 text-[10px] uppercase tracking-[0.2em] text-star-white/25">
+        <p className="mt-4 text-[10px] uppercase tracking-[0.2em] text-ink/25">
           Keep this tab open
         </p>
       </motion.div>

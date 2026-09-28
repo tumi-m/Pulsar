@@ -105,7 +105,7 @@ export default async function ReleasePage({
       />
       <Link
         href="/"
-        className="eyebrow text-star-white/60 transition-colors hover:text-star-white"
+        className="eyebrow text-ink/60 transition-colors hover:text-ink"
       >
         ← Pulsar
       </Link>
@@ -123,28 +123,28 @@ export default async function ReleasePage({
           />
         ) : null}
         <div className="min-w-0">
-          <p className="eyebrow text-star-white/60">
+          <p className="eyebrow text-ink/60">
             {r.type} · {r.release_date}
           </p>
-          <h1 className="text-balance mt-3 font-display text-3xl font-bold tracking-tight text-star-white md:text-5xl">
+          <h1 className="text-balance mt-3 font-display text-3xl font-bold tracking-tight text-ink md:text-5xl">
             {r.title}
           </h1>
-          <p className="mt-2 text-lg text-star-white/70 md:text-xl">{r.artist}</p>
+          <p className="mt-2 text-lg text-ink/70 md:text-xl">{r.artist}</p>
           {r.genre && (
-            <p className="mt-1 text-[12px] uppercase tracking-[0.2em] text-neon-violet/70">{r.genre}</p>
+            <p className="mt-1 text-[12px] uppercase tracking-[0.2em] text-sony/70">{r.genre}</p>
           )}
         </div>
       </div>
 
       {r.curator_note && (
-        <blockquote className="mt-8 border-l-2 border-neon-violet/50 pl-4 text-[15px] leading-relaxed text-star-white/80 md:text-base">
+        <blockquote className="mt-8 border-l-2 border-sony/50 pl-4 text-[15px] leading-relaxed text-ink/80 md:text-base">
           {r.curator_note}
         </blockquote>
       )}
 
       {links.length > 0 && (
         <div className="mt-8">
-          <p className="eyebrow mb-3 text-star-white/60">
+          <p className="eyebrow mb-3 text-ink/60">
             Listen on
           </p>
           <div className="flex flex-wrap gap-2.5">
@@ -154,7 +154,7 @@ export default async function ReleasePage({
                 href={l.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-full border border-star-white/20 bg-white/[0.05] px-5 py-2.5 text-[12px] font-bold uppercase tracking-wide text-star-white transition-colors hover:border-star-white/50 hover:bg-white/[0.1]"
+                className="rounded-full border border-ink/20 bg-white/[0.05] px-5 py-2.5 text-[12px] font-bold uppercase tracking-wide text-ink transition-colors hover:border-ink/50 hover:bg-white/[0.1]"
               >
                 {DSP_LABEL[l.key]}
               </a>
@@ -166,7 +166,7 @@ export default async function ReleasePage({
       <div className="mt-10">
         <Link
           href={`/?play=${encodeURIComponent(r.id)}`}
-          className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-neon-violet to-neon-blue px-6 py-3 text-[13px] font-bold uppercase tracking-wide text-void transition-transform hover:scale-105"
+          className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-sony to-tps px-6 py-3 text-[13px] font-bold uppercase tracking-wide text-deck transition-transform hover:scale-105"
         >
           Play in PULSAR →
         </Link>

@@ -155,18 +155,18 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
         onFocus={enter}
         onBlur={leave}
         aria-label={`${release.artist} — ${release.title}. Open album`}
-        className="block w-full outline-none focus-visible:ring-2 focus-visible:ring-star-white/40"
+        className="block w-full outline-none focus-visible:ring-2 focus-visible:ring-ink/40"
       >
         <div
-          className={`relative w-full overflow-hidden rounded-xl ring-1 ring-star-white/[0.06] transition-[transform,box-shadow,ring-color] duration-300 ${
+          className={`relative w-full overflow-hidden rounded-xl ring-1 ring-ink/[0.06] transition-[transform,box-shadow,ring-color] duration-300 ${
             size === 1 ? "aspect-[2/1]" : "aspect-square"
           } ${size > 0 ? "tile-float" : ""} ${
-            revealed ? "scale-[1.03] ring-2 ring-neon-violet/50" : ""
+            revealed ? "scale-[1.03] ring-2 ring-sony/50" : ""
           }`}
           style={{
             ...(size > 0 ? { animationDelay: `${(index % 5) * 0.8}s` } : {}),
             boxShadow: revealed
-              ? "0 18px 50px -12px rgba(155,93,229,0.45), 0 0 0 1px rgba(155,93,229,0.25)"
+              ? "0 18px 50px -12px rgba(242,102,44,0.45), 0 0 0 1px rgba(242,102,44,0.25)"
               : undefined,
           }}
         >
@@ -213,8 +213,8 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
           {/* fresh-drop pill — more visible than a dot */}
           {isFresh && !armed && (
             <span
-              className="absolute right-1.5 top-1.5 z-10 rounded-full border border-white/40 bg-void/55 px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.18em] text-white backdrop-blur-sm"
-              style={{ boxShadow: "0 0 12px rgba(232,232,244,0.35)" }}
+              className="absolute right-1.5 top-1.5 z-10 rounded-full border border-white/40 bg-deck/55 px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.18em] text-white backdrop-blur-sm"
+              style={{ boxShadow: "0 0 12px rgba(237,241,244,0.35)" }}
             >
               Fresh
             </span>
@@ -233,7 +233,7 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
                 boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.28), 0 2px 8px rgba(0,0,0,0.5)",
               }}
             >
-              <Sparkles size={11} className="text-neon-violet" />
+              <Sparkles size={11} className="text-sony" />
             </span>
           )}
 
@@ -243,12 +243,12 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
               armed ? "opacity-100" : "opacity-0"
             }`}
           >
-            <p className={`font-bold uppercase leading-tight text-star-white ${big ? "text-base" : "text-[11px]"} line-clamp-1`}>
+            <p className={`font-bold uppercase leading-tight text-ink ${big ? "text-base" : "text-[11px]"} line-clamp-1`}>
               {release.title}
             </p>
-            <p className="truncate text-[10px] text-star-white/70">{release.artist}</p>
+            <p className="truncate text-[10px] text-ink/70">{release.artist}</p>
             {release.label && (
-              <p className="mt-0.5 truncate text-[8px] font-bold uppercase tracking-[0.2em] text-neon-green/70">
+              <p className="mt-0.5 truncate text-[8px] font-bold uppercase tracking-[0.2em] text-lcd/70">
                 {release.label}
               </p>
             )}
@@ -307,9 +307,9 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
             }
           }}
           aria-label="Share"
-          className={`flex flex-1 items-center justify-center transition-colors hover:bg-neon-blue/15 ${big ? "h-12" : "h-10"}`}
+          className={`flex flex-1 items-center justify-center transition-colors hover:bg-tps/15 ${big ? "h-12" : "h-10"}`}
         >
-          <Share2 size={big ? 20 : 17} className="text-neon-blue drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]" />
+          <Share2 size={big ? 20 : 17} className="text-tps drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]" />
         </button>
         <span className="my-2 w-px bg-white/25" />
         <button
@@ -318,9 +318,9 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
             toggleFavorite(release);
           }}
           aria-label={fav ? "Remove from favorites" : "Add to favorites"}
-          className={`flex flex-1 items-center justify-center transition-colors hover:bg-neon-pink/15 ${big ? "h-12" : "h-10"}`}
+          className={`flex flex-1 items-center justify-center transition-colors hover:bg-vu/15 ${big ? "h-12" : "h-10"}`}
         >
-          <Heart size={big ? 22 : 19} className={`drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] ${fav ? "fill-neon-pink text-neon-pink" : "text-neon-pink"}`} />
+          <Heart size={big ? 22 : 19} className={`drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] ${fav ? "fill-vu text-vu" : "text-vu"}`} />
         </button>
         <span className="my-2 w-px bg-white/25" />
         <button

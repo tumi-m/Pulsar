@@ -9,18 +9,40 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      /* Walkman palette. Values live as CSS custom properties in
+         app/globals.css — see the comment there for where each colour comes
+         from and what it means. Tokens are named for the part of the machine
+         they belong to, so a class says what it is rather than what hue it
+         happens to be: `bg-deck` is the housing, `text-sony` is the transport
+         button, `border-chrome-500` is brushed trim. */
       colors: {
-        void: "#04040a",
-        cosmos: "#08081a",
-        nebula: "#0f0f2a",
-        "neon-blue": "#00d4ff",
-        "neon-pink": "#ff0080",
-        "neon-violet": "#9b5de5",
-        "neon-amber": "#ffa500",
-        "neon-green": "#00ff88",
-        "star-white": "#e8e8f4",
-        "dust": "#4a4a6a",
-        "mist": "#2a2a4a",
+        deck: {
+          DEFAULT: "var(--deck-900)",
+          600: "var(--deck-600)",
+          700: "var(--deck-700)",
+          800: "var(--deck-800)",
+          900: "var(--deck-900)",
+        },
+        chrome: {
+          DEFAULT: "var(--chrome-500)",
+          100: "var(--chrome-100)",
+          300: "var(--chrome-300)",
+          500: "var(--chrome-500)",
+          700: "var(--chrome-700)",
+        },
+        ink: {
+          DEFAULT: "var(--ink-100)",
+          100: "var(--ink-100)",
+          400: "var(--ink-400)",
+          600: "var(--ink-600)",
+        },
+        sony: "var(--sony-orange)",
+        tps: "var(--tps-blue)",
+        sport: "var(--sport-yellow)",
+        vu: "var(--vu-red)",
+        lcd: "var(--lcd-green)",
+        cream: "var(--label-cream)",
+        tape: "var(--tape-brown)",
       },
       fontFamily: {
         display: ["var(--font-display)", "system-ui", "sans-serif"],
@@ -28,12 +50,15 @@ const config: Config = {
         mono: ["var(--font-mono)", "monospace"],
       },
       backgroundImage: {
-        "cosmic-radial":
-          "radial-gradient(ellipse at center, #0f0f2a 0%, #04040a 70%)",
-        "neon-glow-blue":
-          "radial-gradient(ellipse, rgba(0,212,255,0.15) 0%, transparent 70%)",
-        "neon-glow-pink":
-          "radial-gradient(ellipse, rgba(255,0,128,0.15) 0%, transparent 70%)",
+        /* The two signature surfaces. Their values live in app/globals.css so a
+           single edit changes the brand everywhere; they used to be pasted as
+           literals at ten call sites. */
+        faceplate: "var(--grad-faceplate)",
+        transport: "var(--grad-transport)",
+        /* Brushed aluminium: a fine vertical grain over a metal tone. */
+        brushed:
+          "repeating-linear-gradient(90deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 3px), " +
+          "linear-gradient(180deg, #2a323b 0%, #1a2027 55%, #151b21 100%)",
       },
       animation: {
         "float": "float 6s ease-in-out infinite",
@@ -77,10 +102,17 @@ const config: Config = {
         },
       },
       boxShadow: {
-        "neon-blue": "0 0 20px rgba(0,212,255,0.5), 0 0 60px rgba(0,212,255,0.2)",
-        "neon-pink": "0 0 20px rgba(255,0,128,0.5), 0 0 60px rgba(255,0,128,0.2)",
-        "neon-violet": "0 0 20px rgba(155,93,229,0.5), 0 0 60px rgba(155,93,229,0.2)",
-        "card-hover": "0 30px 80px rgba(0,0,0,0.8), 0 0 40px rgba(0,212,255,0.1)",
+        /* A lit control, not a neon sign: a tight halo the colour of the part
+           itself, over the deep shadow a physical object casts. */
+        sony: "0 0 18px rgba(242,102,44,0.45), 0 0 52px rgba(242,102,44,0.18)",
+        tps: "0 0 18px rgba(78,134,199,0.45), 0 0 52px rgba(78,134,199,0.18)",
+        sport: "0 0 18px rgba(255,206,10,0.45), 0 0 52px rgba(255,206,10,0.18)",
+        vu: "0 0 18px rgba(226,59,46,0.45), 0 0 52px rgba(226,59,46,0.18)",
+        /* A physical key: bezel highlight above, dark well below — and the
+           same key while it is held down. */
+        key: "inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -1px 0 rgba(0,0,0,0.5), 0 2px 5px rgba(0,0,0,0.55)",
+        keyed: "inset 0 2px 5px rgba(0,0,0,0.65), inset 0 -1px 0 rgba(255,255,255,0.08)",
+        "card-hover": "0 30px 80px rgba(0,0,0,0.8), 0 0 40px rgba(78,134,199,0.10)",
       },
     },
   },

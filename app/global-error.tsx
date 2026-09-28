@@ -14,8 +14,8 @@ export default function GlobalError({
   return (
     <html lang="en" className="dark">
       <body
-        className="bg-void min-h-screen text-star-white"
-        style={{ backgroundColor: "#04040a", color: "#e8e8f4" }}
+        className="bg-deck min-h-screen text-ink"
+        style={{ backgroundColor: "#0b0d10", color: "#edf1f4" }}
       >
         <div className="flex min-h-screen flex-col items-center justify-center gap-5 px-6 text-center">
           <h1 className="text-4xl font-bold tracking-tight md:text-6xl">Pulsar</h1>

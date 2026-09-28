@@ -47,9 +47,9 @@ export function FloatingObjects() {
             <div
               className="h-full w-full rounded-full border"
               style={{
-                borderColor: "rgba(155,93,229,0.10)",
+                borderColor: "rgba(242,102,44,0.10)",
                 borderWidth: Math.max(6, o.size / 14),
-                boxShadow: "inset 0 0 40px rgba(0,212,255,0.05)",
+                boxShadow: "inset 0 0 40px rgba(78,134,199,0.05)",
               }}
             />
           )}
@@ -58,18 +58,18 @@ export function FloatingObjects() {
               className="h-full w-full rounded-full"
               style={{
                 background:
-                  "repeating-radial-gradient(circle at center, rgba(255,255,255,0.02) 0px, rgba(155,93,229,0.04) 2px, rgba(255,255,255,0.02) 4px)",
-                boxShadow: "0 0 30px rgba(0,212,255,0.04)",
+                  "repeating-radial-gradient(circle at center, rgba(255,255,255,0.02) 0px, rgba(242,102,44,0.04) 2px, rgba(255,255,255,0.02) 4px)",
+                boxShadow: "0 0 30px rgba(78,134,199,0.04)",
               }}
             >
-              <div className="absolute inset-[44%] rounded-full bg-neon-blue/10" />
+              <div className="absolute inset-[44%] rounded-full bg-tps/10" />
             </div>
           )}
           {o.kind === "square" && (
             <div
               className="h-full w-full rounded-[10px] border"
               style={{
-                borderColor: "rgba(0,212,255,0.10)",
+                borderColor: "rgba(78,134,199,0.10)",
                 background: "linear-gradient(160deg, rgba(255,255,255,0.02), transparent)",
               }}
             />

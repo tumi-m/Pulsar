@@ -7,13 +7,13 @@ import { CrateIcon } from "./CrateIcon";
 
 // The rotating "what Pulsar does" reel.
 const FEATURES: { icon: React.ReactNode; text: string; color: string }[] = [
-  { icon: <Mic2 size={12} />, text: "Lyrics for every track", color: "#4aa3ff" },
-  { icon: <AudioLines size={12} />, text: "Find the samples behind a song", color: "#9b5de5" },
-  { icon: <Library size={12} />, text: "A directory of 29+ genres", color: "#00d4ff" },
+  { icon: <Mic2 size={12} />, text: "Lyrics for every track", color: "#4e86c7" },
+  { icon: <AudioLines size={12} />, text: "Find the samples behind a song", color: "#f2662c" },
+  { icon: <Library size={12} />, text: "A directory of 29+ genres", color: "#7ed9ae" },
   { icon: <ListMusic size={12} />, text: "Build playlists on Spotify, Apple & more", color: "#1DB954" },
   { icon: <CrateIcon size={12} className="text-current" />, text: "Curate your own crates", color: "#d69a5c" },
-  { icon: <Youtube size={12} />, text: "Music videos & live performances", color: "#ff5b5b" },
-  { icon: <Sparkles size={12} />, text: "Selector AI finds your vibe", color: "#ff5fa2" },
+  { icon: <Youtube size={12} />, text: "Music videos & live performances", color: "#e23b2e" },
+  { icon: <Sparkles size={12} />, text: "Selector AI finds your vibe", color: "#ffce0a" },
 ];
 
 /**
@@ -46,7 +46,7 @@ export function FeatureReel() {
             >
               {f.icon}
             </span>
-            <span className="whitespace-nowrap text-[11px] font-semibold tracking-wide text-star-white/75">
+            <span className="whitespace-nowrap text-[11px] font-semibold tracking-wide text-ink/75">
               {f.text}
             </span>
           </motion.div>
@@ -67,7 +67,7 @@ export function FeatureReel() {
               className="block h-1 rounded-full transition-all duration-300"
               style={{
                 width: k === i ? 14 : 4,
-                backgroundColor: k === i ? f.color : "rgba(232,232,244,0.22)",
+                backgroundColor: k === i ? f.color : "rgba(237,241,244,0.22)",
               }}
             />
           </button>

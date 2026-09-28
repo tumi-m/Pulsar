@@ -42,7 +42,9 @@ interface ChainResponse {
   edges: { from: string; to: string }[];
 }
 
-const ROLE_COLORS = ["#ff5fa2", "#9b5de5", "#00d4ff", "#45f0a0", "#ffb347", "#ff5b5b"];
+// Walkman palette, ordered so adjacent roles stay distinguishable:
+// transport orange, housing blue, sport yellow, LCD green, VU red, J-card cream.
+const ROLE_COLORS = ["#f2662c", "#4e86c7", "#ffce0a", "#7ed9ae", "#e23b2e", "#efe4cc"];
 
 export function SampleGraph({
   artist,
@@ -280,7 +282,7 @@ export function SampleGraph({
   };
 
   return (
-    <div className="relative h-[420px] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a14]/60 md:h-[480px]">
+    <div className="relative h-[420px] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#12161a]/60 md:h-[480px]">
       <svg
         ref={svgRef}
         className="h-full w-full touch-none"
@@ -298,7 +300,7 @@ export function SampleGraph({
               y1={a.y}
               x2={b.x}
               y2={b.y}
-              stroke="rgba(155,93,229,0.35)"
+              stroke="rgba(242,102,44,0.35)"
               strokeWidth={1.5}
             />
           );
@@ -336,7 +338,7 @@ export function SampleGraph({
                   className="pointer-events-none select-none"
                   fontSize={9}
                   fontWeight={700}
-                  fill="rgba(232,232,244,0.9)"
+                  fill="rgba(237,241,244,0.9)"
                 >
                   {n.title.length > 22 ? n.title.slice(0, 21) + "…" : n.title}
                 </text>
@@ -359,9 +361,9 @@ export function SampleGraph({
 
       {/* loading state */}
       {!ready && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a14]/80">
-          <Loader2 size={22} className="animate-spin text-neon-violet" />
-          <span className="ml-3 text-[11px] font-bold uppercase tracking-[0.2em] text-star-white/50">
+        <div className="absolute inset-0 flex items-center justify-center bg-[#12161a]/80">
+          <Loader2 size={22} className="animate-spin text-sony" />
+          <span className="ml-3 text-[11px] font-bold uppercase tracking-[0.2em] text-ink/50">
             Tracing sample DNA…
           </span>
         </div>
@@ -374,13 +376,13 @@ export function SampleGraph({
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
-            className="absolute bottom-3 left-3 right-3 rounded-xl border border-white/[0.12] bg-[#0a0a14]/90 p-3 backdrop-blur-xl md:right-auto md:max-w-sm"
+            className="absolute bottom-3 left-3 right-3 rounded-xl border border-white/[0.12] bg-[#12161a]/90 p-3 backdrop-blur-xl md:right-auto md:max-w-sm"
           >
-            <p className="truncate text-[13px] font-bold text-star-white">{selNode.title}</p>
-            <p className="truncate text-[11px] text-star-white/55">{selNode.artist}</p>
+            <p className="truncate text-[13px] font-bold text-ink">{selNode.title}</p>
+            <p className="truncate text-[11px] text-ink/55">{selNode.artist}</p>
             <div className="mt-1.5 flex items-center gap-2">
               {selNode.year && (
-                <span className="font-mono text-[10px] text-star-white/40">{selNode.year}</span>
+                <span className="font-mono text-[10px] text-ink/40">{selNode.year}</span>
               )}
               <span
                 className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide"
@@ -395,19 +397,19 @@ export function SampleGraph({
             <div className="mt-2.5 flex gap-2">
               <button
                 onClick={() => onPlayNode(selNode.artist, selNode.title)}
-                className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-star-white transition-colors hover:bg-white/[0.12]"
+                className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-ink transition-colors hover:bg-white/[0.12]"
               >
                 <Play size={11} fill="currentColor" /> Play
               </button>
               <button
                 onClick={() => void expandNode(selNode)}
                 disabled={selNode.loading}
-                className="flex items-center gap-1.5 rounded-lg border border-neon-violet/40 bg-neon-violet/15 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-neon-violet transition-colors hover:bg-neon-violet/25 disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg border border-sony/40 bg-sony/15 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-sony transition-colors hover:bg-sony/25 disabled:opacity-50"
               >
                 {selNode.loading ? "Tracing…" : "Expand chain"}
               </button>
             </div>
-            <p className="mt-2 text-[9px] leading-relaxed text-star-white/35">
+            <p className="mt-2 text-[9px] leading-relaxed text-ink/35">
               Drag nodes to rearrange · click &ldquo;Expand chain&rdquo; to trace this song&rsquo;s
               own samples and grow the graph.
             </p>
@@ -417,7 +419,7 @@ export function SampleGraph({
 
       {ready && nodes.length <= 1 && (
         <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
-          <p className="text-[11px] leading-relaxed text-star-white/40">
+          <p className="text-[11px] leading-relaxed text-ink/40">
             No sample chain found for this track via MusicBrainz. Try a track from the curated
             set (e.g. Kanye West — Stronger) for a rich graph.
           </p>

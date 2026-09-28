@@ -26,14 +26,14 @@ export function isYesterday(dateStr: string): boolean {
 }
 
 export const MOOD_COLORS: Record<string, { text: string; glow: string; bg: string }> = {
-  euphoric:    { text: "text-neon-amber",  glow: "shadow-[0_0_20px_rgba(255,165,0,0.4)]",   bg: "bg-neon-amber/10" },
-  melancholic: { text: "text-neon-blue",   glow: "shadow-[0_0_20px_rgba(0,212,255,0.4)]",   bg: "bg-neon-blue/10" },
-  energetic:   { text: "text-neon-pink",   glow: "shadow-[0_0_20px_rgba(255,0,128,0.4)]",   bg: "bg-neon-pink/10" },
-  ambient:     { text: "text-neon-violet", glow: "shadow-[0_0_20px_rgba(155,93,229,0.4)]",  bg: "bg-neon-violet/10" },
-  raw:         { text: "text-neon-pink",   glow: "shadow-[0_0_20px_rgba(255,0,128,0.4)]",   bg: "bg-neon-pink/10" },
-  cinematic:   { text: "text-neon-violet", glow: "shadow-[0_0_20px_rgba(155,93,229,0.4)]",  bg: "bg-neon-violet/10" },
-  hypnotic:    { text: "text-neon-green",  glow: "shadow-[0_0_20px_rgba(0,255,136,0.4)]",   bg: "bg-neon-green/10" },
-  tender:      { text: "text-star-white",  glow: "shadow-[0_0_20px_rgba(232,232,244,0.3)]", bg: "bg-star-white/5" },
+  euphoric:    { text: "text-sport",  glow: "shadow-[0_0_20px_rgba(255,206,10,0.4)]",   bg: "bg-sport/10" },
+  melancholic: { text: "text-tps",   glow: "shadow-[0_0_20px_rgba(78,134,199,0.4)]",   bg: "bg-tps/10" },
+  energetic:   { text: "text-vu",   glow: "shadow-[0_0_20px_rgba(226,59,46,0.4)]",   bg: "bg-vu/10" },
+  ambient:     { text: "text-sony", glow: "shadow-[0_0_20px_rgba(242,102,44,0.4)]",  bg: "bg-sony/10" },
+  raw:         { text: "text-vu",   glow: "shadow-[0_0_20px_rgba(226,59,46,0.4)]",   bg: "bg-vu/10" },
+  cinematic:   { text: "text-sony", glow: "shadow-[0_0_20px_rgba(242,102,44,0.4)]",  bg: "bg-sony/10" },
+  hypnotic:    { text: "text-lcd",  glow: "shadow-[0_0_20px_rgba(126,217,174,0.4)]",   bg: "bg-lcd/10" },
+  tender:      { text: "text-ink",  glow: "shadow-[0_0_20px_rgba(237,241,244,0.3)]", bg: "bg-ink/5" },
 };
 
 export const MOOD_LABELS: Record<string, string> = {
@@ -105,22 +105,22 @@ export function genreBucket(genre: string | null | undefined): GenreBucket | nul
 
 // Color theming per bucket (reuses the neon palette).
 export const GENRE_COLORS: Record<GenreBucket, { text: string; bg: string }> = {
-  "Hip-Hop":        { text: "text-neon-amber",  bg: "bg-neon-amber/10" },
-  "Afrobeats":      { text: "text-neon-amber",  bg: "bg-neon-amber/10" },
-  "Amapiano":       { text: "text-neon-green",  bg: "bg-neon-green/10" },
-  "House":          { text: "text-neon-blue",   bg: "bg-neon-blue/10" },
-  "Electronic":     { text: "text-neon-blue",   bg: "bg-neon-blue/10" },
-  "Reggae":         { text: "text-neon-green",  bg: "bg-neon-green/10" },
-  "Soul / R&B":     { text: "text-neon-violet", bg: "bg-neon-violet/10" },
-  "Gospel":         { text: "text-neon-amber",  bg: "bg-neon-amber/10" },
-  "Pop":            { text: "text-neon-green",  bg: "bg-neon-green/10" },
-  "Rock":           { text: "text-neon-pink",   bg: "bg-neon-pink/10" },
-  "Metal":          { text: "text-neon-pink",   bg: "bg-neon-pink/10" },
-  "Jazz":           { text: "text-neon-amber",  bg: "bg-neon-amber/10" },
-  "Blues":          { text: "text-neon-blue",   bg: "bg-neon-blue/10" },
-  "Latin":          { text: "text-neon-pink",   bg: "bg-neon-pink/10" },
-  "Classical":      { text: "text-star-white",  bg: "bg-star-white/5" },
-  "Folk / Country": { text: "text-star-white",  bg: "bg-star-white/5" },
+  "Hip-Hop":        { text: "text-sport",  bg: "bg-sport/10" },
+  "Afrobeats":      { text: "text-sport",  bg: "bg-sport/10" },
+  "Amapiano":       { text: "text-lcd",  bg: "bg-lcd/10" },
+  "House":          { text: "text-tps",   bg: "bg-tps/10" },
+  "Electronic":     { text: "text-tps",   bg: "bg-tps/10" },
+  "Reggae":         { text: "text-lcd",  bg: "bg-lcd/10" },
+  "Soul / R&B":     { text: "text-sony", bg: "bg-sony/10" },
+  "Gospel":         { text: "text-sport",  bg: "bg-sport/10" },
+  "Pop":            { text: "text-lcd",  bg: "bg-lcd/10" },
+  "Rock":           { text: "text-vu",   bg: "bg-vu/10" },
+  "Metal":          { text: "text-vu",   bg: "bg-vu/10" },
+  "Jazz":           { text: "text-sport",  bg: "bg-sport/10" },
+  "Blues":          { text: "text-tps",   bg: "bg-tps/10" },
+  "Latin":          { text: "text-vu",   bg: "bg-vu/10" },
+  "Classical":      { text: "text-ink",  bg: "bg-ink/5" },
+  "Folk / Country": { text: "text-ink",  bg: "bg-ink/5" },
 };
 
 export const PLATFORM_META = {

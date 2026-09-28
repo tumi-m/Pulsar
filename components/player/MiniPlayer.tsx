@@ -72,7 +72,7 @@ export function MiniPlayer({
           >
             <div className="absolute inset-x-0 top-0 h-[3px] bg-white/[0.08]">
               <div
-                className="h-full bg-neon-blue transition-[width] duration-150"
+                className="h-full bg-tps transition-[width] duration-150"
                 style={{ width: `${Math.max(0, Math.min(1, progress)) * 100}%` }}
               />
             </div>
@@ -89,24 +89,24 @@ export function MiniPlayer({
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-bold leading-tight text-star-white">
+              <p className="truncate text-[13px] font-bold leading-tight text-ink">
                 {current.title}
               </p>
-              <p className="truncate text-[11px] text-star-white/55">{current.artist}</p>
+              <p className="truncate text-[11px] text-ink/55">{current.artist}</p>
               {/* Say what's actually happening. A silent 30-second clip that
                   won't load is the most confusing possible state. */}
               {error ? (
-                <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-wide text-neon-amber">
+                <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-wide text-sport">
                   {error}
                 </p>
               ) : !hasAudio && !loading ? (
-                <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-wide text-star-white/35">
+                <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-wide text-ink/35">
                   No preview available
                 </p>
               ) : (
-                <p className="mt-0.5 font-mono text-[10px] tabular-nums text-star-white/40">
+                <p className="mt-0.5 font-mono text-[10px] tabular-nums text-ink/40">
                   {time(elapsed)} / {duration ? time(duration) : "0:30"}
-                  <span className="ml-1.5 text-star-white/25">preview</span>
+                  <span className="ml-1.5 text-ink/25">preview</span>
                 </p>
               )}
             </div>
@@ -115,7 +115,7 @@ export function MiniPlayer({
               onClick={toggle}
               disabled={!hasAudio && !loading}
               aria-label={playing ? `Pause ${current.title}` : `Play ${current.title}`}
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-neon-blue/90 text-void transition-transform active:scale-90 disabled:opacity-35"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-tps/90 text-deck transition-transform active:scale-90 disabled:opacity-35"
             >
               {loading ? (
                 <Loader2 size={17} className="animate-spin" />
@@ -130,7 +130,7 @@ export function MiniPlayer({
               <button
                 onClick={onExpand}
                 aria-label="Open visualiser"
-                className="hidden h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-white/15 text-star-white/60 transition-colors hover:border-white/40 hover:text-star-white sm:flex"
+                className="hidden h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-white/15 text-ink/60 transition-colors hover:border-white/40 hover:text-ink sm:flex"
               >
                 <Maximize2 size={15} />
               </button>
@@ -139,7 +139,7 @@ export function MiniPlayer({
             <button
               onClick={stop}
               aria-label="Stop preview"
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-star-white/35 transition-colors hover:bg-white/10 hover:text-star-white"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-ink/35 transition-colors hover:bg-white/10 hover:text-ink"
             >
               <X size={16} />
             </button>

@@ -72,18 +72,18 @@ export default function AdminPage() {
         >
           <div className="flex items-center justify-center gap-3 mb-4">
             <div className="relative w-3 h-3">
-              <div className="absolute inset-0 rounded-full bg-neon-violet" />
+              <div className="absolute inset-0 rounded-full bg-sony" />
               <motion.div
                 animate={{ scale: [1, 2.5, 1], opacity: [0.8, 0, 0.8] }}
                 transition={{ duration: 2, repeat: Infinity }}
-                className="absolute inset-0 rounded-full bg-neon-violet"
+                className="absolute inset-0 rounded-full bg-sony"
               />
             </div>
-            <h1 className="text-star-white font-bold text-2xl tracking-tight">
+            <h1 className="text-ink font-bold text-2xl tracking-tight">
               PULSAR ADMIN
             </h1>
           </div>
-          <p className="text-dust text-sm font-mono tracking-wide">
+          <p className="text-chrome-700 text-sm font-mono tracking-wide">
             Trigger the music discovery agent manually
           </p>
         </motion.div>
@@ -93,11 +93,11 @@ export default function AdminPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-cosmos/80 border border-mist/20 rounded-2xl p-6 space-y-5 backdrop-blur-sm"
+          className="bg-deck-800/80 border border-deck-600/20 rounded-2xl p-6 space-y-5 backdrop-blur-sm"
         >
           {/* Secret input */}
           <div className="space-y-2">
-            <label className="text-[10px] font-mono text-dust/60 tracking-widest">
+            <label className="text-[10px] font-mono text-chrome-700/60 tracking-widest">
               TRIGGER SECRET
             </label>
             <input
@@ -106,7 +106,7 @@ export default function AdminPage() {
               onChange={(e) => setSecret(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !running && triggerAgent()}
               placeholder="AGENT_TRIGGER_SECRET"
-              className="w-full bg-void/50 border border-mist/30 rounded-lg px-4 py-3 text-sm text-star-white font-mono placeholder:text-dust/30 focus:outline-none focus:border-neon-violet/50 transition-colors"
+              className="w-full bg-deck/50 border border-deck-600/30 rounded-lg px-4 py-3 text-sm text-ink font-mono placeholder:text-chrome-700/30 focus:outline-none focus:border-sony/50 transition-colors"
             />
           </div>
 
@@ -120,8 +120,8 @@ export default function AdminPage() {
               w-full py-3 rounded-xl font-mono font-bold text-sm tracking-widest
               transition-all duration-300
               ${running
-                ? "bg-neon-violet/20 border border-neon-violet/30 text-neon-violet/50 cursor-not-allowed"
-                : "bg-neon-violet/20 border border-neon-violet/40 text-neon-violet hover:bg-neon-violet/30 hover:shadow-neon-violet"
+                ? "bg-sony/20 border border-sony/30 text-sony/50 cursor-not-allowed"
+                : "bg-sony/20 border border-sony/40 text-sony hover:bg-sony/30 hover:shadow-sony"
               }
             `}
           >
@@ -130,7 +130,7 @@ export default function AdminPage() {
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  className="w-4 h-4 border-2 border-neon-violet/30 border-t-neon-violet rounded-full"
+                  className="w-4 h-4 border-2 border-sony/30 border-t-sony rounded-full"
                 />
                 SCANNING MUSIC...
               </span>
@@ -147,7 +147,7 @@ export default function AdminPage() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="mt-4 bg-void/80 border border-mist/10 rounded-xl p-4 space-y-1 font-mono text-xs overflow-hidden"
+              className="mt-4 bg-deck/80 border border-deck-600/10 rounded-xl p-4 space-y-1 font-mono text-xs overflow-hidden"
             >
               {logs.map((log, i) => (
                 <motion.div
@@ -157,16 +157,16 @@ export default function AdminPage() {
                   transition={{ delay: i * 0.05 }}
                   className={`
                     ${log.startsWith("Error") || log.startsWith("Fatal")
-                      ? "text-neon-pink"
+                      ? "text-vu"
                       : log.startsWith("Warning")
-                      ? "text-neon-amber"
+                      ? "text-sport"
                       : log.startsWith("Releases saved")
-                      ? "text-neon-green"
-                      : "text-dust/70"
+                      ? "text-lcd"
+                      : "text-chrome-700/70"
                     }
                   `}
                 >
-                  <span className="text-dust/30 mr-2">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="text-chrome-700/30 mr-2">{String(i + 1).padStart(2, "0")}</span>
                   {log}
                 </motion.div>
               ))}
@@ -180,28 +180,28 @@ export default function AdminPage() {
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mt-4 bg-neon-green/5 border border-neon-green/20 rounded-xl p-5 space-y-3"
+              className="mt-4 bg-lcd/5 border border-lcd/20 rounded-xl p-5 space-y-3"
             >
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-neon-green" />
-                <span className="text-neon-green font-mono text-sm font-bold tracking-widest">
+                <div className="w-2 h-2 rounded-full bg-lcd" />
+                <span className="text-lcd font-mono text-sm font-bold tracking-widest">
                   RUN COMPLETE
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-3xl font-bold text-star-white">
+                  <p className="text-3xl font-bold text-ink">
                     {result.releases_saved}
                   </p>
-                  <p className="text-[10px] font-mono text-dust/50 tracking-widest mt-1">
+                  <p className="text-[10px] font-mono text-chrome-700/50 tracking-widest mt-1">
                     RELEASES SAVED
                   </p>
                 </div>
                 <div>
-                  <p className="text-3xl font-bold text-star-white/60">
+                  <p className="text-3xl font-bold text-ink/60">
                     {result.errors?.length ?? 0}
                   </p>
-                  <p className="text-[10px] font-mono text-dust/50 tracking-widest mt-1">
+                  <p className="text-[10px] font-mono text-chrome-700/50 tracking-widest mt-1">
                     ERRORS
                   </p>
                 </div>
@@ -213,9 +213,9 @@ export default function AdminPage() {
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mt-4 bg-neon-pink/5 border border-neon-pink/20 rounded-xl p-4"
+              className="mt-4 bg-vu/5 border border-vu/20 rounded-xl p-4"
             >
-              <p className="text-neon-pink font-mono text-sm">{error}</p>
+              <p className="text-vu font-mono text-sm">{error}</p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -224,7 +224,7 @@ export default function AdminPage() {
         <div className="mt-8 text-center">
           <Link
             href="/"
-            className="text-[11px] font-mono text-dust/40 tracking-widest hover:text-dust transition-colors"
+            className="text-[11px] font-mono text-chrome-700/40 tracking-widest hover:text-chrome-700 transition-colors"
           >
             ← BACK TO PULSAR
           </Link>

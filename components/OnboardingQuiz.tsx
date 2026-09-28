@@ -8,14 +8,14 @@ import { Portal } from "./Portal";
 
 // Each vibe choice leans toward a theme; the majority wins.
 const OPTION_THEME: Record<string, string> = {
-  sunrise: "solaris",
-  storm: "solaris",
-  night: "sagan",
-  ocean: "sagan",
-  grid: "nebula",
-  static: "escher",
-  silk: "dream",
-  vinyl: "dream",
+  sunrise: "sports", // bright, outdoors, moving
+  storm: "sports",
+  night: "tps-l2", // the blue hour
+  ocean: "tps-l2",
+  grid: "pro", // black, chrome, precise
+  static: "pro",
+  silk: "dd9", // champagne and gunmetal
+  vinyl: "chrome-tape", // the tape itself
 };
 
 function themeFromPicks(picks: string[]): string {
@@ -24,7 +24,7 @@ function themeFromPicks(picks: string[]): string {
     const t = OPTION_THEME[p];
     if (t) tally[t] = (tally[t] ?? 0) + 1;
   }
-  return Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "nebula";
+  return Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "tps-l2";
 }
 
 interface OnboardingQuizProps {
@@ -45,14 +45,14 @@ function Visual({ kind }: { kind: string }) {
           {[...Array(7)].map((_, i) => (
             <motion.div
               key={i}
-              className="absolute w-[2px] bg-gradient-to-b from-[#ff0080] to-transparent"
+              className="absolute w-[2px] bg-gradient-to-b from-[#e23b2e] to-transparent"
               style={{ left: `${10 + i * 13}%`, height: "60%", top: "-10%" }}
               animate={{ opacity: [0, 1, 0], scaleY: [0.4, 1, 0.4] }}
               transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.17 }}
             />
           ))}
           <motion.div
-            className="absolute inset-0 bg-[#ff0080]/10"
+            className="absolute inset-0 bg-[#e23b2e]/10"
             animate={{ opacity: [0, 0.5, 0] }}
             transition={{ duration: 2.2, repeat: Infinity }}
           />
@@ -64,7 +64,7 @@ function Visual({ kind }: { kind: string }) {
           {[...Array(4)].map((_, i) => (
             <motion.div
               key={i}
-              className="absolute inset-x-[-30%] h-16 rounded-[100%] border-t border-[#00d4ff]/40"
+              className="absolute inset-x-[-30%] h-16 rounded-[100%] border-t border-[#4e86c7]/40"
               style={{ top: `${28 + i * 16}%` }}
               animate={{ x: ["-4%", "4%", "-4%"] }}
               transition={{ duration: 5 + i, repeat: Infinity, ease: "easeInOut" }}
@@ -76,20 +76,20 @@ function Visual({ kind }: { kind: string }) {
       return (
         <div className="absolute inset-0 flex items-center justify-center bg-[#160f0a]">
           <motion.div
-            className="relative h-[70%] w-[70%] rounded-full border border-[#ffa500]/50"
+            className="relative h-[70%] w-[70%] rounded-full border border-[#ffce0a]/50"
             animate={{ rotate: 360 }}
             transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
           >
             {[0.78, 0.6, 0.42].map((s) => (
               <div
                 key={s}
-                className="absolute rounded-full border border-[#ffa500]/25"
+                className="absolute rounded-full border border-[#ffce0a]/25"
                 style={{
                   inset: `${(1 - s) * 50}%`,
                 }}
               />
             ))}
-            <div className="absolute inset-[44%] rounded-full bg-[#ffa500]/70" />
+            <div className="absolute inset-[44%] rounded-full bg-[#ffce0a]/70" />
           </motion.div>
         </div>
       );
@@ -100,13 +100,13 @@ function Visual({ kind }: { kind: string }) {
             className="absolute inset-0"
             style={{
               backgroundImage:
-                "linear-gradient(rgba(155,93,229,0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(155,93,229,0.35) 1px, transparent 1px)",
+                "linear-gradient(rgba(242,102,44,0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(242,102,44,0.35) 1px, transparent 1px)",
               backgroundSize: "22px 22px",
               transform: "perspective(240px) rotateX(55deg) translateY(20%) scale(1.6)",
             }}
           />
           <motion.div
-            className="absolute inset-x-0 h-10 bg-gradient-to-b from-[#9b5de5]/40 to-transparent"
+            className="absolute inset-x-0 h-10 bg-gradient-to-b from-[#f2662c]/40 to-transparent"
             animate={{ top: ["-15%", "110%"] }}
             transition={{ duration: 2.4, repeat: Infinity, ease: "linear" }}
           />
@@ -124,15 +124,15 @@ function Visual({ kind }: { kind: string }) {
               transition={{ duration: 2 + (i % 5), repeat: Infinity, delay: i * 0.1 }}
             />
           ))}
-          <div className="absolute right-[18%] top-[20%] h-10 w-10 rounded-full bg-[#e8e8f4]/90 shadow-[0_0_30px_rgba(232,232,244,0.5)]" />
+          <div className="absolute right-[18%] top-[20%] h-10 w-10 rounded-full bg-[#edf1f4]/90 shadow-[0_0_30px_rgba(237,241,244,0.5)]" />
         </div>
       );
     case "sunrise":
       return (
         <div className="absolute inset-0 overflow-hidden bg-gradient-to-b from-[#1a0f2e] via-[#3d1d3a] to-[#c2571d]">
           <motion.div
-            className="absolute left-1/2 h-24 w-24 -translate-x-1/2 rounded-full bg-[#ffa500]"
-            style={{ boxShadow: "0 0 60px rgba(255,165,0,0.8)" }}
+            className="absolute left-1/2 h-24 w-24 -translate-x-1/2 rounded-full bg-[#ffce0a]"
+            style={{ boxShadow: "0 0 60px rgba(255,206,10,0.8)" }}
             animate={{ bottom: ["6%", "18%"] }}
             transition={{ duration: 4, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
           />
@@ -165,7 +165,7 @@ function Visual({ kind }: { kind: string }) {
           {[...Array(5)].map((_, i) => (
             <motion.div
               key={i}
-              className="absolute inset-x-[-20%] h-24 rounded-[100%] bg-gradient-to-r from-transparent via-[#e8e8f4]/15 to-transparent"
+              className="absolute inset-x-[-20%] h-24 rounded-[100%] bg-gradient-to-r from-transparent via-[#edf1f4]/15 to-transparent"
               style={{ top: `${i * 18}%` }}
               animate={{ x: ["-6%", "6%", "-6%"], skewY: [-3, 3, -3] }}
               transition={{ duration: 6 + i * 1.5, repeat: Infinity, ease: "easeInOut" }}
@@ -174,7 +174,7 @@ function Visual({ kind }: { kind: string }) {
         </div>
       );
     default:
-      return <div className="absolute inset-0 bg-cosmos" />;
+      return <div className="absolute inset-0 bg-deck-800" />;
   }
 }
 
@@ -207,16 +207,16 @@ export function OnboardingQuiz({ onComplete, onSkip }: OnboardingQuizProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[60] flex flex-col bg-void"
+        className="fixed inset-0 z-[60] flex flex-col bg-deck"
       >
       {/* industrial header */}
       <div className="flex items-center justify-between px-6 pt-4 md:px-10 md:pt-6">
-        <span className="text-xs font-bold uppercase tracking-[0.3em] text-star-white">
+        <span className="text-xs font-bold uppercase tracking-[0.3em] text-ink">
           PULSAR
         </span>
         <button
           onClick={onSkip}
-          className="flex min-h-[44px] items-center px-2 text-[10px] font-bold uppercase tracking-[0.25em] text-star-white/40 transition-colors hover:text-star-white"
+          className="flex min-h-[44px] items-center px-2 text-[10px] font-bold uppercase tracking-[0.25em] text-ink/40 transition-colors hover:text-ink"
         >
           SKIP →
         </button>
@@ -228,7 +228,7 @@ export function OnboardingQuiz({ onComplete, onSkip }: OnboardingQuizProps) {
           key={`q-${step}`}
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-[10px] font-bold uppercase tracking-[0.35em] text-star-white/40"
+          className="text-[10px] font-bold uppercase tracking-[0.35em] text-ink/40"
         >
           Question {String(step + 1).padStart(2, "0")} / {String(QUIZ.length).padStart(2, "0")}
         </motion.p>
@@ -237,11 +237,11 @@ export function OnboardingQuiz({ onComplete, onSkip }: OnboardingQuizProps) {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
-          className="mt-3 text-2xl font-bold uppercase tracking-tight text-star-white md:text-4xl"
+          className="mt-3 text-2xl font-bold uppercase tracking-tight text-ink md:text-4xl"
         >
           WHICH ONE?
         </motion.h2>
-        <p className="mt-2 text-[10px] uppercase tracking-[0.25em] text-star-white/35">
+        <p className="mt-2 text-[10px] uppercase tracking-[0.25em] text-ink/35">
           Tap the one that feels like you — no wrong answers
         </p>
       </div>
@@ -265,7 +265,7 @@ export function OnboardingQuiz({ onComplete, onSkip }: OnboardingQuizProps) {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 aria-label={opt.label}
-                className="group relative aspect-[4/3] max-h-[30vh] min-h-[120px] overflow-hidden rounded-none border border-star-white/25 outline-none transition-colors hover:border-star-white focus-visible:border-star-white sm:aspect-square sm:max-h-none"
+                className="group relative aspect-[4/3] max-h-[30vh] min-h-[120px] overflow-hidden rounded-none border border-ink/25 outline-none transition-colors hover:border-ink focus-visible:border-ink sm:aspect-square sm:max-h-none"
               >
                 <Visual kind={opt.visual} />
                 {/* Off-White corner marks */}
@@ -292,7 +292,7 @@ export function OnboardingQuiz({ onComplete, onSkip }: OnboardingQuizProps) {
             <div
               key={i}
               className={`h-[3px] flex-1 transition-colors duration-300 ${
-                i <= step ? "bg-star-white" : "bg-star-white/15"
+                i <= step ? "bg-ink" : "bg-ink/15"
               }`}
             />
           ))}

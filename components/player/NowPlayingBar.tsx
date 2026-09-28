@@ -69,7 +69,7 @@ export function NowPlayingBar() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 80, opacity: 0 }}
             transition={{ type: "spring", stiffness: 380, damping: 34 }}
-            className="fixed inset-x-0 bottom-0 z-50 border-t border-star-white/10 bg-[#08080f]/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl"
+            className="fixed inset-x-0 bottom-0 z-50 border-t border-ink/10 bg-[#08080f]/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl"
           >
             {/* where-to menu — visualiser · full album · discography */}
             <AnimatePresence>
@@ -81,7 +81,7 @@ export function NowPlayingBar() {
                     exit={{ opacity: 0 }}
                     aria-label="Close menu"
                     onClick={() => setMenuOpen(false)}
-                    className="fixed inset-0 -z-10 cursor-default bg-void/60 backdrop-blur-sm"
+                    className="fixed inset-0 -z-10 cursor-default bg-deck/60 backdrop-blur-sm"
                   />
                   <motion.div
                     initial={{ opacity: 0, y: 12 }}
@@ -94,7 +94,7 @@ export function NowPlayingBar() {
                       boxShadow: "inset 0 1px 0 rgba(255,255,255,0.14), 0 22px 60px rgba(0,0,0,0.7)",
                     }}
                   >
-                    <p className="truncate border-b border-white/[0.08] px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.24em] text-star-white/40">
+                    <p className="truncate border-b border-white/[0.08] px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.24em] text-ink/40">
                       {current.artist}
                     </p>
 
@@ -105,10 +105,10 @@ export function NowPlayingBar() {
                       }}
                       className="flex min-h-[48px] w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.06]"
                     >
-                      <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-neon-violet/20 text-neon-violet">
+                      <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-sony/20 text-sony">
                         <Sparkles size={15} />
                       </span>
-                      <span className="text-[13px] font-medium text-star-white">Visualise</span>
+                      <span className="text-[13px] font-medium text-ink">Visualise</span>
                     </button>
 
                     <button
@@ -128,10 +128,10 @@ export function NowPlayingBar() {
                       }}
                       className="flex min-h-[48px] w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.06]"
                     >
-                      <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-neon-blue/20 text-neon-blue">
+                      <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-tps/20 text-tps">
                         <ListMusic size={15} />
                       </span>
-                      <span className="text-[13px] font-medium text-star-white">Full album</span>
+                      <span className="text-[13px] font-medium text-ink">Full album</span>
                     </button>
 
                     <button
@@ -146,7 +146,7 @@ export function NowPlayingBar() {
                       <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[#c08a4e]/20 text-[#e0a45c]">
                         <Disc3 size={15} />
                       </span>
-                      <span className="truncate text-[13px] font-medium text-star-white">
+                      <span className="truncate text-[13px] font-medium text-ink">
                         {current.artist}&rsquo;s discography
                       </span>
                     </button>
@@ -190,9 +190,9 @@ export function NowPlayingBar() {
               }}
               className="group absolute -top-2 left-0 right-0 z-10 h-5 cursor-pointer touch-none"
             >
-              <div className="absolute top-2 left-0 right-0 h-1 rounded-full bg-star-white/[0.12]" />
+              <div className="absolute top-2 left-0 right-0 h-1 rounded-full bg-ink/[0.12]" />
               <div
-                className={`absolute top-2 left-0 h-1 rounded-full bg-gradient-to-r from-neon-violet to-neon-blue ${
+                className={`absolute top-2 left-0 h-1 rounded-full bg-gradient-to-r from-sony to-tps ${
                   scrubbing ? "" : "transition-[width]"
                 }`}
                 style={{ width: `${shownProgress * 100}%` }}
@@ -225,27 +225,27 @@ export function NowPlayingBar() {
                         playing={playing}
                         getAnalyser={getAnalyser}
                         bars={5}
-                        className="h-full w-full text-neon-blue drop-shadow-[0_0_6px_rgba(0,212,255,0.55)]"
+                        className="h-full w-full text-tps drop-shadow-[0_0_6px_rgba(78,134,199,0.55)]"
                       />
                     </span>
                   )}
-                  <span className="absolute inset-0 flex items-center justify-center bg-void/55 opacity-0 transition-opacity group-hover:opacity-100">
+                  <span className="absolute inset-0 flex items-center justify-center bg-deck/55 opacity-0 transition-opacity group-hover:opacity-100">
                     <ChevronUp size={16} className="text-white" />
                   </span>
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-bold uppercase tracking-wide text-star-white">
+                  <span className="block truncate text-[13px] font-bold uppercase tracking-wide text-ink">
                     {current.title}
                   </span>
-                  <span className="block truncate text-[11px] text-star-white/50">{current.artist}</span>
+                  <span className="block truncate text-[11px] text-ink/50">{current.artist}</span>
                 </span>
               </button>
 
               {/* elapsed / total — previews are short, so knowing where you are
                   actually matters */}
-              <span className="hidden flex-shrink-0 font-mono text-[11px] tabular-nums text-star-white/40 sm:block">
+              <span className="hidden flex-shrink-0 font-mono text-[11px] tabular-nums text-ink/40 sm:block">
                 {fmt(scrubbing ? shownProgress * duration : elapsed)}
-                <span className="text-star-white/20"> / </span>
+                <span className="text-ink/20"> / </span>
                 {fmt(duration)}
               </span>
 
@@ -255,7 +255,7 @@ export function NowPlayingBar() {
                   {[0, 1, 2, 3].map((i) => (
                     <motion.span
                       key={i}
-                      className="w-0.5 rounded-full bg-neon-blue/70"
+                      className="w-0.5 rounded-full bg-tps/70"
                       animate={{ height: [4, 12, 6, 14, 4] }}
                       transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.12, ease: "easeInOut" }}
                     />
@@ -275,7 +275,7 @@ export function NowPlayingBar() {
                 <CrateIcon
                   size={17}
                   filled={inCrate}
-                  className={inCrate ? "text-[#c08a4e]" : "text-star-white/60"}
+                  className={inCrate ? "text-[#c08a4e]" : "text-ink/60"}
                 />
               </button>
 
@@ -291,11 +291,11 @@ export function NowPlayingBar() {
                 }}
               >
                 {loading ? (
-                  <Loader2 size={20} className="animate-spin text-void" />
+                  <Loader2 size={20} className="animate-spin text-deck" />
                 ) : playing ? (
-                  <Pause size={20} className="text-void" fill="currentColor" />
+                  <Pause size={20} className="text-deck" fill="currentColor" />
                 ) : (
-                  <Play size={20} className="ml-0.5 text-void" fill="currentColor" />
+                  <Play size={20} className="ml-0.5 text-deck" fill="currentColor" />
                 )}
               </button>
 
@@ -305,7 +305,7 @@ export function NowPlayingBar() {
               <button
                 onClick={openVisualizer}
                 aria-label="Open visualizer"
-                className="hidden h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-star-white/15 text-star-white/60 transition-colors hover:border-star-white/40 hover:text-star-white sm:flex"
+                className="hidden h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-ink/15 text-ink/60 transition-colors hover:border-ink/40 hover:text-ink sm:flex"
               >
                 <Maximize2 size={16} />
               </button>
@@ -315,7 +315,7 @@ export function NowPlayingBar() {
               <button
                 onClick={stop}
                 aria-label="Close player"
-                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-star-white/35 transition-colors hover:bg-star-white/10 hover:text-star-white"
+                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-ink/35 transition-colors hover:bg-ink/10 hover:text-ink"
               >
                 <X size={17} />
               </button>
@@ -329,16 +329,16 @@ export function NowPlayingBar() {
             {error && !loading && (
               <button
                 onClick={() => current && play(current)}
-                className="mx-auto flex max-w-full items-center justify-center gap-2 px-4 pb-1.5 text-[9px] font-bold uppercase tracking-[0.16em] text-neon-amber/70 transition-colors hover:text-neon-amber"
+                className="mx-auto flex max-w-full items-center justify-center gap-2 px-4 pb-1.5 text-[9px] font-bold uppercase tracking-[0.16em] text-sport/70 transition-colors hover:text-sport"
               >
                 <span className="truncate">{error}</span>
-                <span className="flex-shrink-0 rounded-full border border-neon-amber/40 px-2 py-0.5 text-neon-amber">
+                <span className="flex-shrink-0 rounded-full border border-sport/40 px-2 py-0.5 text-sport">
                   Retry
                 </span>
               </button>
             )}
             {!hasAudio && !loading && !error && (
-              <p className="truncate px-4 pb-1.5 text-center text-[9px] font-bold uppercase tracking-[0.16em] text-neon-amber/60">
+              <p className="truncate px-4 pb-1.5 text-center text-[9px] font-bold uppercase tracking-[0.16em] text-sport/60">
                 No preview available
               </p>
             )}

@@ -228,12 +228,12 @@ function SampleCard({
   const isCovers = sample.role === "covers" || sample.role === "coveredBy";
   const isRemix = sample.role === "remixOf" || sample.role === "remixedBy";
   const badgeColor = isSamples
-    ? "bg-neon-violet/20 text-neon-violet"
+    ? "bg-sony/20 text-sony"
     : isCovers
-      ? "bg-neon-green/20 text-neon-green"
+      ? "bg-lcd/20 text-lcd"
       : isRemix
-        ? "bg-neon-pink/20 text-neon-pink"
-        : "bg-neon-blue/20 text-neon-blue";
+        ? "bg-vu/20 text-vu"
+        : "bg-tps/20 text-tps";
   const badgeLabel =
     sample.role === "samples" ? "Contains sample"
       : sample.role === "sampledBy" ? "Sampled in"
@@ -294,12 +294,12 @@ function SampleCard({
         className="pointer-events-none absolute -inset-16 opacity-40"
         style={{
           background: isSamples
-            ? "radial-gradient(40% 40% at 15% 0%, rgba(155,93,229,0.5), transparent 70%)"
+            ? "radial-gradient(40% 40% at 15% 0%, rgba(242,102,44,0.5), transparent 70%)"
             : isCovers
               ? "radial-gradient(40% 40% at 15% 0%, rgba(69,240,160,0.45), transparent 70%)"
               : isRemix
                 ? "radial-gradient(40% 40% at 15% 0%, rgba(255,95,162,0.45), transparent 70%)"
-                : "radial-gradient(40% 40% at 15% 0%, rgba(0,212,255,0.45), transparent 70%)",
+                : "radial-gradient(40% 40% at 15% 0%, rgba(78,134,199,0.45), transparent 70%)",
         }}
       />
       <div className="relative p-3 sm:p-3.5">
@@ -311,21 +311,21 @@ function SampleCard({
             {badgeLabel}
           </span>
           {sample.partial && (
-            <span className="rounded-full bg-white/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-star-white/55">
+            <span className="rounded-full bg-white/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-ink/55">
               Partial
             </span>
           )}
           {catalogHit && (
             <Link
               href={`/release/${catalogHit.id}`}
-              className="relative -my-2 rounded-full border border-neon-blue/40 bg-neon-blue/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-neon-blue transition-colors hover:bg-neon-blue/20 before:absolute before:inset-[-6px] before:content-['']"
+              className="relative -my-2 rounded-full border border-tps/40 bg-tps/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-tps transition-colors hover:bg-tps/20 before:absolute before:inset-[-6px] before:content-['']"
               title="This record is in the Pulsar catalog"
             >
               In catalog ↗
             </Link>
           )}
           {sample.year && (
-            <span className="ml-auto font-mono text-[10px] text-star-white/35">{sample.year}</span>
+            <span className="ml-auto font-mono text-[10px] text-ink/35">{sample.year}</span>
           )}
         </div>
 
@@ -343,11 +343,11 @@ function SampleCard({
             />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[15px] font-bold leading-tight text-star-white">{sample.title}</p>
+            <p className="text-[15px] font-bold leading-tight text-ink">{sample.title}</p>
             {sample.artist && (
-              <p className="truncate text-[12px] text-star-white/55">{sample.artist}</p>
+              <p className="truncate text-[12px] text-ink/55">{sample.artist}</p>
             )}
-            <p className="mt-1 text-[11px] leading-snug text-star-white/45">{sample.description}</p>
+            <p className="mt-1 text-[11px] leading-snug text-ink/45">{sample.description}</p>
           </div>
         </div>
 
@@ -368,8 +368,8 @@ function SampleCard({
               disabled={!s.enabled}
               className={`flex-1 truncate rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors disabled:opacity-30 ${
                 side === s.id && playing
-                  ? "bg-neon-violet/25 text-neon-violet"
-                  : "text-star-white/50 hover:text-star-white"
+                  ? "bg-sony/25 text-sony"
+                  : "text-ink/50 hover:text-ink"
               }`}
             >
               {s.label}
@@ -389,13 +389,13 @@ function SampleCard({
               rel="noopener noreferrer"
               className="group flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center transition-colors hover:bg-white/[0.04]"
             >
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ff0000]/15 text-[#ff5b5b] transition-transform group-hover:scale-110">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ff0000]/15 text-[#e23b2e] transition-transform group-hover:scale-110">
                 <Youtube size={20} />
               </span>
-              <span className="text-[12px] font-bold text-star-white">
+              <span className="text-[12px] font-bold text-ink">
                 Find it on YouTube
               </span>
-              <span className="max-w-[36ch] text-[10px] leading-snug text-star-white/45">
+              <span className="max-w-[36ch] text-[10px] leading-snug text-ink/45">
                 No upload is pinned for this record yet, so it can&rsquo;t play inline —
                 this opens a YouTube search for it.
               </span>
@@ -411,7 +411,7 @@ function SampleCard({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={thumb} alt="" className="h-full w-full object-cover" />
               ) : (
-                <span className="flex h-full w-full items-center justify-center text-star-white/25">
+                <span className="flex h-full w-full items-center justify-center text-ink/25">
                   <Disc3 size={30} className={state === "loading" ? "animate-spin" : ""} />
                 </span>
               )}
@@ -447,7 +447,7 @@ function SampleCard({
           {mark.inSong != null && (
             <button
               onClick={() => jumpTo("subject", mark.inSong!)}
-              className="rounded-full bg-neon-violet/20 px-2.5 py-1 font-mono text-[10px] text-neon-violet hover:bg-neon-violet/30"
+              className="rounded-full bg-sony/20 px-2.5 py-1 font-mono text-[10px] text-sony hover:bg-sony/30"
               title={`Sample lands at ${fromSeconds(mark.inSong)} in ${subject.title}`}
             >
               ▶ {fromSeconds(mark.inSong)} in this track
@@ -456,7 +456,7 @@ function SampleCard({
           {mark.inSource != null && (
             <button
               onClick={() => jumpTo("other", mark.inSource!)}
-              className="rounded-full bg-neon-blue/20 px-2.5 py-1 font-mono text-[10px] text-neon-blue hover:bg-neon-blue/30"
+              className="rounded-full bg-tps/20 px-2.5 py-1 font-mono text-[10px] text-tps hover:bg-tps/30"
               title={`Taken from ${fromSeconds(mark.inSource)} in ${sample.title}`}
             >
               ▶ {fromSeconds(mark.inSource)} in {otherLabel(sample.role).toLowerCase()}
@@ -468,8 +468,8 @@ function SampleCard({
             disabled={!playing}
             className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors disabled:opacity-35 ${
               flash
-                ? "bg-neon-green/25 text-neon-green"
-                : "border border-white/15 text-star-white/60 hover:border-white/40 hover:text-star-white"
+                ? "bg-lcd/25 text-lcd"
+                : "border border-white/15 text-ink/60 hover:border-white/40 hover:text-ink"
             }`}
             title={
               playing
@@ -484,7 +484,7 @@ function SampleCard({
           <button
             onClick={() => setManual((v) => !v)}
             aria-label="Type timestamps by hand"
-            className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 text-star-white/45 hover:border-white/40 hover:text-star-white"
+            className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 text-ink/45 hover:border-white/40 hover:text-ink"
             title="Type timestamps by hand"
           >
             <Pencil size={10} />
@@ -503,7 +503,7 @@ function SampleCard({
             }
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-auto flex items-center gap-1 rounded-full bg-[#ff0000]/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#ff5b5b] hover:bg-[#ff0000]/25"
+            className="ml-auto flex items-center gap-1 rounded-full bg-[#ff0000]/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#e23b2e] hover:bg-[#ff0000]/25"
           >
             <Youtube size={12} /> {videoId ? "YouTube" : "Search"}
           </a>
@@ -512,14 +512,14 @@ function SampleCard({
         {/* manual entry — the fallback when there's no playhead to read */}
         {manual && (
           <div className="mt-3 rounded-xl border border-white/10 bg-black/30 p-3">
-            <p className="flex items-start gap-1.5 text-[10px] leading-relaxed text-star-white/45">
+            <p className="flex items-start gap-1.5 text-[10px] leading-relaxed text-ink/45">
               <Clock size={11} className="mt-0.5 flex-shrink-0" />
               No open database publishes sample timings, so they&rsquo;re marked here by ear and
               saved on this device.
             </p>
             <div className="mt-2.5 grid grid-cols-2 gap-2">
               <label className="flex flex-col gap-1">
-                <span className="text-[9px] font-bold uppercase tracking-wide text-neon-violet">
+                <span className="text-[9px] font-bold uppercase tracking-wide text-sony">
                   Lands in this track
                 </span>
                 <input
@@ -531,11 +531,11 @@ function SampleCard({
                     const s = toSeconds(e.target.value.trim());
                     if (s != null) saveMark({ inSong: s });
                   }}
-                  className="w-full rounded-lg border border-white/15 bg-white/[0.05] px-2 py-2 font-mono text-[12px] text-star-white placeholder:text-star-white/25 focus:border-neon-violet/60 focus:outline-none"
+                  className="w-full rounded-lg border border-white/15 bg-white/[0.05] px-2 py-2 font-mono text-[12px] text-ink placeholder:text-ink/25 focus:border-sony/60 focus:outline-none"
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-[9px] font-bold uppercase tracking-wide text-neon-blue">
+                <span className="text-[9px] font-bold uppercase tracking-wide text-tps">
                   Taken from at
                 </span>
                 <input
@@ -547,13 +547,13 @@ function SampleCard({
                     const s = toSeconds(e.target.value.trim());
                     if (s != null) saveMark({ inSource: s });
                   }}
-                  className="w-full rounded-lg border border-white/15 bg-white/[0.05] px-2 py-2 font-mono text-[12px] text-star-white placeholder:text-star-white/25 focus:border-neon-blue/60 focus:outline-none"
+                  className="w-full rounded-lg border border-white/15 bg-white/[0.05] px-2 py-2 font-mono text-[12px] text-ink placeholder:text-ink/25 focus:border-tps/60 focus:outline-none"
                 />
               </label>
             </div>
             <button
               onClick={() => setManual(false)}
-              className="mt-2.5 w-full rounded-lg border border-white/15 py-2 text-[10px] font-bold uppercase tracking-widest text-star-white/60 hover:text-star-white"
+              className="mt-2.5 w-full rounded-lg border border-white/15 py-2 text-[10px] font-bold uppercase tracking-widest text-ink/60 hover:text-ink"
             >
               Done
             </button>
@@ -644,7 +644,7 @@ export function SamplePage({
   const section = (label: string, list: SampleRef[], keyPrefix: string, offset: number) =>
     list.length > 0 && (
       <>
-        <p className="mb-2 mt-5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-star-white/40">
+        <p className="mb-2 mt-5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-ink/40">
           {label}
         </p>
         <div className="space-y-3">
@@ -676,18 +676,18 @@ export function SamplePage({
       <div className="relative flex items-center gap-2 border-b border-white/10 px-3 py-3 sm:gap-3 sm:px-4">
         <span
           className="pointer-events-none absolute inset-0 opacity-60"
-          style={{ background: "radial-gradient(80% 100% at 0% 0%, rgba(155,93,229,0.28), transparent 60%)" }}
+          style={{ background: "radial-gradient(80% 100% at 0% 0%, rgba(242,102,44,0.28), transparent 60%)" }}
         />
         <button
           onClick={onClose}
           aria-label="Back"
-          className="relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-white/20 text-star-white/75 hover:border-white/50 hover:text-star-white"
+          className="relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-white/20 text-ink/75 hover:border-white/50 hover:text-ink"
         >
           <span className="text-lg leading-none">‹</span>
         </button>
         <div className="relative min-w-0 flex-1">
-          <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-neon-violet/80">Sample DNA</p>
-          <h3 className="truncate text-base font-bold uppercase tracking-tight text-star-white">
+          <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-sony/80">Sample DNA</p>
+          <h3 className="truncate text-base font-bold uppercase tracking-tight text-ink">
             {subject.title}
           </h3>
         </div>
@@ -702,7 +702,7 @@ export function SamplePage({
           aria-label="Copy a link to this sample breakdown"
           title="Copy link to this breakdown"
           className={`relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full transition-colors ${
-            copied ? "bg-neon-green/20 text-neon-green" : "text-star-white/50 hover:bg-white/10 hover:text-star-white"
+            copied ? "bg-lcd/20 text-lcd" : "text-ink/50 hover:bg-white/10 hover:text-ink"
           }`}
         >
           {copied ? <Check size={15} /> : <Share2 size={15} />}
@@ -712,7 +712,7 @@ export function SamplePage({
           aria-label="Toggle graph"
           aria-pressed={graphOpen}
           className={`relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full transition-colors ${
-            graphOpen ? "bg-neon-violet/20 text-neon-violet" : "text-star-white/50 hover:bg-white/10 hover:text-star-white"
+            graphOpen ? "bg-sony/20 text-sony" : "text-ink/50 hover:bg-white/10 hover:text-ink"
           }`}
         >
           <GitFork size={15} />
@@ -720,7 +720,7 @@ export function SamplePage({
         <button
           onClick={onClose}
           aria-label="Close"
-          className="relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-star-white/50 hover:bg-white/10 hover:text-star-white"
+          className="relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-ink/50 hover:bg-white/10 hover:text-ink"
         >
           <X size={16} />
         </button>
@@ -733,9 +733,9 @@ export function SamplePage({
             <Artwork src={subject.artwork_url} artist={subject.artist} title={subject.title} sizes="80px" />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-lg font-bold leading-tight text-star-white">{subject.title}</p>
-            <p className="truncate text-sm text-star-white/55">{subject.artist}</p>
-            <p className="mt-1 text-[11px] text-star-white/40">
+            <p className="truncate text-lg font-bold leading-tight text-ink">{subject.title}</p>
+            <p className="truncate text-sm text-ink/55">{subject.artist}</p>
+            <p className="mt-1 text-[11px] text-ink/40">
               {contains.length > 0 && `${contains.length} sample${contains.length > 1 ? "s" : ""}`}
               {contains.length > 0 && sampledIn.length > 0 && " · "}
               {sampledIn.length > 0 && `sampled in ${sampledIn.length}`}
@@ -745,17 +745,17 @@ export function SamplePage({
             {(featCredits.length > 0 || prodCredits.length > 0 || remixCredits.length > 0) && (
               <div className="mt-1.5 flex flex-wrap gap-1">
                 {featCredits.map((c) => (
-                  <span key={`f-${c.slug}`} className="rounded-full bg-neon-green/[0.12] px-2 py-0.5 text-[9px] font-bold text-neon-green">
+                  <span key={`f-${c.slug}`} className="rounded-full bg-lcd/[0.12] px-2 py-0.5 text-[9px] font-bold text-lcd">
                     feat. {c.name}
                   </span>
                 ))}
                 {prodCredits.map((c) => (
-                  <span key={`p-${c.slug}`} className="rounded-full bg-neon-violet/[0.12] px-2 py-0.5 text-[9px] font-bold text-neon-violet">
+                  <span key={`p-${c.slug}`} className="rounded-full bg-sony/[0.12] px-2 py-0.5 text-[9px] font-bold text-sony">
                     prod. {c.name}
                   </span>
                 ))}
                 {remixCredits.map((c) => (
-                  <span key={`r-${c.slug}`} className="rounded-full bg-neon-blue/[0.12] px-2 py-0.5 text-[9px] font-bold text-neon-blue">
+                  <span key={`r-${c.slug}`} className="rounded-full bg-tps/[0.12] px-2 py-0.5 text-[9px] font-bold text-tps">
                     {c.name} remix
                   </span>
                 ))}
@@ -767,8 +767,8 @@ export function SamplePage({
         {/* ── Related tracks — shared sample DNA ── */}
         {related.length > 0 && (
           <div className="mb-5">
-            <p className="mb-2 flex items-center gap-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-star-white/40">
-              <Dna size={11} className="text-neon-green/70" /> Related tracks
+            <p className="mb-2 flex items-center gap-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-ink/40">
+              <Dna size={11} className="text-lcd/70" /> Related tracks
             </p>
             <div className="flex flex-wrap gap-2">
               {related.map((r) => (
@@ -777,16 +777,16 @@ export function SamplePage({
                   onClick={() =>
                     onLookup ? onLookup(r.artist, r.title) : playNode(r.artist, r.title)
                   }
-                  className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-left transition-colors hover:border-neon-green/40 hover:bg-neon-green/[0.08]"
+                  className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-left transition-colors hover:border-lcd/40 hover:bg-lcd/[0.08]"
                 >
                   <span className="min-w-0">
-                    <span className="block truncate text-[11px] font-bold text-star-white group-hover:text-star-white">
+                    <span className="block truncate text-[11px] font-bold text-ink group-hover:text-ink">
                       {r.title}
                     </span>
-                    <span className="block truncate text-[9px] text-star-white/45">{r.artist}</span>
+                    <span className="block truncate text-[9px] text-ink/45">{r.artist}</span>
                   </span>
                   {r.sharedSources.length > 0 && (
-                    <span className="flex-shrink-0 rounded-full bg-neon-green/15 px-1.5 py-0.5 text-[8px] font-bold text-neon-green">
+                    <span className="flex-shrink-0 rounded-full bg-lcd/15 px-1.5 py-0.5 text-[8px] font-bold text-lcd">
                       {r.sharedSources.length} shared
                     </span>
                   )}
@@ -801,7 +801,7 @@ export function SamplePage({
             the fold on a phone. The cards are the point; the graph is a lens. */}
         {graphOpen && (
           <div className="mb-5">
-            <p className="mb-2 flex items-center gap-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-star-white/40">
+            <p className="mb-2 flex items-center gap-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-ink/40">
               <GitFork size={11} /> Sample lineage graph
             </p>
             <SampleGraph
@@ -823,11 +823,11 @@ export function SamplePage({
           contains.length + sampledIn.length + covers.length + coveredBy.length
         )}
 
-        <p className="mt-6 text-center text-[10px] leading-relaxed text-star-white/30">
+        <p className="mt-6 text-center text-[10px] leading-relaxed text-ink/30">
           Connections from a hand-checked catalog + MusicBrainz · originals played from YouTube.
           <br />
           Timings are marked by listeners — hit{" "}
-          <span className="text-star-white/50">Mark this moment</span> while it plays.
+          <span className="text-ink/50">Mark this moment</span> while it plays.
         </p>
       </div>
     </motion.div>

@@ -27,7 +27,7 @@ import {
 export function Sidebar() {
   const [open, setOpen] = useState(false);
   const [format, setFormat] = useState<MediaFormat>("vinyl");
-  const [themeId, setThemeId] = useState("nebula");
+  const [themeId, setThemeId] = useState("tps-l2");
   const [aiMode, setAiMode] = useState<AiMode>("chat");
   const [showType, setShowType] = useState<ShowType>("all");
   const [counts, setCounts] = useState({ fav: 0, crate: 0 });
@@ -71,8 +71,8 @@ export function Sidebar() {
   };
 
   const Section = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <div className="border-t border-star-white/[0.06] px-5 py-5">
-      <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.3em] text-star-white/35">{label}</p>
+    <div className="border-t border-ink/[0.06] px-5 py-5">
+      <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.3em] text-ink/35">{label}</p>
       {children}
     </div>
   );
@@ -86,14 +86,14 @@ export function Sidebar() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setOpen(false)}
-            className="fixed inset-0 z-[55] bg-void/70 backdrop-blur-sm"
+            className="fixed inset-0 z-[55] bg-deck/70 backdrop-blur-sm"
           />
           <motion.aside
             initial={{ x: "-100%" }}
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
             transition={{ type: "spring", stiffness: 520, damping: 42 }}
-            className="fixed inset-y-0 left-0 z-[55] flex w-[92%] max-w-sm transform-gpu flex-col overflow-y-auto border-r border-white/15 bg-[#0a0a14]/60 backdrop-blur-2xl"
+            className="fixed inset-y-0 left-0 z-[55] flex w-[92%] max-w-sm transform-gpu flex-col overflow-y-auto border-r border-white/15 bg-[#12161a]/60 backdrop-blur-2xl"
             style={{ boxShadow: "inset -1px 0 0 rgba(255,255,255,0.14), 20px 0 60px rgba(0,0,0,0.5)" }}
           >
             <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-5">
@@ -104,14 +104,14 @@ export function Sidebar() {
                 aria-label="Pulsar home"
               >
                 <CalabiYau size={26} />
-                <span className="text-base font-bold uppercase tracking-[0.3em] text-star-white">
+                <span className="text-base font-bold uppercase tracking-[0.3em] text-ink">
                   Pulsar
                 </span>
               </Link>
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-star-white/15 text-star-white/60 transition-colors hover:border-star-white/40 hover:text-star-white"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-ink/15 text-ink/60 transition-colors hover:border-ink/40 hover:text-ink"
               >
                 <X size={16} />
               </button>
@@ -122,23 +122,23 @@ export function Sidebar() {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => openCrate("favorites")}
-                  className="flex flex-col items-start gap-2 rounded-xl border border-star-white/10 bg-star-white/[0.03] p-3 transition-colors hover:border-star-white/30"
+                  className="flex flex-col items-start gap-2 rounded-xl border border-ink/10 bg-ink/[0.03] p-3 transition-colors hover:border-ink/30"
                 >
-                  <Heart size={18} className="text-neon-pink" />
-                  <span className="text-[11px] font-bold uppercase tracking-wide text-star-white">
+                  <Heart size={18} className="text-vu" />
+                  <span className="text-[11px] font-bold uppercase tracking-wide text-ink">
                     Favorites
                   </span>
-                  <span className="text-[10px] text-star-white/40">{counts.fav} loved</span>
+                  <span className="text-[10px] text-ink/40">{counts.fav} loved</span>
                 </button>
                 <button
                   onClick={() => openCrate("playlist")}
-                  className="flex flex-col items-start gap-2 rounded-xl border border-star-white/10 bg-star-white/[0.03] p-3 transition-colors hover:border-star-white/30"
+                  className="flex flex-col items-start gap-2 rounded-xl border border-ink/10 bg-ink/[0.03] p-3 transition-colors hover:border-ink/30"
                 >
                   <CrateIcon size={18} filled className="text-[#c08a4e]" />
-                  <span className="text-[11px] font-bold uppercase tracking-wide text-star-white">
+                  <span className="text-[11px] font-bold uppercase tracking-wide text-ink">
                     Crate
                   </span>
-                  <span className="text-[10px] text-star-white/40">{counts.crate} saved</span>
+                  <span className="text-[10px] text-ink/40">{counts.crate} saved</span>
                 </button>
               </div>
             </Section>
@@ -147,33 +147,33 @@ export function Sidebar() {
             {syncConfigured() && (
               <Section label="Sync">
                 {syncUser ? (
-                  <div className="rounded-xl border border-neon-blue/30 bg-neon-blue/[0.08] p-3">
-                    <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-star-white">
-                      <Check size={14} className="text-neon-blue" />
+                  <div className="rounded-xl border border-tps/30 bg-tps/[0.08] p-3">
+                    <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-ink">
+                      <Check size={14} className="text-tps" />
                       Synced across devices
                     </p>
-                    <p className="mt-1 text-[10px] leading-relaxed text-star-white/40">
+                    <p className="mt-1 text-[10px] leading-relaxed text-ink/40">
                       Your crates &amp; favorites mirror to your account.
                     </p>
                     <button
                       onClick={() => signOut()}
-                      className="mt-2.5 flex min-h-[36px] w-full items-center justify-center rounded-lg border border-star-white/15 text-[10px] font-bold uppercase tracking-wide text-star-white/60 transition-colors hover:border-star-white/40 hover:text-star-white"
+                      className="mt-2.5 flex min-h-[36px] w-full items-center justify-center rounded-lg border border-ink/15 text-[10px] font-bold uppercase tracking-wide text-ink/60 transition-colors hover:border-ink/40 hover:text-ink"
                     >
                       Sign out
                     </button>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-star-white/10 bg-star-white/[0.03] p-3">
-                    <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-star-white">
-                      <CloudUpload size={14} className="text-neon-violet" />
+                  <div className="rounded-xl border border-ink/10 bg-ink/[0.03] p-3">
+                    <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-ink">
+                      <CloudUpload size={14} className="text-sony" />
                       Keep my collection
                     </p>
-                    <p className="mt-1 text-[10px] leading-relaxed text-star-white/40">
+                    <p className="mt-1 text-[10px] leading-relaxed text-ink/40">
                       Enter your email — we&apos;ll send a magic link to sync crates &amp; favorites
                       across devices.
                     </p>
                     {emailState === "sent" ? (
-                      <p className="mt-2.5 rounded-lg border border-neon-blue/30 bg-neon-blue/10 px-3 py-2 text-[11px] text-neon-blue">
+                      <p className="mt-2.5 rounded-lg border border-tps/30 bg-tps/10 px-3 py-2 text-[11px] text-tps">
                         Check your email for the sign-in link.
                       </p>
                     ) : (
@@ -185,19 +185,19 @@ export function Sidebar() {
                           onKeyDown={(e) => e.key === "Enter" && sendLink()}
                           placeholder="you@email.com"
                           aria-label="Email for magic link"
-                          className="min-h-[40px] flex-1 rounded-lg border border-star-white/15 bg-void/60 px-3 text-[12px] text-star-white outline-none placeholder:text-star-white/25 focus:border-neon-violet/50"
+                          className="min-h-[40px] flex-1 rounded-lg border border-ink/15 bg-deck/60 px-3 text-[12px] text-ink outline-none placeholder:text-ink/25 focus:border-sony/50"
                         />
                         <button
                           onClick={sendLink}
                           disabled={emailState === "sending"}
-                          className="min-h-[40px] flex-shrink-0 rounded-lg bg-neon-violet px-3 text-[11px] font-bold uppercase tracking-wide text-void transition-opacity disabled:opacity-50"
+                          className="min-h-[40px] flex-shrink-0 rounded-lg bg-sony px-3 text-[11px] font-bold uppercase tracking-wide text-deck transition-opacity disabled:opacity-50"
                         >
                           {emailState === "sending" ? "…" : "Link"}
                         </button>
                       </div>
                     )}
                     {emailState === "error" && (
-                      <p className="mt-2 text-[10px] text-neon-amber">Couldn&apos;t send — try again.</p>
+                      <p className="mt-2 text-[10px] text-sport">Couldn&apos;t send — try again.</p>
                     )}
                   </div>
                 )}
@@ -217,11 +217,11 @@ export function Sidebar() {
                     }}
                     className={`flex items-center justify-between rounded-lg border px-3 py-2 text-left transition-colors ${
                       format === f.id
-                        ? "border-star-white/40 bg-star-white/[0.06]"
-                        : "border-star-white/10 hover:border-star-white/25"
+                        ? "border-ink/40 bg-ink/[0.06]"
+                        : "border-ink/10 hover:border-ink/25"
                     }`}
                   >
-                    <span className="text-[12px] font-bold uppercase tracking-wide text-star-white">
+                    <span className="text-[12px] font-bold uppercase tracking-wide text-ink">
                       {f.label}
                     </span>
                   </button>
@@ -241,20 +241,20 @@ export function Sidebar() {
                     }}
                     className={`flex items-center gap-3 rounded-lg border px-3 py-2 transition-colors ${
                       themeId === t.id
-                        ? "border-star-white/40 bg-star-white/[0.06]"
-                        : "border-star-white/10 hover:border-star-white/25"
+                        ? "border-ink/40 bg-ink/[0.06]"
+                        : "border-ink/10 hover:border-ink/25"
                     }`}
                   >
                     <span className="flex -space-x-1">
                       {t.swatch.map((c) => (
                         <span
                           key={c}
-                          className="h-4 w-4 rounded-full ring-1 ring-void"
+                          className="h-4 w-4 rounded-full ring-1 ring-deck"
                           style={{ backgroundColor: c }}
                         />
                       ))}
                     </span>
-                    <span className="text-[12px] font-bold uppercase tracking-wide text-star-white">
+                    <span className="text-[12px] font-bold uppercase tracking-wide text-ink">
                       {t.name}
                     </span>
                   </button>
@@ -281,8 +281,8 @@ export function Sidebar() {
                     }}
                     className={`rounded-lg border py-2 text-[10px] font-bold uppercase tracking-wide transition-colors ${
                       showType === t
-                        ? "border-star-white/40 bg-star-white/[0.06] text-star-white"
-                        : "border-star-white/10 text-star-white/50 hover:text-star-white"
+                        ? "border-ink/40 bg-ink/[0.06] text-ink"
+                        : "border-ink/10 text-ink/50 hover:text-ink"
                     }`}
                   >
                     {label}
@@ -308,15 +308,15 @@ export function Sidebar() {
                     }}
                     className={`rounded-lg border px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide transition-colors ${
                       aiMode === m
-                        ? "border-neon-violet/50 bg-neon-violet/10 text-star-white"
-                        : "border-star-white/10 text-star-white/50 hover:text-star-white"
+                        ? "border-sony/50 bg-sony/10 text-ink"
+                        : "border-ink/10 text-ink/50 hover:text-ink"
                     }`}
                   >
                     {label}
                   </button>
                 ))}
               </div>
-              <p className="mt-2 text-[10px] leading-relaxed text-star-white/35">
+              <p className="mt-2 text-[10px] leading-relaxed text-ink/35">
                 The AI button uses this: a visual taste quiz, or a chat to describe your mood.
               </p>
             </Section>
@@ -328,21 +328,21 @@ export function Sidebar() {
                   window.dispatchEvent(new CustomEvent("pulsar-retake-quiz"));
                   setOpen(false);
                 }}
-                className="flex w-full items-center gap-3 rounded-xl border border-neon-violet/30 bg-neon-violet/10 px-3 py-3 text-left transition-colors hover:bg-neon-violet/20"
+                className="flex w-full items-center gap-3 rounded-xl border border-sony/30 bg-sony/10 px-3 py-3 text-left transition-colors hover:bg-sony/20"
               >
-                <Sparkles size={18} className="text-neon-violet" />
+                <Sparkles size={18} className="text-sony" />
                 <span className="flex-1">
-                  <span className="block text-[12px] font-bold uppercase tracking-wide text-star-white">
+                  <span className="block text-[12px] font-bold uppercase tracking-wide text-ink">
                     Retake the vibe quiz
                   </span>
-                  <span className="block text-[10px] text-star-white/40">
+                  <span className="block text-[10px] text-ink/40">
                     Re-tune recommendations &amp; theme
                   </span>
                 </span>
               </button>
             </Section>
 
-            <div className="mt-auto px-5 py-5 text-[9px] font-bold uppercase tracking-[0.24em] text-star-white/25">
+            <div className="mt-auto px-5 py-5 text-[9px] font-bold uppercase tracking-[0.24em] text-ink/25">
               Music discovery
             </div>
           </motion.aside>

@@ -238,10 +238,10 @@ export function AiChat({ releases }: AiChatProps) {
   const lastTurn = turns[turns.length - 1];
   const status =
     thinking || !lastTurn
-      ? { label: thinking ? "Listening…" : "Standby", color: "#9b5de5" }
+      ? { label: thinking ? "Listening…" : "Standby", color: "#f2662c" }
       : lastTurn.source === "llm"
         ? { label: lastTurn.model ?? "DeepSeek", color: "#1DB954" }
-        : { label: "Keyword mode", color: "#ffb347" };
+        : { label: "Keyword mode", color: "#ffce0a" };
 
   return (
     <Portal>
@@ -253,7 +253,7 @@ export function AiChat({ releases }: AiChatProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={close}
-            className="fixed inset-0 z-[58] bg-void/75 backdrop-blur-md"
+            className="fixed inset-0 z-[58] bg-deck/75 backdrop-blur-md"
           />
           {/* Centring lives HERE, in flexbox, not on the panel.
               The panel used `left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2`,
@@ -284,7 +284,7 @@ export function AiChat({ releases }: AiChatProps) {
             className="
               pointer-events-auto relative flex h-[100dvh] w-full transform-gpu flex-col
               overflow-hidden rounded-t-[26px] border border-white/15 border-b-0
-              bg-[#0a0a14]/75 pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl
+              bg-[#12161a]/75 pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl
               sm:rounded-3xl sm:border-b
               sm:h-[min(88dvh,44rem)] sm:w-[min(94vw,46rem)]
               lg:h-[min(88dvh,50rem)] lg:w-[min(92vw,66rem)]
@@ -299,7 +299,7 @@ export function AiChat({ releases }: AiChatProps) {
             >
               <div
                 className="aurora-blob absolute -top-32 left-1/2 h-80 w-[36rem] -translate-x-1/2 rounded-full opacity-60 blur-3xl"
-                style={{ background: "radial-gradient(closest-side, rgba(155,93,229,0.4), rgba(255,95,162,0.2) 55%, transparent)" }}
+                style={{ background: "radial-gradient(closest-side, rgba(242,102,44,0.4), rgba(255,95,162,0.2) 55%, transparent)" }}
               />
               <div
                 className="aurora-blob absolute -bottom-40 -right-24 h-72 w-72 rounded-full opacity-40 blur-3xl"
@@ -324,15 +324,15 @@ export function AiChat({ releases }: AiChatProps) {
                     <span
                       className="flex h-9 w-9 items-center justify-center rounded-xl"
                       style={{
-                        background: "linear-gradient(135deg, #9b5de5, #ff5fa2 60%, #ffb347)",
-                        boxShadow: "0 6px 18px rgba(155,93,229,0.5), inset 0 1px 0 rgba(255,255,255,0.4)",
+                        background: "var(--grad-transport)",
+                        boxShadow: "0 6px 18px rgba(242,102,44,0.5), inset 0 1px 0 rgba(255,255,255,0.4)",
                       }}
                     >
                       <Sparkles size={16} className="text-white" />
                     </span>
                     <div>
-                      <p className="text-sm font-black uppercase tracking-[0.2em] text-star-white">The Selector</p>
-                      <p className="text-[10px] font-medium uppercase tracking-widest text-star-white/40">
+                      <p className="text-sm font-black uppercase tracking-[0.2em] text-ink">The Selector</p>
+                      <p className="text-[10px] font-medium uppercase tracking-widest text-ink/40">
                         Curated by DeepSeek
                       </p>
                     </div>
@@ -340,7 +340,7 @@ export function AiChat({ releases }: AiChatProps) {
                   <button
                     onClick={close}
                     aria-label="Close"
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-star-white/50 hover:bg-white/10 hover:text-star-white"
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-ink/50 hover:bg-white/10 hover:text-ink"
                   >
                     <X size={16} />
                   </button>
@@ -349,32 +349,32 @@ export function AiChat({ releases }: AiChatProps) {
                   <motion.button
                     whileTap={{ scale: 0.96 }}
                     onClick={chooseSurvey}
-                    className="group relative flex flex-col items-center gap-3 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-center transition-all hover:border-neon-violet/50 hover:bg-neon-violet/[0.07] lg:gap-4 lg:p-9"
+                    className="group relative flex flex-col items-center gap-3 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-center transition-all hover:border-sony/50 hover:bg-sony/[0.07] lg:gap-4 lg:p-9"
                   >
                     <span
                       className="pointer-events-none absolute -inset-8 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-                      style={{ background: "radial-gradient(50% 50% at 50% 30%, rgba(155,93,229,0.25), transparent 70%)" }}
+                      style={{ background: "radial-gradient(50% 50% at 50% 30%, rgba(242,102,44,0.25), transparent 70%)" }}
                     />
                     <span
                       className="relative flex h-14 w-14 items-center justify-center rounded-2xl transition-transform duration-300 group-hover:scale-110"
                       style={{
-                        background: "linear-gradient(135deg, rgba(155,93,229,0.9), rgba(107,63,175,0.7))",
-                        boxShadow: "0 8px 22px rgba(155,93,229,0.4), inset 0 1px 0 rgba(255,255,255,0.35)",
+                        background: "linear-gradient(135deg, rgba(242,102,44,0.9), rgba(107,63,175,0.7))",
+                        boxShadow: "0 8px 22px rgba(242,102,44,0.4), inset 0 1px 0 rgba(255,255,255,0.35)",
                       }}
                     >
                       <LayoutGrid size={24} className="text-white" />
                     </span>
-                    <span className="relative text-[13px] font-bold uppercase tracking-wide text-star-white">
+                    <span className="relative text-[13px] font-bold uppercase tracking-wide text-ink">
                       Visual Survey
                     </span>
-                    <span className="relative text-[10px] leading-snug text-star-white/45">
+                    <span className="relative text-[10px] leading-snug text-ink/45">
                       Tap images · no typing
                     </span>
                   </motion.button>
                   <motion.button
                     whileTap={{ scale: 0.96 }}
                     onClick={() => setView("chat")}
-                    className="group relative flex flex-col items-center gap-3 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-center transition-all hover:border-neon-blue/50 hover:bg-neon-blue/[0.07] lg:gap-4 lg:p-9"
+                    className="group relative flex flex-col items-center gap-3 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-center transition-all hover:border-tps/50 hover:bg-tps/[0.07] lg:gap-4 lg:p-9"
                   >
                     <span
                       className="pointer-events-none absolute -inset-8 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
@@ -389,10 +389,10 @@ export function AiChat({ releases }: AiChatProps) {
                     >
                       <MessagesSquare size={24} className="text-white" />
                     </span>
-                    <span className="relative text-[13px] font-bold uppercase tracking-wide text-star-white">
+                    <span className="relative text-[13px] font-bold uppercase tracking-wide text-ink">
                       Chat
                     </span>
-                    <span className="relative text-[10px] leading-snug text-star-white/45">
+                    <span className="relative text-[10px] leading-snug text-ink/45">
                       Describe a mood in words
                     </span>
                   </motion.button>
@@ -407,18 +407,18 @@ export function AiChat({ releases }: AiChatProps) {
                     <span
                       className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl"
                       style={{
-                        background: "linear-gradient(135deg, #9b5de5, #ff5fa2 60%, #ffb347)",
-                        boxShadow: "0 6px 18px rgba(155,93,229,0.5), inset 0 1px 0 rgba(255,255,255,0.4)",
+                        background: "var(--grad-transport)",
+                        boxShadow: "0 6px 18px rgba(242,102,44,0.5), inset 0 1px 0 rgba(255,255,255,0.4)",
                       }}
                     >
                       <Sparkles size={14} className="text-white" />
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate text-[13px] font-black uppercase tracking-[0.2em] text-star-white">
+                      <p className="truncate text-[13px] font-black uppercase tracking-[0.2em] text-ink">
                         The Selector
                       </p>
                       {/* honest status: live model vs keyword fallback */}
-                      <p className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-star-white/40">
+                      <p className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-ink/40">
                         <span
                           className="inline-block h-1.5 w-1.5 rounded-full"
                           style={{ backgroundColor: status.color, boxShadow: `0 0 8px ${status.color}` }}
@@ -431,7 +431,7 @@ export function AiChat({ releases }: AiChatProps) {
                     <button
                       onClick={chooseSurvey}
                       aria-label="Switch to the visual survey"
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-star-white/50 transition-colors hover:bg-white/10 hover:text-star-white"
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-ink/50 transition-colors hover:bg-white/10 hover:text-ink"
                       title="Visual survey"
                     >
                       <LayoutGrid size={15} />
@@ -440,7 +440,7 @@ export function AiChat({ releases }: AiChatProps) {
                       <button
                         onClick={reset}
                         aria-label="Start the conversation over"
-                        className="flex h-8 w-8 items-center justify-center rounded-full text-star-white/50 transition-colors hover:bg-white/10 hover:text-star-white"
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-ink/50 transition-colors hover:bg-white/10 hover:text-ink"
                         title="Start over"
                       >
                         <RotateCcw size={14} />
@@ -449,7 +449,7 @@ export function AiChat({ releases }: AiChatProps) {
                     <button
                       onClick={close}
                       aria-label="Close"
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-star-white/50 transition-colors hover:bg-white/10 hover:text-star-white"
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-ink/50 transition-colors hover:bg-white/10 hover:text-ink"
                     >
                       <X size={16} />
                     </button>
@@ -466,16 +466,16 @@ export function AiChat({ releases }: AiChatProps) {
                       <span
                         className="flex h-16 w-16 items-center justify-center rounded-3xl"
                         style={{
-                          background: "linear-gradient(135deg, #9b5de5, #ff5fa2 60%, #ffb347)",
-                          boxShadow: "0 10px 30px rgba(155,93,229,0.45), inset 0 1px 0 rgba(255,255,255,0.4)",
+                          background: "var(--grad-transport)",
+                          boxShadow: "0 10px 30px rgba(242,102,44,0.45), inset 0 1px 0 rgba(255,255,255,0.4)",
                         }}
                       >
                         <MessagesSquare size={26} className="text-white" />
                       </span>
-                      <p className="text-lg font-black uppercase tracking-[0.18em] text-star-white">
+                      <p className="text-lg font-black uppercase tracking-[0.18em] text-ink">
                         What should the room sound like?
                       </p>
-                      <p className="max-w-sm text-xs leading-relaxed text-star-white/45">
+                      <p className="max-w-sm text-xs leading-relaxed text-ink/45">
                         Describe a mood, an era or a genre — then keep talking to refine it.
                         “euphoric house” → “slower, more hypnotic”.
                       </p>
@@ -484,7 +484,7 @@ export function AiChat({ releases }: AiChatProps) {
                           <button
                             key={s}
                             onClick={() => run(s)}
-                            className="rounded-full border border-star-white/[0.12] px-3 py-1.5 text-[10px] text-star-white/55 transition-colors hover:border-neon-violet/50 hover:bg-neon-violet/10 hover:text-star-white"
+                            className="rounded-full border border-ink/[0.12] px-3 py-1.5 text-[10px] text-ink/55 transition-colors hover:border-sony/50 hover:bg-sony/10 hover:text-ink"
                           >
                             {s}
                           </button>
@@ -501,7 +501,7 @@ export function AiChat({ releases }: AiChatProps) {
                     <div className="mb-4 flex items-center gap-3">
                       <span
                         className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-2xl"
-                        style={{ background: "linear-gradient(135deg, #9b5de5, #ff5fa2 60%, #ffb347)" }}
+                        style={{ background: "var(--grad-transport)" }}
                       >
                         <Sparkles size={14} className="text-white" />
                       </span>
@@ -509,7 +509,7 @@ export function AiChat({ releases }: AiChatProps) {
                         {[0, 1, 2, 3].map((i) => (
                           <motion.span
                             key={i}
-                            className="w-1 rounded-full bg-neon-violet"
+                            className="w-1 rounded-full bg-sony"
                             initial={{ height: 6 }}
                             // Reduced motion: a static dot still says "working".
                             animate={reduce ? undefined : { height: [6, 18, 6] }}
@@ -517,7 +517,7 @@ export function AiChat({ releases }: AiChatProps) {
                           />
                         ))}
                       </div>
-                      <span className="text-[11px] text-star-white/50">Reading the room…</span>
+                      <span className="text-[11px] text-ink/50">Reading the room…</span>
                     </div>
                   )}
                 </div>
@@ -533,7 +533,7 @@ export function AiChat({ releases }: AiChatProps) {
 
                 {/* composer */}
                 <div className="relative z-10 border-t border-white/[0.08] p-3 pt-2.5 sm:p-4 sm:pt-3">
-                  <div className="flex items-end gap-2 rounded-2xl border border-star-white/[0.12] bg-star-white/[0.04] p-2 transition-colors focus-within:border-neon-violet/50">
+                  <div className="flex items-end gap-2 rounded-2xl border border-ink/[0.12] bg-ink/[0.04] p-2 transition-colors focus-within:border-sony/50">
                     <textarea
                       // Opening a conversation should put the cursor where you
                       // type, not on the Close button that happens to come
@@ -552,7 +552,7 @@ export function AiChat({ releases }: AiChatProps) {
                       placeholder={turns.length ? "Refine it — “slower”, “add sax”, “more 80s”…" : "Describe the vibe — mood, genre, era, anything…"}
                       rows={1}
                       autoFocus
-                      className="max-h-28 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-star-white placeholder:text-star-white/35 focus:outline-none"
+                      className="max-h-28 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-ink placeholder:text-ink/35 focus:outline-none"
                     />
                     <motion.button
                       whileTap={{ scale: 0.92 }}
@@ -561,8 +561,8 @@ export function AiChat({ releases }: AiChatProps) {
                       aria-label="Send"
                       className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-white transition-opacity disabled:opacity-35"
                       style={{
-                        background: "linear-gradient(120deg, #9b5de5, #ff5fa2 60%, #ffb347)",
-                        boxShadow: "0 4px 14px rgba(155,93,229,0.4)",
+                        background: "var(--grad-transport)",
+                        boxShadow: "0 4px 14px rgba(242,102,44,0.4)",
                       }}
                     >
                       <ArrowUp size={16} />
@@ -608,7 +608,7 @@ function TurnBlock({
   // framer re-evaluate the whole list on each render.
   const rowVariants = useMemo(() => fadeUp(reduce, 10), [reduce]);
   const chips = [
-    ...turn.signals.moods.map((v) => ({ kind: "moods" as const, v, color: "rgba(155,93,229,0.5)" })),
+    ...turn.signals.moods.map((v) => ({ kind: "moods" as const, v, color: "rgba(242,102,44,0.5)" })),
     ...turn.signals.genres.map((v) => ({ kind: "genres" as const, v, color: "rgba(74,163,255,0.5)" })),
     ...turn.signals.decades.map((v) => ({ kind: "decades" as const, v, color: "rgba(255,179,71,0.5)" })),
   ];
@@ -618,7 +618,7 @@ function TurnBlock({
       {/* the user's words */}
       <div className="mb-2.5 flex justify-end">
         <p
-          className="max-w-[85%] rounded-2xl rounded-br-md border border-neon-violet/25 bg-neon-violet/[0.12] px-3.5 py-2 text-[13px] leading-relaxed text-star-white"
+          className="max-w-[85%] rounded-2xl rounded-br-md border border-sony/25 bg-sony/[0.12] px-3.5 py-2 text-[13px] leading-relaxed text-ink"
         >
           {turn.prompt}
         </p>
@@ -632,8 +632,8 @@ function TurnBlock({
               key={`${kind}-${v}`}
               onClick={() => isLast && onDropSignal(kind, v)}
               title={isLast ? `Drop “${v}” and re-curate` : v}
-              className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-star-white/80 transition-colors ${
-                isLast ? "hover:border-white/40 hover:text-star-white" : "opacity-70"
+              className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-ink/80 transition-colors ${
+                isLast ? "hover:border-white/40 hover:text-ink" : "opacity-70"
               }`}
               style={{ borderColor: color, backgroundColor: `${color.slice(0, 7)}1a` }}
             >
@@ -644,7 +644,7 @@ function TurnBlock({
       )}
 
       {turn.results.length === 0 ? (
-        <p className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3 text-[13px] text-star-white/50">
+        <p className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3 text-[13px] text-ink/50">
           Nothing in the catalog matches that yet — try different words, a genre, or an era.
         </p>
       ) : (
@@ -694,14 +694,14 @@ function TurnBlock({
                     />
                     <span
                       className={`absolute inset-0 flex items-center justify-center transition-colors ${
-                        isThis ? "bg-void/45" : "bg-void/20 group-hover/art:bg-void/50"
+                        isThis ? "bg-deck/45" : "bg-deck/20 group-hover/art:bg-deck/50"
                       }`}
                     >
                       <span
                         className={`flex h-9 w-9 items-center justify-center rounded-full backdrop-blur-sm transition-transform group-active/art:scale-90 ${
                           isThis
-                            ? "bg-neon-blue/85 text-void"
-                            : "bg-void/60 text-star-white ring-1 ring-star-white/40"
+                            ? "bg-tps/85 text-deck"
+                            : "bg-deck/60 text-ink ring-1 ring-ink/40"
                         }`}
                       >
                         {isThis && player.loading ? (
@@ -725,7 +725,7 @@ function TurnBlock({
                       WRAP rather than scroll, so none is ever unreachable. */}
                   <div className="min-w-0 flex-1">
                     <p
-                      className={`text-[15px] font-bold leading-tight sm:text-[17px] ${isThis ? "text-neon-blue" : "text-star-white"}`}
+                      className={`text-[15px] font-bold leading-tight sm:text-[17px] ${isThis ? "text-tps" : "text-ink"}`}
                       style={{
                         display: "-webkit-box",
                         WebkitLineClamp: 2,
@@ -735,8 +735,8 @@ function TurnBlock({
                     >
                       {r.title}
                     </p>
-                    <p className="truncate text-[13px] font-medium text-star-white/75">{r.artist}</p>
-                    <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-[0.14em] text-star-white/35">
+                    <p className="truncate text-[13px] font-medium text-ink/75">{r.artist}</p>
+                    <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-[0.14em] text-ink/35">
                       {r.type === "ep" ? "EP" : r.type}
                       {r.release_date ? ` · ${r.release_date.slice(0, 4)}` : ""}
                       {r.genre ? ` · ${r.genre}` : ""}
@@ -774,10 +774,10 @@ function TurnBlock({
             {/* Say which stage produced this order. "Ranked" means the model
                 actually judged these records; "DeepSeek" alone means it only
                 read the request and the keyword scorer did the ordering. */}
-            <p className="text-[10px] font-bold uppercase tracking-widest text-star-white/35">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-ink/35">
               {turn.results.length} match{turn.results.length === 1 ? "" : "es"} ·{" "}
               {turn.reranked ? (
-                <span className="text-neon-green/70">Ranked by DeepSeek</span>
+                <span className="text-lcd/70">Ranked by DeepSeek</span>
               ) : turn.source === "llm" ? (
                 "DeepSeek"
               ) : (
@@ -788,7 +788,7 @@ function TurnBlock({
               {turn.results.length > visible && (
                 <button
                   onClick={() => setVisible((v) => v + 12)}
-                  className="text-[10px] font-bold uppercase tracking-widest text-star-white/50 hover:text-star-white"
+                  className="text-[10px] font-bold uppercase tracking-widest text-ink/50 hover:text-ink"
                 >
                   +{Math.min(12, turn.results.length - visible)} more
                 </button>
@@ -796,14 +796,14 @@ function TurnBlock({
               {visible > 12 && (
                 <button
                   onClick={() => setVisible(12)}
-                  className="text-[10px] font-bold uppercase tracking-widest text-star-white/35 hover:text-star-white"
+                  className="text-[10px] font-bold uppercase tracking-widest text-ink/35 hover:text-ink"
                 >
                   Less
                 </button>
               )}
               <button
                 onClick={() => onCrateAll(turn.results)}
-                className="rounded-full border border-neon-green/40 bg-neon-green/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-neon-green"
+                className="rounded-full border border-lcd/40 bg-lcd/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-lcd"
               >
                 + Crate all
               </button>
@@ -827,7 +827,7 @@ function CrateToggle({ release }: { release: Release }) {
     <button
       onClick={() => window.dispatchEvent(new CustomEvent("pulsar-crate-picker", { detail: release }))}
       aria-label="Add to a crate"
-      className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-star-white/20 text-star-white/70 hover:border-white/50"
+      className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-ink/20 text-ink/70 hover:border-white/50"
     >
       <CrateIcon size={18} filled={inList} className="text-[#c08a4e]" />
     </button>

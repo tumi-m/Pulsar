@@ -148,7 +148,7 @@ function hueOf(seed: string): number {
  *
  * This is not an error state as far as the visitor is concerned — the record is
  * real, playable and crate-able, it just has no cover we could resolve. It used
- * to be drawn at `text-dust/40`, which on the dark grid was close to invisible
+ * to be drawn at `text-chrome-700/40`, which on the dark grid was close to invisible
  * and read as something half-loaded. Now it is a designed sleeve: a tinted
  * gradient, a printed-label ring, and the artist and title actually legible.
  */

@@ -51,25 +51,25 @@ export function CratePicker() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={close}
-            className="fixed inset-0 z-[60] bg-void/70 backdrop-blur-sm"
+            className="fixed inset-0 z-[60] bg-deck/70 backdrop-blur-sm"
           />
           <motion.div
             initial={{ opacity: 0, y: 16, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.97 }}
             transition={{ type: "spring", stiffness: 520, damping: 40 }}
-            className="fixed left-1/2 top-1/2 z-[60] flex max-h-[80dvh] w-[min(90vw,22rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#0d0d16]/95 backdrop-blur-2xl"
+            className="fixed left-1/2 top-1/2 z-[60] flex max-h-[80dvh] w-[min(90vw,22rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#1a2027]/95 backdrop-blur-2xl"
             style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35), 0 24px 70px rgba(0,0,0,0.6)" }}
           >
             <div className="flex items-center justify-between border-b border-white/[0.08] p-4">
               <div className="min-w-0">
-                <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-star-white/40">Add to crate</p>
-                <p className="truncate text-sm font-bold text-star-white">{release.title}</p>
+                <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-ink/40">Add to crate</p>
+                <p className="truncate text-sm font-bold text-ink">{release.title}</p>
               </div>
               <button
                 onClick={close}
                 aria-label="Close"
-                className="relative -m-2 flex h-8 w-8 items-center justify-center text-star-white/50 hover:text-star-white"
+                className="relative -m-2 flex h-8 w-8 items-center justify-center text-ink/50 hover:text-ink"
               >
                 <X size={16} />
               </button>
@@ -96,13 +96,13 @@ export function CratePicker() {
                         on ? "border-[#c08a4e]/50 bg-[#c08a4e]/15" : "border-white/[0.12] bg-white/[0.03]"
                       }`}
                     >
-                      <CrateIcon size={18} filled={on} className={on ? "text-[#c08a4e]" : "text-star-white/50"} />
+                      <CrateIcon size={18} filled={on} className={on ? "text-[#c08a4e]" : "text-ink/50"} />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-bold text-star-white">{c.name}</span>
-                      <span className="block text-[10px] text-star-white/40">{c.releases.length} saved</span>
+                      <span className="block truncate text-[13px] font-bold text-ink">{c.name}</span>
+                      <span className="block text-[10px] text-ink/40">{c.releases.length} saved</span>
                     </span>
-                    <span className={`text-[10px] font-bold uppercase tracking-widest ${on ? "text-[#c08a4e]" : "text-star-white/30"}`}>
+                    <span className={`text-[10px] font-bold uppercase tracking-widest ${on ? "text-[#c08a4e]" : "text-ink/30"}`}>
                       {on ? "Added" : "Add"}
                     </span>
                   </button>
@@ -128,7 +128,7 @@ export function CratePicker() {
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="New crate name…"
-                className="min-w-0 flex-1 rounded-lg border border-white/[0.12] bg-white/[0.04] px-3 py-2 text-sm text-star-white placeholder:text-star-white/35 focus:border-white/30 focus:outline-none"
+                className="min-w-0 flex-1 rounded-lg border border-white/[0.12] bg-white/[0.04] px-3 py-2 text-sm text-ink placeholder:text-ink/35 focus:border-white/30 focus:outline-none"
               />
               <button
                 type="submit"

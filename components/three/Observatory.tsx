@@ -14,9 +14,9 @@ import { AUTHORITY, buildConstellation, sampleWordmark } from "@/lib/three/wordm
  * reveal). Everything honours reduced-motion with snap + crossfade.
  */
 
-const VOID = "#04040a";
-const ION = "#00d4ff";
-const MIST = "#2a2a4a";
+const VOID = "#0b0d10";
+const ION = "#4e86c7";
+const MIST = "#252d36";
 
 /* Wordmark begins after a beat of anticipation (fog still closed). */
 const WORDMARK_T0 = 1.1;

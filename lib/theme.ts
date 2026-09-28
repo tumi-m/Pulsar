@@ -1,8 +1,9 @@
 /**
  * Pulsar — Themes
  *
- * A theme is mostly a background "nebula" gradient + a hero wordmark
- * gradient. Persisted to localStorage and broadcast so the themed
+ * A theme is a full-page background wash + a hero wordmark gradient. Each one
+ * is a real Walkman: the palette in app/globals.css is the machine's, and these
+ * are the finishes it shipped in. Persisted to localStorage and broadcast so the themed
  * background and hero react instantly. The onboarding quiz picks a
  * starting theme from the user's answers.
  */
@@ -17,58 +18,62 @@ export interface Theme {
 
 export const THEMES: Theme[] = [
   {
-    id: "nebula",
-    name: "Nebula",
-    swatch: ["#9b5de5", "#00d4ff", "#ff0080"],
+    // The original, 1979. Blue-and-silver housing, orange transport keys.
+    id: "tps-l2",
+    name: "TPS-L2",
+    swatch: ["#4e86c7", "#c6ccd2", "#f2662c"],
     bg:
-      "radial-gradient(ellipse 70% 55% at 50% -5%, rgba(155,93,229,0.22) 0%, transparent 60%)," +
-      "radial-gradient(ellipse 55% 45% at 82% 78%, rgba(0,212,255,0.16) 0%, transparent 62%)," +
-      "radial-gradient(ellipse 50% 40% at 12% 68%, rgba(255,0,128,0.14) 0%, transparent 62%)," +
-      "#06061a",
-    hero: "linear-gradient(120deg, #e8e8f4 0%, #9b5de5 55%, #00d4ff 100%)",
+      "radial-gradient(ellipse 70% 55% at 50% -5%, rgba(78,134,199,0.20) 0%, transparent 60%)," +
+      "radial-gradient(ellipse 55% 45% at 84% 78%, rgba(242,102,44,0.13) 0%, transparent 62%)," +
+      "radial-gradient(ellipse 52% 42% at 12% 70%, rgba(199,206,213,0.07) 0%, transparent 62%)," +
+      "#0b0d10",
+    hero: "linear-gradient(118deg, #e7ebee 0%, #bac2c9 16%, #4e86c7 52%, #f2662c 100%)",
   },
   {
-    id: "solaris",
-    name: "Solaris",
-    swatch: ["#ffb347", "#ff5fa2", "#ff7b00"],
+    // WM-F5, 1983 — the yellow splashproof one you took running.
+    id: "sports",
+    name: "Sports",
+    swatch: ["#ffce0a", "#f2662c", "#1c1f22"],
     bg:
-      "radial-gradient(ellipse 70% 55% at 50% -5%, rgba(255,123,0,0.22) 0%, transparent 60%)," +
-      "radial-gradient(ellipse 55% 45% at 82% 78%, rgba(255,95,162,0.18) 0%, transparent 62%)," +
-      "radial-gradient(ellipse 50% 45% at 14% 70%, rgba(255,179,71,0.14) 0%, transparent 62%)," +
-      "#140a06",
-    hero: "linear-gradient(120deg, #ffe8c9 0%, #ff9d5c 35%, #ff5fa2 100%)",
+      "radial-gradient(ellipse 70% 55% at 50% -5%, rgba(255,206,10,0.16) 0%, transparent 60%)," +
+      "radial-gradient(ellipse 55% 45% at 82% 80%, rgba(242,102,44,0.16) 0%, transparent 62%)," +
+      "radial-gradient(ellipse 50% 42% at 14% 68%, rgba(255,206,10,0.08) 0%, transparent 62%)," +
+      "#0f0d08",
+    hero: "linear-gradient(118deg, #fff6d0 0%, #ffce0a 38%, #f2662c 100%)",
   },
   {
-    id: "sagan",
-    name: "Sagan",
-    swatch: ["#0a3d62", "#f6b93b", "#60a3bc"],
+    // WM-D6C Professional — black, chrome, and a record button.
+    id: "pro",
+    name: "Professional",
+    swatch: ["#1a2027", "#bac2c9", "#e23b2e"],
     bg:
-      "radial-gradient(ellipse 75% 60% at 50% -8%, rgba(96,163,188,0.20) 0%, transparent 62%)," +
-      "radial-gradient(ellipse 55% 45% at 80% 82%, rgba(246,185,59,0.10) 0%, transparent 62%)," +
-      "radial-gradient(ellipse 60% 50% at 15% 70%, rgba(10,61,98,0.35) 0%, transparent 62%)," +
-      "#03060f",
-    hero: "linear-gradient(120deg, #f6f0e0 0%, #f6b93b 40%, #60a3bc 100%)",
+      "radial-gradient(ellipse 72% 58% at 50% -6%, rgba(186,194,201,0.10) 0%, transparent 62%)," +
+      "radial-gradient(ellipse 55% 45% at 84% 82%, rgba(226,59,46,0.10) 0%, transparent 62%)," +
+      "#08090b",
+    hero: "linear-gradient(118deg, #ffffff 0%, #bac2c9 46%, #e23b2e 100%)",
   },
   {
-    id: "dream",
-    name: "Dream",
-    swatch: ["#f7a8c4", "#b28dff", "#8ce8ff"],
+    // WM-DD9 — champagne and gunmetal, the one built like a watch.
+    id: "dd9",
+    name: "DD9",
+    swatch: ["#c8b487", "#59626b", "#e7ebee"],
     bg:
-      "radial-gradient(ellipse 70% 55% at 50% -5%, rgba(178,141,255,0.20) 0%, transparent 62%)," +
-      "radial-gradient(ellipse 55% 45% at 80% 80%, rgba(247,168,196,0.18) 0%, transparent 62%)," +
-      "radial-gradient(ellipse 55% 45% at 15% 70%, rgba(140,232,255,0.14) 0%, transparent 62%)," +
-      "#0d0a16",
-    hero: "linear-gradient(120deg, #fdeaf3 0%, #f7a8c4 40%, #b28dff 100%)",
-  },
-  {
-    id: "escher",
-    name: "Escher",
-    swatch: ["#d8d8e0", "#8a8a99", "#3a3a44"],
-    bg:
-      "radial-gradient(ellipse 70% 55% at 50% -5%, rgba(216,216,224,0.10) 0%, transparent 60%)," +
-      "radial-gradient(ellipse 55% 45% at 82% 80%, rgba(138,138,153,0.08) 0%, transparent 62%)," +
+      "radial-gradient(ellipse 70% 55% at 50% -5%, rgba(200,180,135,0.14) 0%, transparent 60%)," +
+      "radial-gradient(ellipse 55% 45% at 80% 78%, rgba(89,98,107,0.22) 0%, transparent 62%)," +
       "#0a0a0c",
-    hero: "linear-gradient(120deg, #ffffff 0%, #b8b8c4 50%, #6a6a78 100%)",
+    hero: "linear-gradient(118deg, #f4ecd8 0%, #c8b487 44%, #8b949d 100%)",
+  },
+  {
+    // The tape rather than the deck: TDK-style J-card cream over oxide brown.
+    id: "chrome-tape",
+    name: "Chrome Tape",
+    swatch: ["#efe4cc", "#3a2a20", "#7ed9ae"],
+    bg:
+      "radial-gradient(ellipse 70% 55% at 50% -5%, rgba(239,228,204,0.11) 0%, transparent 60%)," +
+      "radial-gradient(ellipse 55% 48% at 82% 80%, rgba(58,42,32,0.45) 0%, transparent 64%)," +
+      "radial-gradient(ellipse 50% 42% at 14% 70%, rgba(126,217,174,0.08) 0%, transparent 62%)," +
+      "#0c0a09",
+    hero: "linear-gradient(118deg, #efe4cc 0%, #c8b487 40%, #7ed9ae 100%)",
   },
 ];
 

@@ -91,12 +91,12 @@ export default async function HomePage() {
         <ReleaseGrid releases={gridReleases} />
       </section>
 
-      <footer className="border-t border-star-white/[0.06] px-6 py-10 md:px-10">
+      <footer className="border-t border-ink/[0.06] px-6 py-10 md:px-10">
         <div className="mx-auto flex max-w-screen-2xl flex-col items-center justify-between gap-3 md:flex-row">
-          <span className="font-mono text-[10px] tracking-[0.22em] text-star-white/35">
+          <span className="font-mono text-[10px] tracking-[0.22em] text-ink/35">
             PULSAR — DAILY MUSIC DISCOVERY
           </span>
-          <span className="font-mono text-[10px] tracking-[0.22em] text-star-white/40">
+          <span className="font-mono text-[10px] tracking-[0.22em] text-ink/40">
             UPDATED DAILY · {new Date().getFullYear()}
           </span>
         </div>

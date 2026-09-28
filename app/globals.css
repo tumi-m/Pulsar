@@ -6,6 +6,77 @@
   /* Typefaces are provided by next/font in app/layout.tsx
      (--font-display/body/mono). Fallbacks live in tailwind.config.ts. */
 
+  /* ── Palette: the Walkman ──────────────────────────────────
+     Pulsar used to be one violet accent over near-black, which read as
+     monotone: every surface, state and control borrowed the same hue, so
+     nothing could be distinguished by colour alone.
+
+     The palette now comes from the object the product is actually about —
+     the personal cassette player — and every value below is sampled from
+     real hardware rather than invented, which is what keeps the set
+     coherent instead of merely colourful. It also gives the interface the
+     one thing a single hue cannot: distinct meanings. Orange is the thing
+     you press. Yellow is new. Blue is information. Red is a peak or a
+     loss. Green is running. Cream is paper. Chrome is structure.
+
+     Tailwind tokens in tailwind.config.ts read these, so changing a value
+     here changes it everywhere. */
+
+  /* Graphite housing — the body of the machine, and of the page. */
+  --deck-900: #0b0d10;
+  --deck-800: #12161a;
+  --deck-700: #1a2027;
+  --deck-600: #252d36; /* a raised panel, or the well a button sits in */
+
+  /* Brushed aluminium. Structure: bezels, hairlines, rules, quiet text. */
+  --chrome-100: #e7ebee;
+  --chrome-300: #bac2c9;
+  --chrome-500: #8b949d;
+  --chrome-700: #59626b;
+
+  /* TPS-L2 (1979): blue housing, silver trim, orange transport buttons. */
+  --sony-orange: #f2662c; /* the button you press — primary action */
+  --tps-blue: #4e86c7; /* the housing — secondary, links, information */
+
+  /* WM-F5 Sports (1983): the yellow one. Highlight, fresh, energy. */
+  --sport-yellow: #ffce0a;
+
+  /* The meter and the record button. */
+  --vu-red: #e23b2e;
+
+  /* The LCD readout on the later decks. Playing, connected, succeeded. */
+  --lcd-green: #7ed9ae;
+
+  /* Consumables: J-card paper stock, and the tape seen through the window. */
+  --label-cream: #efe4cc;
+  --tape-brown: #3a2a20;
+
+  /* ── Signature gradients ───────────────────────────────────
+     Both of these were copy-pasted as literals at ten call sites, so the
+     brand could never be changed in one place. They are the two surfaces
+     of the machine.
+
+     The faceplate is a TPS-L2 read left to right: polished bezel, brushed
+     aluminium, the yellow of the Sports model, the orange of the transport
+     buttons, and the blue of the housing.
+
+     The transport is the button itself — the warm orange-to-amber of the
+     play key under a light. */
+  --grad-faceplate: linear-gradient(
+    118deg,
+    #e7ebee 0%,
+    #bac2c9 16%,
+    #ffce0a 44%,
+    #f2662c 70%,
+    #4e86c7 100%
+  );
+  --grad-transport: linear-gradient(118deg, #f2662c 0%, #ff8c39 46%, #ffce0a 100%);
+
+  /* Type on a dark deck. */
+  --ink-100: #edf1f4;
+  --ink-400: #98a2ab;
+  --ink-600: #626b74;
+
   /* ── Design tokens: one radius / hairline / layering scale ──
      Components previously hard-coded rounded-lg/xl/2xl and z-[57]-style
      magic numbers. These are the canonical values; match new UI to them. */
@@ -31,7 +102,7 @@
 /* ─── Focus visibility ─────────────────────────── */
 /* Keyboard users get a clear ring; pointer users don't (focus-visible). */
 :focus-visible {
-  outline: 2px solid rgba(155, 93, 229, 0.85);
+  outline: 2px solid rgba(242, 102, 44, 0.85);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
@@ -77,8 +148,8 @@ html {
 }
 
 body {
-  background-color: #04040a;
-  color: #e8e8f4;
+  background-color: #0b0d10;
+  color: #edf1f4;
   font-family: var(--font-body);
   min-height: 100vh;
   overflow-x: hidden;
@@ -121,8 +192,8 @@ body {
 
 /* ─── Selection ─────────────────────────────── */
 ::selection {
-  background: rgba(155, 93, 229, 0.3);
-  color: #e8e8f4;
+  background: rgba(242, 102, 44, 0.3);
+  color: #edf1f4;
 }
 
 /* ─── Text clamping ──────────────────────────── */
@@ -174,16 +245,16 @@ body {
 
 /* ─── Text gradient utility ─────────────────── */
 .text-gradient-cosmic {
-  background: linear-gradient(135deg, #e8e8f4 0%, #9b5de5 50%, #00d4ff 100%);
+  background: linear-gradient(135deg, #edf1f4 0%, #f2662c 50%, #4e86c7 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 /* ─── Glow utilities ─────────────────────────── */
-.glow-blue  { text-shadow: 0 0 20px rgba(0, 212, 255, 0.8); }
-.glow-pink  { text-shadow: 0 0 20px rgba(255, 0, 128, 0.8); }
-.glow-violet { text-shadow: 0 0 20px rgba(155, 93, 229, 0.8); }
+.glow-blue  { text-shadow: 0 0 20px rgba(78, 134, 199, 0.8); }
+.glow-pink  { text-shadow: 0 0 20px rgba(226, 59, 46, 0.8); }
+.glow-violet { text-shadow: 0 0 20px rgba(242, 102, 44, 0.8); }
 
 /* ─── Floating tiles (featured) ─────────────── */
 @keyframes tileFloat {
@@ -198,7 +269,12 @@ body {
   }
 }
 
-/* ─── Rainbow search outline (animated) ─────── */
+/* ─── Search field: light travelling across a metal face ─────
+   This was a six-stop rainbow, which belonged to no palette at all and read
+   as a novelty next to everything around it. It is now the same motion —
+   a band panning left to right — but the band is a highlight crossing
+   brushed aluminium, catching the yellow and orange of the keys on its way.
+   The class name is kept: it is referenced from the search markup. */
 @keyframes rainbowPan {
   0%   { background-position: 0% 50%; }
   100% { background-position: 300% 50%; }
@@ -206,7 +282,7 @@ body {
 .search-rainbow {
   background-image: linear-gradient(
     90deg,
-    #ff5fa2, #ffb347, #9b5de5, #00d4ff, #45f0a0, #ff5fa2
+    #8b949d, #e7ebee, #ffce0a, #f2662c, #4e86c7, #8b949d
   );
   background-size: 300% 100%;
   animation: rainbowPan 8s linear infinite;
@@ -282,7 +358,7 @@ body {
     100deg,
     transparent 20%,
     rgba(255, 255, 255, 0.06) 45%,
-    rgba(155, 93, 229, 0.10) 55%,
+    rgba(242, 102, 44, 0.10) 55%,
     transparent 80%
   );
   animation: artSheen 1.8s ease-in-out infinite;

@@ -20,10 +20,10 @@ interface Bubble {
 }
 
 const TINTS = [
-  "rgba(155,93,229,0.16)", // violet
-  "rgba(0,212,255,0.14)", // blue
+  "rgba(242,102,44,0.16)", // violet
+  "rgba(78,134,199,0.14)", // blue
   "rgba(255,95,162,0.12)", // pink
-  "rgba(232,232,244,0.10)", // starlight
+  "rgba(237,241,244,0.10)", // starlight
 ];
 
 function build(count: number): Bubble[] {

@@ -165,23 +165,23 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
             <div className="relative flex items-center gap-3 border-b border-white/10 px-4 py-3">
               <span
                 className="pointer-events-none absolute inset-0 opacity-60"
-                style={{ background: "radial-gradient(80% 100% at 0% 0%, rgba(155,93,229,0.28), transparent 60%)" }}
+                style={{ background: "radial-gradient(80% 100% at 0% 0%, rgba(242,102,44,0.28), transparent 60%)" }}
               />
-              <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-neon-violet/20 text-neon-violet">
+              <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-sony/20 text-sony">
                 <AudioLines size={17} />
               </span>
               <div className="relative min-w-0 flex-1">
-                <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-neon-violet/80">
+                <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-sony/80">
                   Samples mode
                 </p>
-                <h3 className="truncate text-base font-bold uppercase tracking-tight text-star-white">
+                <h3 className="truncate text-base font-bold uppercase tracking-tight text-ink">
                   What&rsquo;s the sample?
                 </h3>
               </div>
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close"
-                className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-star-white/50 hover:bg-white/10 hover:text-star-white"
+                className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-ink/50 hover:bg-white/10 hover:text-ink"
               >
                 <X size={18} />
               </button>
@@ -190,7 +190,7 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
             <div className="flex-1 overflow-y-auto overscroll-contain p-4">
               {/* search */}
               <div className="flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.05] px-3 py-2.5">
-                <Search size={15} className="flex-shrink-0 text-star-white/45" />
+                <Search size={15} className="flex-shrink-0 text-ink/45" />
                 <input
                   value={query}
                   onChange={(e) => {
@@ -199,9 +199,9 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
                   }}
                   placeholder="Search a song or artist…"
                   aria-label="Search a song or artist"
-                  className="min-w-0 flex-1 bg-transparent text-sm text-star-white placeholder:text-star-white/35 focus:outline-none"
+                  className="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-ink/35 focus:outline-none"
                 />
-                {busy && <Loader2 size={15} className="animate-spin text-neon-violet" />}
+                {busy && <Loader2 size={15} className="animate-spin text-sony" />}
               </div>
 
               {/* Catalogue + graph suggestions, each labelled with what it will
@@ -217,28 +217,28 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
                       }
                       className={`flex min-h-[52px] w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition-colors ${
                         connections > 0
-                          ? "border-neon-violet/30 bg-neon-violet/[0.06] hover:bg-neon-violet/[0.12]"
+                          ? "border-sony/30 bg-sony/[0.06] hover:bg-sony/[0.12]"
                           : "border-white/10 hover:bg-white/[0.06]"
                       }`}
                     >
                       <span className="min-w-0 flex-1">
                         <span
                           className={`block truncate text-[13px] font-bold ${
-                            connections > 0 ? "text-star-white" : "text-star-white/60"
+                            connections > 0 ? "text-ink" : "text-ink/60"
                           }`}
                         >
                           {r.title}
                         </span>
-                        <span className="block truncate text-[11px] text-star-white/50">{r.artist}</span>
+                        <span className="block truncate text-[11px] text-ink/50">{r.artist}</span>
                       </span>
                       {busyFor(r.artist, r.title) ? (
-                        <Loader2 size={14} className="flex-shrink-0 animate-spin text-neon-violet" />
+                        <Loader2 size={14} className="flex-shrink-0 animate-spin text-sony" />
                       ) : connections > 0 ? (
-                        <span className="flex-shrink-0 rounded-full bg-neon-violet/20 px-2 py-1 text-[10px] font-bold text-neon-violet">
+                        <span className="flex-shrink-0 rounded-full bg-sony/20 px-2 py-1 text-[10px] font-bold text-sony">
                           {connections} sample{connections === 1 ? "" : "s"}
                         </span>
                       ) : (
-                        <span className="flex-shrink-0 text-[10px] uppercase tracking-wide text-star-white/25">
+                        <span className="flex-shrink-0 text-[10px] uppercase tracking-wide text-ink/25">
                           none yet
                         </span>
                       )}
@@ -250,16 +250,16 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
               {/* Every match came back empty — say so up front instead of
                   letting someone tap eight rows to find that out. */}
               {allSuggestionsEmpty && !notFound && (
-                <p className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center text-[11px] leading-relaxed text-star-white/45">
+                <p className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center text-[11px] leading-relaxed text-ink/45">
                   None of those have documented samples yet. The connections below are
                   the ones worth digging into.
                 </p>
               )}
 
               {noSuggestions && !notFound && !busy && (
-                <p className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center text-[11.5px] leading-relaxed text-star-white/50">
+                <p className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center text-[11.5px] leading-relaxed text-ink/50">
                   Nothing in the catalogue matches{" "}
-                  <span className="font-semibold text-star-white/75">
+                  <span className="font-semibold text-ink/75">
                     &ldquo;{query.trim()}&rdquo;
                   </span>
                   . Try the artist&rsquo;s name on its own, or{" "}
@@ -267,7 +267,7 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
                     href={`https://www.whosampled.com/search/?q=${encodeURIComponent(query.trim())}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-neon-violet hover:underline"
+                    className="inline-flex items-center gap-1 text-sony hover:underline"
                   >
                     look it up on WhoSampled <ExternalLink size={10} />
                   </a>
@@ -275,7 +275,7 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
               )}
 
               {notFound && (
-                <p className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-center text-[12px] leading-relaxed text-star-white/50">
+                <p className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-center text-[12px] leading-relaxed text-ink/50">
                   No documented samples for that track yet — the data is a hand-checked catalog
                   plus community-maintained MusicBrainz, so well-known records resolve and deep
                   cuts often don&rsquo;t.{" "}
@@ -283,7 +283,7 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
                     href={`https://www.whosampled.com/search/?q=${encodeURIComponent(query)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-neon-violet hover:underline"
+                    className="inline-flex items-center gap-1 text-sony hover:underline"
                   >
                     Try WhoSampled <ExternalLink size={10} />
                   </a>
@@ -292,32 +292,32 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
 
               {/* ── browse: the records everyone keeps lifting from ── */}
               <section className="mt-6">
-                <p className="mb-2 flex items-center gap-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-star-white/40">
-                  <Trophy size={11} className="text-neon-violet/70" /> Most sampled sources
+                <p className="mb-2 flex items-center gap-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-ink/40">
+                  <Trophy size={11} className="text-sony/70" /> Most sampled sources
                 </p>
                 <div className="space-y-1">
                   {leaders.map((row, i) => (
                     <button
                       key={`${row.artist}-${row.title}`}
                       onClick={() => lookup(row.artist, row.title)}
-                      className="flex min-h-[52px] w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-left transition-colors hover:border-neon-violet/40 hover:bg-neon-violet/[0.08]"
+                      className="flex min-h-[52px] w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-left transition-colors hover:border-sony/40 hover:bg-sony/[0.08]"
                     >
-                      <span className="w-5 flex-shrink-0 text-center font-mono text-[13px] font-bold text-neon-violet/80">
+                      <span className="w-5 flex-shrink-0 text-center font-mono text-[13px] font-bold text-sony/80">
                         {i + 1}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13px] font-bold text-star-white">
+                        <span className="block truncate text-[13px] font-bold text-ink">
                           {row.title}
                         </span>
-                        <span className="block truncate text-[11px] text-star-white/50">
+                        <span className="block truncate text-[11px] text-ink/50">
                           {row.artist}
                           {row.year ? ` · ${row.year}` : ""}
                         </span>
                       </span>
                       {busyFor(row.artist, row.title) ? (
-                        <Loader2 size={14} className="flex-shrink-0 animate-spin text-neon-violet" />
+                        <Loader2 size={14} className="flex-shrink-0 animate-spin text-sony" />
                       ) : (
-                        <span className="flex-shrink-0 rounded-full bg-neon-violet/15 px-2 py-1 text-[10px] font-bold text-neon-violet">
+                        <span className="flex-shrink-0 rounded-full bg-sony/15 px-2 py-1 text-[10px] font-bold text-sony">
                           {row.count}×
                         </span>
                       )}
@@ -328,18 +328,18 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
 
               {/* ── browse: songs built out of the most sources ── */}
               <section className="mt-6">
-                <p className="mb-2 flex items-center gap-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-star-white/40">
-                  <Sparkles size={11} className="text-neon-blue/70" /> Deep diggers
+                <p className="mb-2 flex items-center gap-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-ink/40">
+                  <Sparkles size={11} className="text-tps/70" /> Deep diggers
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {picks.map((p) => (
                     <button
                       key={`${p.artist}-${p.title}`}
                       onClick={() => lookup(p.artist, p.title)}
-                      className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-star-white/70 transition-colors hover:border-neon-blue/40 hover:text-star-white"
+                      className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-ink/70 transition-colors hover:border-tps/40 hover:text-ink"
                     >
                       {p.artist} — {p.title}
-                      <span className="ml-1.5 text-neon-blue/80">{p.sources}</span>
+                      <span className="ml-1.5 text-tps/80">{p.sources}</span>
                     </button>
                   ))}
                 </div>
@@ -347,13 +347,13 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
 
               {/* timestamps the listener has marked */}
               <section className="mt-6">
-                <p className="mb-2 flex items-center gap-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-star-white/40">
+                <p className="mb-2 flex items-center gap-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.24em] text-ink/40">
                   <Clock size={11} /> Your marked timings
                 </p>
                 {marked.length === 0 ? (
-                  <p className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-[11px] leading-relaxed text-star-white/40">
+                  <p className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-[11px] leading-relaxed text-ink/40">
                     Nothing marked yet. Open any breakdown, play a track and hit{" "}
-                    <span className="text-star-white/70">Mark this moment</span> — no open
+                    <span className="text-ink/70">Mark this moment</span> — no open
                     database publishes sample timings, so this is how they get captured.
                   </p>
                 ) : (
@@ -363,11 +363,11 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
                         key={i}
                         className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5"
                       >
-                        <p className="truncate text-[12px] font-bold text-star-white">{m.subject}</p>
-                        <p className="truncate text-[11px] text-star-white/50">
+                        <p className="truncate text-[12px] font-bold text-ink">{m.subject}</p>
+                        <p className="truncate text-[11px] text-ink/50">
                           samples {m.sample}
                         </p>
-                        <p className="mt-1 font-mono text-[10px] text-neon-violet">{m.mark}</p>
+                        <p className="mt-1 font-mono text-[10px] text-sony">{m.mark}</p>
                       </div>
                     ))}
                   </div>
@@ -376,7 +376,7 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
 
               <a
                 href="/samples"
-                className="mt-6 flex items-center justify-center gap-1.5 rounded-xl border border-white/10 py-3 text-[11px] font-bold uppercase tracking-widest text-star-white/50 hover:border-white/25 hover:text-star-white"
+                className="mt-6 flex items-center justify-center gap-1.5 rounded-xl border border-white/10 py-3 text-[11px] font-bold uppercase tracking-widest text-ink/50 hover:border-white/25 hover:text-ink"
               >
                 Full sample DNA page <ArrowRight size={12} />
               </a>

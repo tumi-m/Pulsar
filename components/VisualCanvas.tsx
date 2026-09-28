@@ -138,7 +138,7 @@ export function VisualCanvas({
             />
           ) : (
             <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-center">
-              <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-star-white/45">
+              <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-ink/45">
                 {videoState === "none"
                   ? videoKind === "live"
                     ? "No live performance found"
@@ -148,7 +148,7 @@ export function VisualCanvas({
                     : "Finding music video…"}
               </p>
               {videoState === "loading" && (
-                <span className="h-1.5 w-1.5 animate-ping rounded-full bg-neon-violet" />
+                <span className="h-1.5 w-1.5 animate-ping rounded-full bg-sony" />
               )}
             </div>
           )}
@@ -166,7 +166,7 @@ export function VisualCanvas({
                   key={k}
                   onClick={() => setVideoKind(k)}
                   className={`rounded-full px-3 py-1 text-[9px] font-bold uppercase tracking-[0.16em] transition-colors ${
-                    videoKind === k ? "bg-white text-void" : "text-star-white/60 hover:text-star-white"
+                    videoKind === k ? "bg-white text-deck" : "text-ink/60 hover:text-ink"
                   }`}
                 >
                   {k === "video" ? "Official" : "Live"}

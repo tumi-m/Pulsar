@@ -563,7 +563,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
             <button
               onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
               aria-label="Open menu"
-              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-white/20 text-star-white/90 transition-transform hover:scale-105 active:scale-95"
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-white/20 text-ink/90 transition-transform hover:scale-105 active:scale-95"
               style={{ background: "rgba(255,255,255,0.1)" }}
             >
               <span className="flex flex-col gap-[3px]">
@@ -588,7 +588,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                   boxShadow: "inset 0 1px 0 rgba(255,255,255,0.45)",
                 }}
               >
-                <svg viewBox="0 0 20 20" className="h-4 w-4 flex-shrink-0 text-star-white/70" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg viewBox="0 0 20 20" className="h-4 w-4 flex-shrink-0 text-ink/70" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="9" cy="9" r="6" />
                   <path d="M14 14l4 4" strokeLinecap="round" />
                 </svg>
@@ -605,13 +605,13 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                     resetPage();
                   }}
                   placeholder="Search artists, albums…"
-                  className="w-full bg-transparent text-sm font-medium text-white placeholder:text-star-white/55 focus:outline-none"
+                  className="w-full bg-transparent text-sm font-medium text-white placeholder:text-ink/55 focus:outline-none"
                 />
                 {query && (
                   <button
                     onClick={() => setQuery("")}
                     aria-label="Clear search"
-                    className="flex-shrink-0 text-star-white/40 hover:text-star-white"
+                    className="flex-shrink-0 text-ink/40 hover:text-ink"
                   >
                     ✕
                   </button>
@@ -624,8 +624,8 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               aria-expanded={showGenres}
               className={`flex min-h-9 flex-shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-[0.1em] transition-colors sm:min-h-0 sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.16em] ${
                 activeGenre
-                  ? "border-[#4aa3ff]/60 bg-[#4aa3ff]/15 text-[#a9d5ff]" // filter active → reminder
-                  : "border-star-white/15 text-star-white/60 hover:border-star-white/40 hover:text-star-white"
+                  ? "border-[#4e86c7]/60 bg-[#4e86c7]/15 text-[#bcd4f0]" // filter active → reminder
+                  : "border-ink/15 text-ink/60 hover:border-ink/40 hover:text-ink"
               }`}
             >
               {activeGenre ?? "Genre"}
@@ -636,14 +636,14 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
               aria-expanded={showRefine}
               className={`flex min-h-9 flex-shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-[0.1em] transition-colors sm:min-h-0 sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.2em] ${
                 refineActive
-                  ? "border-[#4aa3ff]/60 bg-[#4aa3ff]/15 text-[#a9d5ff]" // filter active → reminder
+                  ? "border-[#4e86c7]/60 bg-[#4e86c7]/15 text-[#bcd4f0]" // filter active → reminder
                   : showRefine
-                    ? "border-star-white/40 bg-star-white/[0.06] text-star-white"
-                    : "border-star-white/15 text-star-white/50 hover:border-star-white/40 hover:text-star-white"
+                    ? "border-ink/40 bg-ink/[0.06] text-ink"
+                    : "border-ink/15 text-ink/50 hover:border-ink/40 hover:text-ink"
               }`}
             >
               Refine
-              {refineActive && <span className="h-1 w-1 rounded-full bg-[#4aa3ff]" />}
+              {refineActive && <span className="h-1 w-1 rounded-full bg-[#4e86c7]" />}
               <span className={`transition-transform ${showRefine ? "rotate-180" : ""}`}>⌄</span>
             </button>
           </div>
@@ -726,13 +726,13 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                                   layoutId="view-active"
                                   className="absolute inset-0 rounded-md"
                                   style={{
-                                    background: "linear-gradient(160deg, #8cc6ff, #3f9bff)",
+                                    background: "linear-gradient(160deg, #9dc0e8, #3f9bff)",
                                     boxShadow: "0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.5)",
                                   }}
                                   transition={{ type: "spring", stiffness: 400, damping: 32 }}
                                 />
                               )}
-                              <span className={`relative ${isActive ? "text-void" : "text-[#a9d5ff]"}`}>
+                              <span className={`relative ${isActive ? "text-deck" : "text-[#bcd4f0]"}`}>
                                 {v === "latest" ? "Latest" : v === "streamed" ? "Most Streamed" : "For You"}
                               </span>
                             </button>
@@ -740,7 +740,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                         }
                       )}
                     </div>
-                    <span className="hidden h-4 w-px bg-star-white/15 sm:block" />
+                    <span className="hidden h-4 w-px bg-ink/15 sm:block" />
                     <FormatPicker
                       active={format}
                       onChange={(f) => {
@@ -756,7 +756,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                         setView("latest");
                         setShowQuiz(true);
                       }}
-                      className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#8cc6ff]/80 transition-colors hover:text-[#a9d5ff]"
+                      className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9dc0e8]/80 transition-colors hover:text-[#bcd4f0]"
                     >
                       {profile ? "Retake quiz →" : "Take quiz →"}
                     </button>
@@ -765,7 +765,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                   {/* labels */}
                   {labels.length > 0 && (
                     <div className="scrollbar-none flex items-center gap-1.5 overflow-x-auto">
-                      <span className="flex-shrink-0 pr-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#8cc6ff]/70">
+                      <span className="flex-shrink-0 pr-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#9dc0e8]/70">
                         Label
                       </span>
                       <button
@@ -775,8 +775,8 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                         }}
                         className={`flex-shrink-0 rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
                           activeLabel === null
-                            ? "bg-[#4aa3ff] text-void shadow-[0_1px_3px_rgba(0,0,0,0.5)]"
-                            : "bg-white/[0.06] text-[#a9d5ff] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-white/[0.1] hover:text-white"
+                            ? "bg-[#4e86c7] text-deck shadow-[0_1px_3px_rgba(0,0,0,0.5)]"
+                            : "bg-white/[0.06] text-[#bcd4f0] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-white/[0.1] hover:text-white"
                         }`}
                       >
                         All
@@ -790,8 +790,8 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                           }}
                           className={`flex-shrink-0 whitespace-nowrap rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
                             activeLabel === l
-                              ? "bg-[#4aa3ff] text-void shadow-[0_1px_3px_rgba(0,0,0,0.5)]"
-                              : "bg-white/[0.06] text-[#a9d5ff] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-white/[0.1] hover:text-white"
+                              ? "bg-[#4e86c7] text-deck shadow-[0_1px_3px_rgba(0,0,0,0.5)]"
+                              : "bg-white/[0.06] text-[#bcd4f0] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-white/[0.1] hover:text-white"
                           }`}
                         >
                           {l}
@@ -830,17 +830,17 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
              neither the cause nor a way out, so the only obvious move was to
              reload. Say which it is, and offer the undo. */
           <div className="flex flex-col items-center justify-center gap-3 px-6 py-24 text-center">
-            <p className="font-mono text-sm tracking-widest text-star-white/45">
+            <p className="font-mono text-sm tracking-widest text-ink/45">
               {query.trim() ? "NO MATCHES" : "NOTHING HERE YET"}
             </p>
             {query.trim() ? (
-              <p className="max-w-xs text-sm leading-relaxed text-star-white/50">
+              <p className="max-w-xs text-sm leading-relaxed text-ink/50">
                 Nothing matched{" "}
-                <span className="font-semibold text-star-white/80">“{query.trim()}”</span>
+                <span className="font-semibold text-ink/80">“{query.trim()}”</span>
                 {activeGenre || refineActive ? " with your filters applied." : "."}
               </p>
             ) : activeGenre || refineActive ? (
-              <p className="max-w-xs text-sm leading-relaxed text-star-white/50">
+              <p className="max-w-xs text-sm leading-relaxed text-ink/50">
                 No releases match these filters.
               </p>
             ) : null}
@@ -854,7 +854,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                   setFormat("vinyl");
                   resetPage();
                 }}
-                className="min-h-9 rounded-full border border-star-white/25 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-star-white/80 transition-colors hover:border-star-white/60 hover:text-star-white"
+                className="min-h-9 rounded-full border border-ink/25 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-ink/80 transition-colors hover:border-ink/60 hover:text-ink"
               >
                 Clear search &amp; filters
               </button>
@@ -876,10 +876,10 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                       WebkitBackdropFilter: "blur(14px) saturate(160%)",
                     }}
                   >
-                    <span className="text-[13px] font-bold tracking-tight text-star-white">
+                    <span className="text-[13px] font-bold tracking-tight text-ink">
                       {section.label}
                     </span>
-                    <span className="text-[10px] font-mono text-star-white/40">
+                    <span className="text-[10px] font-mono text-ink/40">
                       {section.items.length}
                     </span>
                   </motion.h2>
@@ -961,16 +961,16 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                   style={{ gridTemplateColumns: `repeat(${colHud}, 1fr)` }}
                 >
                   {Array.from({ length: colHud * 2 }).map((_, k) => (
-                    <span key={k} className="h-2.5 w-2.5 rounded-[3px] bg-star-white/85" />
+                    <span key={k} className="h-2.5 w-2.5 rounded-[3px] bg-ink/85" />
                   ))}
                 </div>
-                <span className="text-[11px] font-bold uppercase tracking-[0.24em] text-star-white/70">
+                <span className="text-[11px] font-bold uppercase tracking-[0.24em] text-ink/70">
                   {colHud} across
                 </span>
                 {/* mirror the Photos library: tell the user the grid is now
                     grouped, and by what */}
                 {grouping !== "none" && (
-                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-neon-blue/80">
+                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-tps/80">
                     Grouped by {grouping}
                   </span>
                 )}
@@ -982,8 +982,8 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
         {/* infinite-scroll sentinel + subtle loader */}
         {hasMore && (
           <div ref={sentinelRef} className="flex justify-center py-14">
-            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.25em] text-star-white/30">
-              <span className="h-1.5 w-1.5 animate-ping rounded-full bg-neon-violet" />
+            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.25em] text-ink/30">
+              <span className="h-1.5 w-1.5 animate-ping rounded-full bg-sony" />
               Loading more
             </div>
           </div>
