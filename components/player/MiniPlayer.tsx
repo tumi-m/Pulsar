@@ -49,14 +49,27 @@ export function MiniPlayer({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}
           transition={{ type: "spring", stiffness: 520, damping: 40 }}
-          className={`relative overflow-hidden rounded-2xl border border-white/[0.1] bg-white/[0.04] ${className}`}
+          className={`relative overflow-hidden rounded-2xl border border-chrome-700/50 ${className}`}
+          // The same brushed faceplate as the main transport, so the two read
+          // as one machine rather than a player and a lookalike.
+          style={{
+            background:
+              "repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 3px)," +
+              "linear-gradient(180deg, rgba(38,46,55,0.9), rgba(22,27,33,0.92))",
+            boxShadow: "inset 0 1px 0 rgba(231,235,238,0.14)",
+          }}
         >
           {/* progress — the whole strip's top edge, tappable to scrub */}
           <div
             ref={barRef}
-            onPointerDown={(e) => scrub(e.clientX)}
+            // Capture the pointer, or the drag dies the moment a finger drifts
+            // off a 16px-tall strip — which on a phone is almost immediately.
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId);
+              scrub(e.clientX);
+            }}
             onPointerMove={(e) => {
-              if (e.buttons === 1) scrub(e.clientX);
+              if (e.currentTarget.hasPointerCapture(e.pointerId)) scrub(e.clientX);
             }}
             role="slider"
             aria-label="Seek within preview"
@@ -70,9 +83,9 @@ export function MiniPlayer({
             }}
             className="group absolute inset-x-0 top-0 z-10 h-4 cursor-pointer touch-none"
           >
-            <div className="absolute inset-x-0 top-0 h-[3px] bg-white/[0.08]">
+            <div className="absolute inset-x-0 top-0 h-[3px] bg-deck shadow-[inset_0_1px_1px_rgba(0,0,0,0.8)]">
               <div
-                className="h-full bg-tps transition-[width] duration-150"
+                className="h-full bg-transport transition-[width] duration-150"
                 style={{ width: `${Math.max(0, Math.min(1, progress)) * 100}%` }}
               />
             </div>
@@ -104,9 +117,14 @@ export function MiniPlayer({
                   No preview available
                 </p>
               ) : (
-                <p className="mt-0.5 font-mono text-[10px] tabular-nums text-ink/40">
-                  {time(elapsed)} / {duration ? time(duration) : "0:30"}
-                  <span className="ml-1.5 text-ink/25">preview</span>
+                // LCD green, like the main bar's readout. The length used to
+                // fall back to a hard-coded "0:30" — a guess shown as a fact.
+                <p
+                  className="mt-0.5 font-mono text-[10px] tabular-nums text-lcd/80"
+                  style={{ textShadow: "0 0 5px rgba(126,217,174,0.4)" }}
+                >
+                  {duration ? time(elapsed) : "-:--"} / {duration ? time(duration) : "-:--"}
+                  <span className="ml-1.5 text-lcd/40">preview</span>
                 </p>
               )}
             </div>
@@ -115,7 +133,7 @@ export function MiniPlayer({
               onClick={toggle}
               disabled={!hasAudio && !loading}
               aria-label={playing ? `Pause ${current.title}` : `Play ${current.title}`}
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-tps/90 text-deck transition-transform active:scale-90 disabled:opacity-35"
+              className="flex h-10 w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-[#b84516] bg-transport text-deck shadow-key transition-[box-shadow,transform] active:translate-y-px active:shadow-keyed disabled:border-chrome-700/60 disabled:bg-deck-600 disabled:bg-none disabled:text-ink-600"
             >
               {loading ? (
                 <Loader2 size={17} className="animate-spin" />
@@ -130,7 +148,7 @@ export function MiniPlayer({
               <button
                 onClick={onExpand}
                 aria-label="Open visualiser"
-                className="hidden h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-white/15 text-ink/60 transition-colors hover:border-white/40 hover:text-ink sm:flex"
+                className="hidden h-10 w-10 flex-shrink-0 items-center justify-center rounded-[10px] border border-chrome-700/70 bg-deck-600 text-ink-400 shadow-key transition-[box-shadow,transform,color] hover:text-ink active:translate-y-px active:shadow-keyed sm:flex"
               >
                 <Maximize2 size={15} />
               </button>
@@ -139,7 +157,7 @@ export function MiniPlayer({
             <button
               onClick={stop}
               aria-label="Stop preview"
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-ink/35 transition-colors hover:bg-white/10 hover:text-ink"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[10px] text-ink-600 transition-colors hover:bg-deck-600 hover:text-ink"
             >
               <X size={16} />
             </button>

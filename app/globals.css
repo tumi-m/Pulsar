@@ -22,34 +22,57 @@
      Tailwind tokens in tailwind.config.ts read these, so changing a value
      here changes it everywhere. */
 
+  /* Every colour is declared twice: as hex, for inline styles, gradients and
+     canvas; and as bare RGB channels (the -rgb twin), which is the only form
+     Tailwind 3 can apply an opacity modifier to. A token defined as a plain
+     `var(--x)` makes `text-ink/60` emit NO CSS at all — it was 517 class
+     usages, silently dead: dimmed text at full strength, tints gone, borders
+     falling back to preflight's light grey. tailwind.config.ts reads the -rgb
+     form; test/palette-tokens.test.ts keeps it that way. */
+
   /* Graphite housing — the body of the machine, and of the page. */
   --deck-900: #0b0d10;
+  --deck-900-rgb: 11 13 16;
   --deck-800: #12161a;
+  --deck-800-rgb: 18 22 26;
   --deck-700: #1a2027;
+  --deck-700-rgb: 26 32 39;
   --deck-600: #252d36; /* a raised panel, or the well a button sits in */
+  --deck-600-rgb: 37 45 54;
 
   /* Brushed aluminium. Structure: bezels, hairlines, rules, quiet text. */
   --chrome-100: #e7ebee;
+  --chrome-100-rgb: 231 235 238;
   --chrome-300: #bac2c9;
+  --chrome-300-rgb: 186 194 201;
   --chrome-500: #8b949d;
+  --chrome-500-rgb: 139 148 157;
   --chrome-700: #59626b;
+  --chrome-700-rgb: 89 98 107;
 
   /* TPS-L2 (1979): blue housing, silver trim, orange transport buttons. */
   --sony-orange: #f2662c; /* the button you press — primary action */
+  --sony-orange-rgb: 242 102 44;
   --tps-blue: #4e86c7; /* the housing — secondary, links, information */
+  --tps-blue-rgb: 78 134 199;
 
   /* WM-F5 Sports (1983): the yellow one. Highlight, fresh, energy. */
   --sport-yellow: #ffce0a;
+  --sport-yellow-rgb: 255 206 10;
 
   /* The meter and the record button. */
   --vu-red: #e23b2e;
+  --vu-red-rgb: 226 59 46;
 
   /* The LCD readout on the later decks. Playing, connected, succeeded. */
   --lcd-green: #7ed9ae;
+  --lcd-green-rgb: 126 217 174;
 
   /* Consumables: J-card paper stock, and the tape seen through the window. */
   --label-cream: #efe4cc;
+  --label-cream-rgb: 239 228 204;
   --tape-brown: #3a2a20;
+  --tape-brown-rgb: 58 42 32;
 
   /* ── Signature gradients ───────────────────────────────────
      Both of these were copy-pasted as literals at ten call sites, so the
@@ -74,8 +97,11 @@
 
   /* Type on a dark deck. */
   --ink-100: #edf1f4;
+  --ink-100-rgb: 237 241 244;
   --ink-400: #98a2ab;
+  --ink-400-rgb: 152 162 171;
   --ink-600: #626b74;
+  --ink-600-rgb: 98 107 116;
 
   /* ── Design tokens: one radius / hairline / layering scale ──
      Components previously hard-coded rounded-lg/xl/2xl and z-[57]-style

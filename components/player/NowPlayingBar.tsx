@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Play, Pause, X, Maximize2, Loader2, ChevronUp, Disc3, ListMusic, Sparkles } from "lucide-react";
 import { usePlayer, useTransport } from "./PlayerProvider";
 import { LevelMeter } from "./LevelMeter";
@@ -12,13 +12,12 @@ import { inPlaylist } from "@/lib/collection";
 import type { Release } from "@/lib/types";
 
 /**
- * Now-Playing bar — persistent bottom transport (Apple/Spotify/Tidal
- * pattern), reimagined in the Pulsar cosmos aesthetic. Plays 30s previews
- * inline while browsing; a scrubbable progress line; expand opens the
- * full 3D visualizer.
+ * Now-Playing bar — the persistent bottom transport, built as the top panel of
+ * a Walkman: brushed aluminium face, a groove the tape position runs along, an
+ * LCD for time and level, and one orange key that does the thing you came for.
+ * Plays 30s previews inline while browsing; expand opens the visualizer.
  */
 export function NowPlayingBar() {
-  const reduce = useReducedMotion();
   const { current, playing, loading, hasAudio, error, toggle, stop, seek, ensureGraph, getAnalyser, play } =
     usePlayer();
   // Hot per-tick values come from the transport context — reading them here
@@ -69,7 +68,15 @@ export function NowPlayingBar() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 80, opacity: 0 }}
             transition={{ type: "spring", stiffness: 380, damping: 34 }}
-            className="fixed inset-x-0 bottom-0 z-50 border-t border-ink/10 bg-[#08080f]/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl"
+            className="fixed inset-x-0 bottom-0 z-50 border-t border-chrome-300/25 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl"
+            style={{
+              // Brushed aluminium: a fine vertical grain over a cool metal tone,
+              // with the polished lip of the top bezel catching the light.
+              background:
+                "repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 3px)," +
+                "linear-gradient(180deg, rgba(38,46,55,0.96) 0%, rgba(22,27,33,0.97) 60%, rgba(16,20,24,0.98) 100%)",
+              boxShadow: "inset 0 1px 0 rgba(231,235,238,0.18), 0 -18px 40px rgba(0,0,0,0.45)",
+            }}
           >
             {/* where-to menu — visualiser · full album · discography */}
             <AnimatePresence>
@@ -90,8 +97,8 @@ export function NowPlayingBar() {
                     transition={{ type: "spring", stiffness: 460, damping: 34 }}
                     className="absolute bottom-full left-4 mb-2 w-[min(88vw,300px)] overflow-hidden rounded-2xl border border-white/[0.12] md:left-8"
                     style={{
-                      background: "rgba(12,12,20,0.97)",
-                      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.14), 0 22px 60px rgba(0,0,0,0.7)",
+                      background: "linear-gradient(180deg, rgba(33,40,48,0.98), rgba(20,25,30,0.98))",
+                      boxShadow: "inset 0 1px 0 rgba(231,235,238,0.16), 0 22px 60px rgba(0,0,0,0.7)",
                     }}
                   >
                     <p className="truncate border-b border-white/[0.08] px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.24em] text-ink/40">
@@ -190,16 +197,16 @@ export function NowPlayingBar() {
               }}
               className="group absolute -top-2 left-0 right-0 z-10 h-5 cursor-pointer touch-none"
             >
-              <div className="absolute top-2 left-0 right-0 h-1 rounded-full bg-ink/[0.12]" />
+              <div className="absolute top-2 left-0 right-0 h-1 rounded-full bg-deck shadow-[inset_0_1px_2px_rgba(0,0,0,0.85)]" />
               <div
-                className={`absolute top-2 left-0 h-1 rounded-full bg-gradient-to-r from-sony to-tps ${
+                className={`absolute top-2 left-0 h-1 rounded-full bg-transport ${
                   scrubbing ? "" : "transition-[width]"
                 }`}
                 style={{ width: `${shownProgress * 100}%` }}
               />
               {/* thumb — appears on hover, always visible while dragging */}
               <span
-                className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow transition-opacity ${
+                className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-chrome-500 bg-gradient-to-b from-chrome-100 to-chrome-300 shadow-key transition-opacity ${
                   scrubbing ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                 }`}
                 style={{ left: `${shownProgress * 100}%` }}
@@ -220,12 +227,12 @@ export function NowPlayingBar() {
                       playing. Sits over the artwork's foot so it reads as part
                       of the record rather than as another control. */}
                   {playing && (
-                    <span className="pointer-events-none absolute inset-x-1 bottom-1 h-3">
+                    <span className="pointer-events-none absolute inset-x-1 bottom-1 h-3 sm:hidden">
                       <LevelMeter
                         playing={playing}
                         getAnalyser={getAnalyser}
                         bars={5}
-                        className="h-full w-full text-tps drop-shadow-[0_0_6px_rgba(78,134,199,0.55)]"
+                        className="h-full w-full text-lcd drop-shadow-[0_0_6px_rgba(126,217,174,0.6)]"
                       />
                     </span>
                   )}
@@ -241,35 +248,47 @@ export function NowPlayingBar() {
                 </span>
               </button>
 
-              {/* elapsed / total — previews are short, so knowing where you are
-                  actually matters */}
-              <span className="hidden flex-shrink-0 font-mono text-[11px] tabular-nums text-ink/40 sm:block">
-                {fmt(scrubbing ? shownProgress * duration : elapsed)}
-                <span className="text-ink/20"> / </span>
-                {fmt(duration)}
+              {/* The LCD. Time and level in one readout, the way a deck shows
+                  them. It replaces two things: a grey timestamp, and a four-bar
+                  "equaliser" that looped the same keyframes whatever was playing
+                  — decoration dressed as a measurement, sitting beside a real
+                  meter that already existed. The ladder here is that real meter. */}
+              <span
+                className="hidden flex-shrink-0 items-center gap-2.5 rounded-md border border-black/60 px-2.5 py-1.5 sm:flex"
+                style={{
+                  background: "linear-gradient(180deg, #0b1410 0%, #0e1a14 100%)",
+                  boxShadow: "inset 0 1px 3px rgba(0,0,0,0.9), 0 1px 0 rgba(231,235,238,0.08)",
+                }}
+              >
+                <span
+                  className="font-mono text-[12px] tabular-nums tracking-wider text-lcd"
+                  style={{ textShadow: "0 0 6px rgba(126,217,174,0.55)" }}
+                >
+                  {/* With no length known there is no tape loaded: a deck shows
+                      dashes, not a confident "0:00 / 0:00" that reads as a
+                      zero-second track. */}
+                  {duration > 0 ? fmt(scrubbing ? shownProgress * duration : elapsed) : "-:--"}
+                  <span className="text-lcd/35"> / </span>
+                  <span className="text-lcd/70">{duration > 0 ? fmt(duration) : "-:--"}</span>
+                </span>
+                <LevelMeter
+                  playing={playing && !scrubbing}
+                  getAnalyser={getAnalyser}
+                  bars={7}
+                  segments={6}
+                  className="h-5 w-11"
+                />
               </span>
-
-              {/* equalizer flourish while playing (off under reduced motion) */}
-              {playing && !scrubbing && !reduce && (
-                <div className="hidden items-end gap-0.5 md:flex" aria-hidden>
-                  {[0, 1, 2, 3].map((i) => (
-                    <motion.span
-                      key={i}
-                      className="w-0.5 rounded-full bg-tps/70"
-                      animate={{ height: [4, 12, 6, 14, 4] }}
-                      transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.12, ease: "easeInOut" }}
-                    />
-                  ))}
-                </div>
-              )}
 
               {/* add to crate — brown crate glyph */}
               <button
                 onClick={() => current && window.dispatchEvent(new CustomEvent("pulsar-crate-picker", { detail: current }))}
                 aria-label="Add to a crate"
                 title={inCrate ? "In a crate" : "Add to a crate"}
-                className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
-                  inCrate ? "border-[#c08a4e]/60 bg-[#c08a4e]/15" : "border-white/25 bg-white/[0.06] hover:border-white/50"
+                className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[10px] border shadow-key transition-[box-shadow,transform,background-color] active:translate-y-px active:shadow-keyed ${
+                  inCrate
+                    ? "border-[#c08a4e]/60 bg-[#c08a4e]/20"
+                    : "border-chrome-700/70 bg-deck-600 hover:bg-[#2c353f]"
                 }`}
               >
                 <CrateIcon
@@ -284,11 +303,14 @@ export function NowPlayingBar() {
                 onClick={toggle}
                 disabled={!hasAudio && !loading}
                 aria-label={playing ? "Pause" : "Play"}
-                className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95 disabled:opacity-40"
-                style={{
-                  background: "linear-gradient(160deg, #f0f0f4, #c4c4cc)",
-                  boxShadow: "0 4px 14px rgba(0,0,0,0.45)",
-                }}
+                // The one orange key. On a TPS-L2 the transport buttons were
+                // the only coloured thing on a silver-and-blue body, which is
+                // exactly the job this has: the single action the bar exists for.
+                // It travels a pixel and loses its bezel shadow when pressed.
+                // Disabled, it becomes an unlit grey key rather than a faded
+                // orange one: orange at 40% over graphite reads as dirt, not as
+                // "unavailable".
+                className="flex h-12 w-14 flex-shrink-0 items-center justify-center rounded-[12px] border border-[#b84516] bg-transport shadow-key transition-[box-shadow,transform,filter] hover:brightness-110 active:translate-y-px active:shadow-keyed disabled:border-chrome-700/60 disabled:bg-deck-600 disabled:bg-none disabled:hover:brightness-100 [&:disabled_svg]:text-ink-600"
               >
                 {loading ? (
                   <Loader2 size={20} className="animate-spin text-deck" />
@@ -305,7 +327,7 @@ export function NowPlayingBar() {
               <button
                 onClick={openVisualizer}
                 aria-label="Open visualizer"
-                className="hidden h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-ink/15 text-ink/60 transition-colors hover:border-ink/40 hover:text-ink sm:flex"
+                className="hidden h-11 w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-chrome-700/70 bg-deck-600 text-ink-400 shadow-key transition-[box-shadow,transform,color] hover:text-ink active:translate-y-px active:shadow-keyed sm:flex"
               >
                 <Maximize2 size={16} />
               </button>
@@ -315,7 +337,7 @@ export function NowPlayingBar() {
               <button
                 onClick={stop}
                 aria-label="Close player"
-                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-ink/35 transition-colors hover:bg-ink/10 hover:text-ink"
+                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[10px] text-ink-600 transition-colors hover:bg-deck-600 hover:text-ink"
               >
                 <X size={17} />
               </button>

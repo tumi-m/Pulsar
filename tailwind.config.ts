@@ -14,35 +14,39 @@ const config: Config = {
          from and what it means. Tokens are named for the part of the machine
          they belong to, so a class says what it is rather than what hue it
          happens to be: `bg-deck` is the housing, `text-sony` is the transport
-         button, `border-chrome-500` is brushed trim. */
+         button, `border-chrome-500` is brushed trim.
+
+         Each reads the -rgb channel twin with <alpha-value>, because that is
+         the only shape Tailwind 3 can apply `/60`-style opacity to. A bare
+         `var(--x)` here silently drops every opacity-modified class. */
       colors: {
         deck: {
-          DEFAULT: "var(--deck-900)",
-          600: "var(--deck-600)",
-          700: "var(--deck-700)",
-          800: "var(--deck-800)",
-          900: "var(--deck-900)",
+          DEFAULT: "rgb(var(--deck-900-rgb) / <alpha-value>)",
+          600: "rgb(var(--deck-600-rgb) / <alpha-value>)",
+          700: "rgb(var(--deck-700-rgb) / <alpha-value>)",
+          800: "rgb(var(--deck-800-rgb) / <alpha-value>)",
+          900: "rgb(var(--deck-900-rgb) / <alpha-value>)",
         },
         chrome: {
-          DEFAULT: "var(--chrome-500)",
-          100: "var(--chrome-100)",
-          300: "var(--chrome-300)",
-          500: "var(--chrome-500)",
-          700: "var(--chrome-700)",
+          DEFAULT: "rgb(var(--chrome-500-rgb) / <alpha-value>)",
+          100: "rgb(var(--chrome-100-rgb) / <alpha-value>)",
+          300: "rgb(var(--chrome-300-rgb) / <alpha-value>)",
+          500: "rgb(var(--chrome-500-rgb) / <alpha-value>)",
+          700: "rgb(var(--chrome-700-rgb) / <alpha-value>)",
         },
         ink: {
-          DEFAULT: "var(--ink-100)",
-          100: "var(--ink-100)",
-          400: "var(--ink-400)",
-          600: "var(--ink-600)",
+          DEFAULT: "rgb(var(--ink-100-rgb) / <alpha-value>)",
+          100: "rgb(var(--ink-100-rgb) / <alpha-value>)",
+          400: "rgb(var(--ink-400-rgb) / <alpha-value>)",
+          600: "rgb(var(--ink-600-rgb) / <alpha-value>)",
         },
-        sony: "var(--sony-orange)",
-        tps: "var(--tps-blue)",
-        sport: "var(--sport-yellow)",
-        vu: "var(--vu-red)",
-        lcd: "var(--lcd-green)",
-        cream: "var(--label-cream)",
-        tape: "var(--tape-brown)",
+        sony: "rgb(var(--sony-orange-rgb) / <alpha-value>)",
+        tps: "rgb(var(--tps-blue-rgb) / <alpha-value>)",
+        sport: "rgb(var(--sport-yellow-rgb) / <alpha-value>)",
+        vu: "rgb(var(--vu-red-rgb) / <alpha-value>)",
+        lcd: "rgb(var(--lcd-green-rgb) / <alpha-value>)",
+        cream: "rgb(var(--label-cream-rgb) / <alpha-value>)",
+        tape: "rgb(var(--tape-brown-rgb) / <alpha-value>)",
       },
       fontFamily: {
         display: ["var(--font-display)", "system-ui", "sans-serif"],

@@ -24,12 +24,22 @@ export function LevelMeter({
   playing,
   getAnalyser,
   bars = 5,
+  segments = 0,
   className = "",
   color = "currentColor",
 }: {
   playing: boolean;
   getAnalyser: () => AnalyserNode | null;
   bars?: number;
+  /**
+   * 0 draws continuous bars in `color`. Any other value draws each bar as a
+   * ladder of that many LED segments, coloured by POSITION rather than level —
+   * green through the body, yellow near the top, red for the last step — which
+   * is how a deck's VU ladder reads: you learn where red is, and the music
+   * reaches it or doesn't. Unlit segments stay faintly visible, as a dark LED
+   * does, so the scale is legible at rest.
+   */
+  segments?: number;
   className?: string;
   color?: string;
 }) {
@@ -50,6 +60,19 @@ export function LevelMeter({
     if (!ctx) return;
 
     const engine = new AudioEngine({ bands: bars });
+
+    // Canvas can't read CSS custom properties, so resolve the palette once.
+    const root = getComputedStyle(document.documentElement);
+    const tone = (name: string, fallback: string) => root.getPropertyValue(name).trim() || fallback;
+    const LED = {
+      low: tone("--lcd-green", "#7ed9ae"),
+      high: tone("--sport-yellow", "#ffce0a"),
+      peak: tone("--vu-red", "#e23b2e"),
+    };
+    const ledFor = (k: number, n: number) => {
+      const f = (k + 1) / n;
+      return f > 0.86 ? LED.peak : f > 0.62 ? LED.high : LED.low;
+    };
     let raf = 0;
     let stopped = false;
     // Held so a paused meter settles to rest rather than freezing mid-jump.
@@ -74,6 +97,10 @@ export function LevelMeter({
       const dt = (now - last) / 1000;
       last = now;
 
+      // A breakpoint-hidden instance (the bar mounts one meter per layout) is
+      // display:none — skip the analyser read and the paint entirely.
+      if (canvas.offsetParent === null) return;
+
       const analyser = getAnalyser();
       const frame = engine.update(analyser, dt, playingRef.current);
       syntheticRef.current = frame.isSynthetic;
@@ -97,8 +124,23 @@ export function LevelMeter({
         const prev = heights[i];
         heights[i] = target > prev ? prev + (target - prev) * 0.55 : prev + (target - prev) * 0.12;
 
-        const barH = Math.max(dpr, heights[i] * h);
         const x = i * (barW + gap);
+
+        if (segments > 0) {
+          const segGap = Math.max(1, Math.round(dpr));
+          const segH = Math.max(1, (h - segGap * (segments - 1)) / segments);
+          const lit = Math.round(heights[i] * segments);
+          for (let k = 0; k < segments; k++) {
+            const y = h - (k + 1) * segH - k * segGap;
+            ctx.globalAlpha = k < lit ? 1 : 0.14;
+            ctx.fillStyle = ledFor(k, segments);
+            ctx.fillRect(x, y, barW, segH);
+          }
+          ctx.globalAlpha = 1;
+          continue;
+        }
+
+        const barH = Math.max(dpr, heights[i] * h);
         const y = h - barH;
         ctx.fillStyle = color;
         // Rounded caps read as a meter; square ones read as a chart.
@@ -118,7 +160,24 @@ export function LevelMeter({
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
     };
-  }, [bars, color, getAnalyser, reduced]);
+  }, [bars, segments, color, getAnalyser, reduced]);
+
+  if (reduced && segments > 0) {
+    // Static ladder: the scale without the motion — green body, yellow, red.
+    return (
+      <span aria-hidden="true" className={`flex items-end gap-[2px] ${className}`}>
+        {Array.from({ length: bars }, (_, i) => (
+          <span key={i} className="flex h-full flex-1 flex-col-reverse gap-px">
+            {Array.from({ length: segments }, (_, k) => {
+              const f = (k + 1) / segments;
+              const bg = f > 0.86 ? "var(--vu-red)" : f > 0.62 ? "var(--sport-yellow)" : "var(--lcd-green)";
+              return <span key={k} className="flex-1" style={{ background: bg, opacity: k < 2 ? 0.8 : 0.14 }} />;
+            })}
+          </span>
+        ))}
+      </span>
+    );
+  }
 
   if (reduced) {
     // Static equivalent: same footprint, no movement.
