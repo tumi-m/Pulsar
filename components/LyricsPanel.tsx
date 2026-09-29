@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { X, Mic2 } from "lucide-react";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { useDialog } from "@/lib/useDialog";
+import { useBackClose } from "@/lib/useBackClose";
 import { Portal } from "./Portal";
 
 export interface LyricsSubject {
@@ -17,8 +19,16 @@ export interface LyricsSubject {
  */
 export function LyricsPanel({ subject, onClose }: { subject: LyricsSubject | null; onClose: () => void }) {
   const [lyrics, setLyrics] = useState<string | null>(null);
-  const [state, setState] = useState<"loading" | "done" | "none">("loading");
+  const [state, setState] = useState<"loading" | "done" | "none" | "error">("loading");
+  // Bumped by "Try again" to re-run the lookup after a failure.
+  const [attempt, setAttempt] = useState(0);
   useScrollLock(Boolean(subject));
+  // This overlay opens OVER the release panel, in its own portal. Without these
+  // it wasn't part of the overlay stack: Escape and Back skipped it and closed
+  // the release panel underneath, focus stayed behind it, and the release
+  // panel's Tab trap kept keyboard users out of it entirely.
+  useBackClose(Boolean(subject), onClose);
+  const dialogRef = useDialog<HTMLDivElement>(Boolean(subject), { modal: true });
 
   useEffect(() => {
     if (!subject) return;
@@ -32,6 +42,11 @@ export function LyricsPanel({ subject, onClose }: { subject: LyricsSubject | nul
         );
         const data = await res.json();
         if (cancelled) return;
+        // A failed lookup is not "this song has no lyrics" — say which it is.
+        if (!res.ok || data.error) {
+          setState("error");
+          return;
+        }
         if (typeof data.lyrics === "string" && data.lyrics.trim()) {
           setLyrics(data.lyrics.trim());
           setState("done");
@@ -39,13 +54,13 @@ export function LyricsPanel({ subject, onClose }: { subject: LyricsSubject | nul
           setState("none");
         }
       } catch {
-        if (!cancelled) setState("none");
+        if (!cancelled) setState("error");
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [subject]);
+  }, [subject, attempt]);
 
   if (!subject) return null;
 
@@ -56,7 +71,11 @@ export function LyricsPanel({ subject, onClose }: { subject: LyricsSubject | nul
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
       transition={{ type: "spring", stiffness: 480, damping: 40 }}
-      className="fixed inset-0 z-[56] flex flex-col bg-[#07070d]/[0.98] backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-14 lg:w-1/2"
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={subject ? `Lyrics — ${subject.artist}, ${subject.title}` : "Lyrics"}
+      className="fixed inset-0 z-[56] flex flex-col bg-[#0b0d10]/[0.98] backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-14 lg:w-1/2"
     >
       <div className="relative flex items-center gap-3 border-b border-white/10 px-4 py-3">
         <span
@@ -101,6 +120,21 @@ export function LyricsPanel({ subject, onClose }: { subject: LyricsSubject | nul
             <p className="max-w-[240px] text-[11px] text-ink/30">
               Lyrics aren't documented for this track yet.
             </p>
+          </div>
+        )}
+        {state === "error" && (
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+            <Mic2 size={26} className="text-ink/20" />
+            <p className="text-[12px] uppercase tracking-widest text-ink/50">Lyrics unavailable right now</p>
+            <p className="max-w-[240px] text-[11px] text-ink/40">
+              The lyrics service didn&rsquo;t answer. That says nothing about this track.
+            </p>
+            <button
+              onClick={() => setAttempt((n) => n + 1)}
+              className="min-h-9 rounded-[10px] border border-chrome-700/70 bg-deck-600 px-4 text-[11px] font-bold uppercase tracking-[0.16em] text-ink shadow-key active:translate-y-px active:shadow-keyed"
+            >
+              Try again
+            </button>
           </div>
         )}
         {state === "done" && lyrics && (

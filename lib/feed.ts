@@ -158,9 +158,23 @@ interface DeezerAlbum {
   release_date?: string;
   record_type?: string;
   artist?: { name?: string };
+  /** Present on list endpoints; resolved to a name via the /genre list. */
+  genre_id?: number;
 }
 
-export function mapDeezer(a: DeezerAlbum, popularity: number | null): FeedRelease | null {
+/**
+ * `genre` is the genre name when the caller knows it — the page it came from,
+ * or the album's genre_id resolved against Deezer's /genre list. Every Deezer
+ * release used to be mapped with genre null, so only the few undated chart
+ * albums that later got a detail fetch ever had one: the rest of the Deezer
+ * catalogue carried no genre, no tags, and mood "cinematic" by default, which
+ * starved genre filtering and the Selector's genre scoring.
+ */
+export function mapDeezer(
+  a: DeezerAlbum,
+  popularity: number | null,
+  genre: string | null = null
+): FeedRelease | null {
   const artist = a.artist?.name?.trim();
   const title = a.title?.trim();
   const art = a.cover_xl ?? a.cover_big;
@@ -172,7 +186,7 @@ export function mapDeezer(a: DeezerAlbum, popularity: number | null): FeedReleas
   // instead of pretending everything dropped today.
   const hasRealDate = Boolean(a.release_date && /^\d{4}-\d{2}-\d{2}$/.test(a.release_date));
   const date = hasRealDate ? a.release_date! : todayISO();
-  const r = baseRelease(artist, title, type, art, date, null, null) as FeedRelease;
+  const r = baseRelease(artist, title, type, art, date, genre, null) as FeedRelease;
   if (popularity != null) r.popularity = popularity;
   if (a.id) r._dz = a.id;
   if (!hasRealDate) r._noDate = true;
@@ -236,18 +250,21 @@ async function enrichRealDates(list: FeedRelease[]): Promise<void> {
 }
 
 async function fromDeezer(): Promise<Release[]> {
-  const [releases, chart] = await Promise.all([
+  const [releases, chart, genres] = await Promise.all([
     fetchJSON("https://api.deezer.com/editorial/0/releases") as Promise<{ data?: DeezerAlbum[] } | null>,
     fetchJSON("https://api.deezer.com/chart/0/albums?limit=100") as Promise<{ data?: DeezerAlbum[] } | null>,
+    deezerGenres(),
   ]);
+  const nameOf = new Map(genres.map((g) => [g.id, g.name]));
+  const genreOf = (a: DeezerAlbum) => (a.genre_id ? nameOf.get(a.genre_id) ?? null : null);
   const out: Release[] = [];
   for (const a of releases?.data ?? []) {
-    const r = mapDeezer(a, null);
+    const r = mapDeezer(a, null, genreOf(a));
     if (r) out.push(r);
   }
   // Chart entries carry a popularity rank: position 1 => 200, 2 => 199...
   (chart?.data ?? []).forEach((a, i) => {
-    const r = mapDeezer(a, 200 - i);
+    const r = mapDeezer(a, 200 - i, genreOf(a));
     if (r) out.push(r);
   });
   return out;
@@ -255,7 +272,9 @@ async function fromDeezer(): Promise<Release[]> {
 
 // ── Source 1b: every genre's chart + editorial (thousands of albums) ──
 async function fromDeezerGenres(): Promise<Release[]> {
-  const ids = await deezerGenreIds();
+  const genres = (await deezerGenres()).slice(0, 29);
+  const ids = genres.map((g) => g.id);
+  const nameOf = new Map(genres.map((g) => [g.id, g.name]));
   const out: Release[] = [];
   // Deezer caps a page at 100, so walk several pages per genre. This is what
   // takes the catalogue from hundreds into the thousands. Bounded by a worker
@@ -280,7 +299,8 @@ async function fromDeezerGenres(): Promise<Release[]> {
       const pages = await Promise.all(reqs);
       for (const page of pages) {
         for (const a of page?.data ?? []) {
-          const r = mapDeezer(a, null);
+          // The page's own genre is the one we asked for.
+          const r = mapDeezer(a, null, nameOf.get(id) ?? null);
           if (r) out.push(r);
         }
       }
@@ -290,12 +310,17 @@ async function fromDeezerGenres(): Promise<Release[]> {
   return out;
 }
 
-/** Fetch (and cache) the Deezer genre list → up to 29 usable genre ids. */
-async function deezerGenreIds(): Promise<number[]> {
+/** Deezer's genre list, minus id 0 ("All"). Cached by fetchJSON's revalidate. */
+async function deezerGenres(): Promise<{ id: number; name: string }[]> {
   const genres = (await fetchJSON("https://api.deezer.com/genre")) as {
     data?: { id: number; name: string }[];
   } | null;
-  return (genres?.data ?? []).map((g) => g.id).filter((id) => id > 0).slice(0, 29);
+  return (genres?.data ?? []).filter((g) => g.id > 0 && typeof g.name === "string");
+}
+
+/** Up to 29 usable genre ids. */
+async function deezerGenreIds(): Promise<number[]> {
+  return (await deezerGenres()).map((g) => g.id).slice(0, 29);
 }
 
 // ── Source 1e: top artists per genre → their catalogues ──────────────

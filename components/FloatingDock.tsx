@@ -129,8 +129,14 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       // build-time inlines.
       await ensureDspConfig().catch(() => {});
       setCfgTick((t) => t + 1);
-      const pending = await handleDspRedirect();
-      if (!pending) return;
+      const outcome = await handleDspRedirect();
+      if (!outcome) return;
+      if ("failed" in outcome) {
+        const plat = PLATFORMS.find((p) => p.key === outcome.failed);
+        flash(outcome.message ?? `${plat?.label ?? "The"} sign-in didn't complete, so the crate wasn't exported. Try again.`);
+        return;
+      }
+      const pending = outcome;
       const plat = PLATFORMS.find((p) => p.key === pending.provider);
       const label = plat?.label ?? "your DSP";
       const color = plat?.color ?? "#1DB954";

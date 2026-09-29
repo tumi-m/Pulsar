@@ -61,6 +61,11 @@ export function SampleGraph({
   const rafRef = useRef<number>(0);
   const [, setTick] = useState(0); // re-render trigger (value never read)
   const [ready, setReady] = useState(false);
+  // The request failed, as opposed to succeeding with nothing to draw. Both
+  // used to show "No sample chain found … try a different track", which
+  // blamed the record for a network error and offered no way to retry.
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const widthRef = useRef(600);
@@ -146,6 +151,7 @@ export function SampleGraph({
   useEffect(() => {
     let cancelled = false;
     setReady(false);
+    setFailed(false);
     (async () => {
       try {
         const res = await fetch(
@@ -181,7 +187,10 @@ export function SampleGraph({
         setReady(true);
         rafRef.current = requestAnimationFrame(step);
       } catch {
-        if (!cancelled) setReady(true);
+        if (!cancelled) {
+          setFailed(true);
+          setReady(true);
+        }
       }
     })();
     return () => {
@@ -189,7 +198,7 @@ export function SampleGraph({
       cancelAnimationFrame(rafRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [artist, title]);
+  }, [artist, title, attempt]);
 
   // Track the SVG size for responsive layout.
   useEffect(() => {
@@ -417,7 +426,20 @@ export function SampleGraph({
         )}
       </AnimatePresence>
 
-      {ready && nodes.length <= 1 && (
+      {ready && failed && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+          <p className="text-[11px] leading-relaxed text-ink/50">
+            Couldn&rsquo;t reach the sample graph just now.
+          </p>
+          <button
+            onClick={() => setAttempt((n) => n + 1)}
+            className="min-h-9 rounded-[10px] border border-chrome-700/70 bg-deck-600 px-4 text-[11px] font-bold uppercase tracking-[0.16em] text-ink shadow-key active:translate-y-px active:shadow-keyed"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+      {ready && !failed && nodes.length <= 1 && (
         <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
           <p className="text-[11px] leading-relaxed text-ink/40">
             No sample chain found for this track via MusicBrainz. Try a track from the curated

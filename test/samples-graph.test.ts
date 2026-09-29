@@ -99,13 +99,17 @@ describe("connectSongs", () => {
 
 describe("graph stats", () => {
   it("mostSampledArtists counts every catalog edge into the source artist", () => {
+    // Expectation built on the same normalised identity the graph uses; built
+    // on the raw spelling, it asserted the bug (one artist split in two).
+    const key = (s: string) =>
+      s.toLowerCase().replace(/\(.*?\)/g, "").replace(/&/g, "and").replace(/[^a-z0-9]/g, "");
     const counts = new Map<string, number>();
     for (const c of SAMPLE_CATALOG) {
-      counts.set(c.sourceArtist, (counts.get(c.sourceArtist) ?? 0) + 1);
+      counts.set(key(c.sourceArtist), (counts.get(key(c.sourceArtist)) ?? 0) + 1);
     }
     const rows = mostSampledArtists(500);
     for (const row of rows) {
-      expect(row.sampledCount).toBe(counts.get(row.artist));
+      expect(row.sampledCount).toBe(counts.get(key(row.artist)));
     }
     // sorted descending
     for (let i = 1; i < rows.length; i++) {
@@ -189,5 +193,14 @@ describe("relatedSongs", () => {
 
   it("respects the limit", () => {
     expect(relatedSongs("Kanye West", "Stronger", 3).length).toBeLessThanOrEqual(3);
+  });
+});
+
+
+describe("mostSampledArtists merges spellings of one artist", () => {
+  it("counts 'Sly and the Family Stone' and 'Sly & the Family Stone' as one row", async () => {
+    const { mostSampledArtists } = await import("@/lib/samples-graph");
+    const rows = mostSampledArtists(500).filter((r) => /^sly (and|&) the family stone$/i.test(r.artist));
+    expect(rows.length).toBeLessThanOrEqual(1);
   });
 });

@@ -20,6 +20,8 @@ import {
 import Link from "next/link";
 import { Artwork } from "./Artwork";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { useDialog } from "@/lib/useDialog";
+import { useBackClose } from "@/lib/useBackClose";
 import { useYouTubePlayer } from "@/lib/useYouTubePlayer";
 import { youtubeSearchUrl } from "@/lib/samples-media";
 import { Portal } from "./Portal";
@@ -588,6 +590,12 @@ export function SamplePage({
   // plays the same video, and the lookup is a scrape.
   const [subjectVideoId, setSubjectVideoId] = useState<string | null>(null);
   useScrollLock(Boolean(subject));
+  // This overlay opens OVER the release panel, in its own portal. Without these
+  // it wasn't part of the overlay stack: Escape and Back skipped it and closed
+  // the release panel underneath, focus stayed behind it, and the release
+  // panel's Tab trap kept keyboard users out of it entirely.
+  useBackClose(Boolean(subject), onClose);
+  const dialogRef = useDialog<HTMLDivElement>(Boolean(subject), { modal: true });
 
   const subjArtist = subject?.artist;
   const subjTitle = subject?.title;
@@ -670,7 +678,11 @@ export function SamplePage({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
       transition={{ type: "spring", stiffness: 480, damping: 40 }}
-      className="fixed inset-0 z-[58] flex flex-col bg-[#07070d]/[0.98] backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-14 lg:w-1/2"
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={subject ? `Sample breakdown — ${subject.artist}, ${subject.title}` : "Sample breakdown"}
+      className="fixed inset-0 z-[58] flex flex-col bg-[#0b0d10]/[0.98] backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-14 lg:w-1/2"
     >
       {/* header */}
       <div className="relative flex items-center gap-2 border-b border-white/10 px-3 py-3 sm:gap-3 sm:px-4">

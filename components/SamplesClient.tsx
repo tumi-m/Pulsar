@@ -37,6 +37,8 @@ export function SamplesClient({
   initial: { artist: string; title: string } | null;
 }) {
   const [tab, setTab] = useState<Tab>("lookup");
+  /** What the most recent lookup was for — feedback names it, whichever tab fired it. */
+  const [lastLookup, setLastLookup] = useState<{ artist: string; title: string } | null>(null);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [, setResult] = useState<{ subject: SampleSubject; samples: SampleRef[] } | null>(null);
@@ -75,6 +77,7 @@ export function SamplesClient({
   }, [releases, songs]);
 
   async function lookup(artist: string, title: string, artwork?: string) {
+    setLastLookup({ artist, title });
     setBusy(true);
     setNotFound(false);
     setResult(null);
@@ -144,6 +147,38 @@ export function SamplesClient({
         ))}
       </div>
 
+      {/* Lookup feedback lives outside the tabs. It used to render only on the
+          Lookup tab, but Connect, Artist, Canon and People all call lookup() —
+          so a miss from any of them showed nothing at all, and the page read
+          as broken. It also named the Lookup box's text rather than the track
+          that was actually looked up. */}
+      <div aria-live="polite">
+        {busy && lastLookup && (
+          <p className="mb-3 flex items-center gap-2 text-[12px] text-ink/60">
+            <Loader2 size={14} className="animate-spin text-tps" />
+            Looking up {lastLookup.title}…
+          </p>
+        )}
+        {notFound && lastLookup && (
+          <p className="mb-4 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-center text-[12px] leading-relaxed text-ink/50">
+            No documented samples for{" "}
+            <span className="font-semibold text-ink/80">
+              {lastLookup.artist} — {lastLookup.title}
+            </span>{" "}
+            yet. Sample data comes from a hand-checked catalog plus community-maintained
+            MusicBrainz — well-known records resolve, deep cuts often don&rsquo;t.{" "}
+            <a
+              href={`https://www.whosampled.com/search/?q=${encodeURIComponent(`${lastLookup.artist} ${lastLookup.title}`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-tps hover:underline"
+            >
+              Try WhoSampled <ExternalLink size={10} />
+            </a>
+          </p>
+        )}
+      </div>
+
       {tab === "lookup" && (
         <>
           {/* search */}
@@ -177,21 +212,6 @@ export function SamplesClient({
             </div>
           )}
 
-          {notFound && (
-            <p className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-center text-[12px] leading-relaxed text-ink/50">
-              No documented samples for that track here yet. Sample data comes from a hand-checked
-              catalog plus community-maintained MusicBrainz — well-known records resolve, deep cuts
-              often don&rsquo;t.{" "}
-              <a
-                href={`https://www.whosampled.com/search/?q=${encodeURIComponent(query)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sony hover:underline"
-              >
-                Try WhoSampled <ExternalLink size={10} />
-              </a>
-            </p>
-          )}
         </>
       )}
 

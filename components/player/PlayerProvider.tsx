@@ -7,6 +7,7 @@ import {
   useState,
   useCallback,
   useEffect,
+  useMemo,
 } from "react";
 import type { Release } from "@/lib/types";
 import { currentUserId, recordListen } from "@/lib/sync";
@@ -118,8 +119,13 @@ export function useTransport(): TransportCtx {
   return ctx;
 }
 
+/** Seconds of real playback before a preview counts as a listen. */
+const LISTEN_AFTER_S = 5;
+
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  /** A track whose listen will be logged once it has genuinely played. */
+  const pendingListenRef = useRef<Release | null>(null);
   const [current, setCurrent] = useState<Release | null>(null);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -271,6 +277,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     audioRef.current = audio;
 
     const onTime = () => {
+      // Log a listen (signed-in users only; it feeds the taste engine) once a
+      // few seconds have really played. It used to be logged as soon as the
+      // source was assigned — before play() had even been attempted — so
+      // blocked, dead and immediately-skipped previews all counted as taste.
+      const pending = pendingListenRef.current;
+      if (pending && (audio.currentTime || 0) >= LISTEN_AFTER_S) {
+        pendingListenRef.current = null;
+        currentUserId()
+          .then((uid) => {
+            if (uid) void recordListen(uid, pending);
+          })
+          .catch(() => {});
+      }
       setElapsed(audio.currentTime || 0);
       if (audio.duration) {
         setDuration(audio.duration);
@@ -380,13 +399,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         // from clearing what we just assigned.
         primeTokenRef.current++;
         setHasAudio(true);
-        // Log the listen (signed-in users only) so history feeds the taste
-        // engine and the daily-mix feature. Best-effort, fire-and-forget.
-        currentUserId()
-          .then((uid) => {
-            if (uid) void recordListen(uid, release);
-          })
-          .catch(() => {});
+        // The listen is logged once playback has actually run (see onTime).
+        pendingListenRef.current = release;
         // Make sure the priming play() has finished before we start the real
         // one — two concurrent play() calls on the same element make Safari
         // reject both. A bare 140ms sleep used to stand in for this and lost
@@ -437,11 +451,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       audio.src = previewUrl;
       audio.load();
       primeTokenRef.current++;
-      currentUserId()
-        .then((uid) => {
-          if (uid) void recordListen(uid, display);
-        })
-        .catch(() => {});
+      pendingListenRef.current = display;
       // playDirect is called with an already-resolved URL, so there's no fetch
       // in the way — but the element may still never have been primed if this
       // is the listener's first interaction with audio.
@@ -512,6 +522,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     // of reloading the page.
     reqIdRef.current++;
     primeTokenRef.current++;
+    pendingListenRef.current = null;
     const audio = audioRef.current;
     if (audio) {
       audio.pause();
@@ -535,13 +546,25 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const transportValue = { progress, elapsed, duration };
 
+  // Memoised on what it actually contains. It was an object literal, rebuilt
+  // on every render — and this provider re-renders four times a second during
+  // playback for the transport's progress. Every usePlayer() consumer, which
+  // includes every tile in the grid (memo() can't stop a context update),
+  // re-rendered with it. The Transport context split exists to prevent exactly
+  // that; the fresh literal defeated it.
+  const value = useMemo(
+    () => ({
+      current, playing, loading, hasAudio, shuffle, error,
+      play, playDirect, toggle, toggleShuffle, stop, seek, setNextProvider, ensureGraph, getAnalyser,
+    }),
+    [
+      current, playing, loading, hasAudio, shuffle, error,
+      play, playDirect, toggle, toggleShuffle, stop, seek, setNextProvider, ensureGraph, getAnalyser,
+    ]
+  );
+
   return (
-    <Ctx.Provider
-      value={{
-        current, playing, loading, hasAudio, shuffle, error,
-        play, playDirect, toggle, toggleShuffle, stop, seek, setNextProvider, ensureGraph, getAnalyser,
-      }}
-    >
+    <Ctx.Provider value={value}>
       <Transport.Provider value={transportValue}>{children}</Transport.Provider>
     </Ctx.Provider>
   );

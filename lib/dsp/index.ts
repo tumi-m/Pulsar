@@ -18,6 +18,7 @@ import {
   type DspProvider,
   type Pending,
   type ProgressFn,
+  takeAuthError,
 } from "./shared";
 import { spotifyProvider, setSpotifyClientId } from "./spotify";
 import { tidalProvider, setTidalClientId } from "./tidal";
@@ -91,10 +92,29 @@ export async function exportCrate(
  * the token exchange and return the crate that was pending so the UI can resume
  * building it. Returns null when there's nothing to resume.
  */
-export async function handleDspRedirect(): Promise<Pending | null> {
+/** Outcome of a returning OAuth redirect that queued an export and failed. */
+export interface RedirectFailure {
+  failed: Pending["provider"];
+  /** The provider's own reason, when it recorded one. */
+  message: string | null;
+}
+
+/** Which auth-error key each export provider records its reason under. */
+const AUTH_ERROR_KEY: Partial<Record<Pending["provider"], string>> = {
+  spotify: "spotify",
+  tidal: "tidal",
+  youtube_music: "youtube",
+};
+
+export async function handleDspRedirect(): Promise<Pending | RedirectFailure | null> {
   if (typeof window === "undefined") return null;
+  // `error=` counts too: a declined consent comes back with an error and no
+  // code, and used to be ignored here — so no provider ever saw it, nothing
+  // was recorded, and the ?error=… stayed in the address bar.
   const hasResponse =
-    window.location.search.includes("code=") || window.location.hash.includes("access_token=");
+    window.location.search.includes("code=") ||
+    window.location.search.includes("error=") ||
+    window.location.hash.includes("access_token=");
   if (!hasResponse) return null;
 
   const pending = readPending();
@@ -115,8 +135,14 @@ export async function handleDspRedirect(): Promise<Pending | null> {
   }
 
   // Nobody claimed it: consent denied, or the exchange failed. Drop the pending
-  // crate so it can't silently re-trigger an export on a later page load.
-  if (pending) clearPending();
+  // crate so it can't silently re-trigger an export on a later page load — and
+  // report it. This returned null, so someone who went to Google or Spotify to
+  // export a crate came back to a homepage with no word of what happened.
+  if (pending) {
+    clearPending();
+    const key = AUTH_ERROR_KEY[pending.provider];
+    return { failed: pending.provider, message: key ? takeAuthError(key) : null };
+  }
   return null;
 }
 

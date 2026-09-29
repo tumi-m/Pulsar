@@ -64,53 +64,67 @@ export function VisualCanvas({
   className?: string;
 }) {
   const player = usePlayer();
-  const [videoId, setVideoId] = useState<string | null>(null);
-  const [videoState, setVideoState] = useState<"idle" | "loading" | "none">("idle");
   // "video" = official music video · "live" = a live performance on YouTube.
   const [videoKind, setVideoKind] = useState<"video" | "live">("video");
+  useEffect(() => setVideoKind("video"), [release?.id]);
 
-  useEffect(() => {
-    setVideoId(null);
-    setVideoState("idle");
-    setVideoKind("video");
-  }, [release]);
+  /*
+   * One state object, stamped with the (release, kind) it describes.
+   *
+   * This used to be three separate pieces of state plus a "reset" effect, and
+   * the fetch effect guarded on them: on a release change it ran in the same
+   * commit as the reset, saw the PREVIOUS release's videoId/"none", bailed out,
+   * and — since its deps didn't change again — never ran. Switching records in
+   * Video mode sat on "Finding music video…" forever. Now anything not stamped
+   * with the current key simply reads as loading, and the fetch runs whenever
+   * the key changes.
+   */
+  const key = release ? `${release.id}|${videoKind}` : "";
+  const [lookup, setLookup] = useState<{
+    key: string;
+    videoId: string | null;
+    failed: boolean; // the lookup itself failed, as opposed to "no video exists"
+  } | null>(null);
+  const current = lookup?.key === key ? lookup : null;
+  const videoId = current?.videoId ?? null;
+  const videoState: "loading" | "none" | "unavailable" | "idle" = !current
+    ? "loading"
+    : current.videoId
+      ? "idle"
+      : current.failed
+        ? "unavailable"
+        : "none";
 
-  // Refetch when the user flips Official ↔ Live.
-  useEffect(() => {
-    setVideoId(null);
-    setVideoState("idle");
-  }, [videoKind]);
-
-  // Resolve the YouTube video id the first time "Video" mode opens; pause the
-  // 30s preview so its audio doesn't clash.
+  const playing = player.playing;
+  const toggle = player.toggle;
   useEffect(() => {
     if (mode !== "video" || !release) return;
-    if (player.playing) player.toggle();
-    if (videoId || videoState === "loading" || videoState === "none") return;
-    let cancelled = false;
-    setVideoState("loading");
-    (async () => {
-      try {
-        const res = await fetch(
-          `/api/ytvideo?artist=${encodeURIComponent(release.artist)}&title=${encodeURIComponent(release.title)}&kind=${videoKind}`
-        );
-        const data = await res.json();
-        if (cancelled) return;
-        if (data.videoId) {
-          setVideoId(data.videoId);
-          setVideoState("idle");
-        } else {
-          setVideoState("none");
-        }
-      } catch {
-        if (!cancelled) setVideoState("none");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    // Pause the 30s preview so its audio doesn't clash with the video.
+    if (playing) toggle();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, release, videoKind]);
+  }, [mode, release?.id]);
+
+  useEffect(() => {
+    if (mode !== "video" || !release || lookup?.key === key) return;
+    const ctrl = new AbortController();
+    fetch(
+      `/api/ytvideo?artist=${encodeURIComponent(release.artist)}&title=${encodeURIComponent(release.title)}&kind=${videoKind}`,
+      { signal: ctrl.signal }
+    )
+      .then((r) => r.json())
+      .then((data: { videoId: string | null; reason?: string }) => {
+        // The route says WHY there's no id. "no-key" and "api-error" mean the
+        // lookup failed, not that the record has no video — every consumer
+        // used to throw the reason away and blame the record.
+        const failed = !data.videoId && (data.reason === "no-key" || data.reason === "api-error");
+        setLookup({ key, videoId: data.videoId ?? null, failed });
+      })
+      .catch(() => {
+        if (!ctrl.signal.aborted) setLookup({ key, videoId: null, failed: true });
+      });
+    return () => ctrl.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, key]);
 
   return (
     <div className={`relative overflow-hidden ${className}`}>
@@ -139,14 +153,28 @@ export function VisualCanvas({
           ) : (
             <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-center">
               <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-ink/45">
-                {videoState === "none"
-                  ? videoKind === "live"
-                    ? "No live performance found"
-                    : "No music video found"
-                  : videoKind === "live"
-                    ? "Finding live performance…"
-                    : "Finding music video…"}
+                {videoState === "unavailable"
+                  ? "Video lookup is unavailable right now"
+                  : videoState === "none"
+                    ? videoKind === "live"
+                      ? "No live performance found"
+                      : "No music video found"
+                    : videoKind === "live"
+                      ? "Finding live performance…"
+                      : "Finding music video…"}
               </p>
+              {(videoState === "unavailable" || videoState === "none") && release && (
+                <a
+                  href={`https://www.youtube.com/results?search_query=${encodeURIComponent(
+                    `${release.artist} ${release.title}${videoKind === "live" ? " live" : ""}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] font-bold uppercase tracking-widest text-tps hover:underline"
+                >
+                  Find it on YouTube
+                </a>
+              )}
               {videoState === "loading" && (
                 <span className="h-1.5 w-1.5 animate-ping rounded-full bg-sony" />
               )}

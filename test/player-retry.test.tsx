@@ -159,3 +159,29 @@ describe("stop() cancels a play still in flight", () => {
     expect(audio!.getAttribute("src")).not.toBe(PREVIEW);
   });
 });
+
+describe("playback progress doesn't re-render every usePlayer() consumer", () => {
+  it("a tile-like consumer stays still while the transport ticks", async () => {
+    const rendered = vi.fn();
+    function Tile() {
+      usePlayer();
+      rendered();
+      return null;
+    }
+    render(
+      <PlayerProvider>
+        <Tile />
+      </PlayerProvider>
+    );
+    await act(async () => {});
+    const before = rendered.mock.calls.length;
+    Object.defineProperty(audio!, "duration", { value: 30, configurable: true });
+    for (let t = 1; t <= 8; t++) {
+      Object.defineProperty(audio!, "currentTime", { value: t, configurable: true });
+      await act(async () => {
+        audio!.dispatchEvent(new Event("timeupdate"));
+      });
+    }
+    expect(rendered.mock.calls.length).toBe(before);
+  });
+});

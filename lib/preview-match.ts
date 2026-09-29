@@ -64,7 +64,10 @@ export function candidateAcceptable(opts: {
   candidateAlbum: string;
 }): boolean {
   if (isCompilation(opts.wantedArtist)) {
-    return titleCloseness(opts.candidateAlbum, opts.wantedTitle) >= 1;
+    // Exact (2), not merely overlapping (1): a partial match is exactly how
+    // "Chill Drives, Vol. 2" passed for "Chill Drives" — a different record in
+    // the same series, the one mix-up this album check exists to prevent.
+    return titleCloseness(opts.candidateAlbum, opts.wantedTitle) === 2;
   }
   return artistMatches(opts.candidateArtist, opts.wantedArtist);
 }

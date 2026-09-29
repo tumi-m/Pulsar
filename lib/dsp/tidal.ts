@@ -48,6 +48,8 @@ import {
   type BuildResult,
   type DspProvider,
   type ProgressFn,
+  newOAuthState,
+  checkOAuthState,
 } from "./shared";
 
 let CLIENT_ID = process.env.NEXT_PUBLIC_TIDAL_CLIENT_ID ?? "";
@@ -145,7 +147,7 @@ async function beginAuth() {
     response_type: "code",
     redirect_uri: redirectUri(),
     scope: SCOPES,
-    state: "tidal",
+    state: newOAuthState("tidal"),
     code_challenge_method: "S256",
     code_challenge: challenge,
   });
@@ -343,7 +345,15 @@ export const tidalProvider: DspProvider = {
 
   async completeRedirect(): Promise<boolean> {
     const url = new URL(window.location.href);
-    if (url.searchParams.get("state") !== "tidal") return false;
+    const stateCheck = checkOAuthState("tidal", url.searchParams.get("state"));
+    if (stateCheck === "other") return false;
+    if (stateCheck === "mismatch") {
+      // Not a sign-in this browser started. Don't spend the code.
+      cleanUrl();
+      clearVerifier();
+      setAuthError("tidal", "TIDAL sign-in couldn't be verified. Please try exporting again.");
+      return false;
+    }
 
     const error = url.searchParams.get("error");
     if (error) {

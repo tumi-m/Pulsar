@@ -139,12 +139,25 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
       onPointerCancel={endPress}
       onPointerLeave={endPress}
       whileTap={scrolling ? undefined : { scale: 0.95 }}
+      // Focus is tracked on the whole tile, like :focus-within. It used to sit
+      // on the cover button alone, so tabbing from the cover to its own Play
+      // button fired the cover's blur, which hid the overlay — the control
+      // that had just received focus went invisible as it got it.
+      // Capture-phase: framer-motion claims onFocus/onBlur on a motion
+      // component for its own focus gesture, so the plain handlers never ran.
+      onFocusCapture={enter}
+      onBlurCapture={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) leave();
+      }}
       className={`group relative ${size === 2 ? "col-span-2 row-span-2" : size === 1 ? "col-span-2" : ""}`}
       style={{
         contentVisibility: "auto",
         // Reserve the tile's box so skipping paint never collapses the grid or
         // makes the scrollbar jump.
         containIntrinsicSize: size === 1 ? "auto 180px" : "auto 320px",
+        // content-visibility implies paint containment, which clipped the hover
+        // scale, ring and glow exactly at the tile's edge. Let them spill.
+        overflowClipMargin: "48px",
       }}
     >
       <button
@@ -159,8 +172,6 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
           player.play(release);
           onOpen(release);
         }}
-        onFocus={enter}
-        onBlur={leave}
         aria-label={`${release.artist} — ${release.title}. Open album`}
         className="block w-full outline-none focus-visible:ring-2 focus-visible:ring-ink/40"
       >
@@ -277,6 +288,11 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
           else player.play(release);
         }}
         aria-label={isPlayingThis ? "Pause" : "Play preview"}
+        // Compact tiles never show their overlay controls, but they stayed in
+        // the tab order: five-plus invisible stops per tile. Out of the tab
+        // order and the accessibility tree when they can't be seen. (A tile
+        // that's playing still shows its triangle, so it stays reachable.)
+        inert={compact && !isCurrent}
         className={`absolute left-1/2 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full ring-1 ring-white/40 transition-all duration-200 ${
           big ? "h-20 w-20" : "h-14 w-14"
         } ${isCurrent || revealed ? "scale-100 opacity-100" : "scale-90 opacity-0"}`}
@@ -296,6 +312,7 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
       {/* quick actions — a full-width liquid-glass bar (matches the play
           triangle): Share · Favorite · Crate, spanning the tile's width */}
       <div
+        inert={compact}
         className={`absolute inset-x-2 top-2 z-20 flex items-stretch overflow-hidden rounded-full ring-1 ring-white/45 transition-all duration-200 ${
           revealed ? "translate-y-0 opacity-100" : "-translate-y-1.5 opacity-0"
         }`}
@@ -351,7 +368,7 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
       {dsps.length > 0 && (
         <div
           className={`pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-center justify-around gap-0.5 rounded-b-2xl px-1.5 py-2 transition-all duration-300 sm:gap-1 sm:px-2 ${
-            showDsp ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
+            showDsp ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0 group-focus-within:translate-y-0 group-focus-within:opacity-100"
           }`}
           style={{
             background: "linear-gradient(0deg, rgba(4,4,10,0.95), rgba(4,4,10,0.62) 70%, transparent)",

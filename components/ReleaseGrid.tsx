@@ -95,13 +95,25 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       setServerResults([]);
       return;
     }
+    // The request is aborted when the query changes. Before, only the debounce
+    // timer was cleared: a slow response for "radio" could land after the one
+    // for "radiohead" and merge its results into the newer search.
+    const ctrl = new AbortController();
+    setServerResults([]); // never show the previous query's archive hits under this one
     const handle = setTimeout(() => {
-      fetch(`/api/search?q=${encodeURIComponent(q)}`)
+      fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: ctrl.signal })
         .then((r) => (r.ok ? r.json() : { releases: [] }))
-        .then((d) => setServerResults((d.releases ?? []) as Release[]))
-        .catch(() => setServerResults([]));
+        .then((d) => {
+          if (!ctrl.signal.aborted) setServerResults((d.releases ?? []) as Release[]);
+        })
+        .catch(() => {
+          if (!ctrl.signal.aborted) setServerResults([]);
+        });
     }, 350);
-    return () => clearTimeout(handle);
+    return () => {
+      clearTimeout(handle);
+      ctrl.abort();
+    };
   }, [query]);
 
   // Restore the saved density delta once.
@@ -446,29 +458,16 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   // popularity or relevance would emit a header on nearly every row.
   const grouping = gridGrouping({ cols, view, searching, detailOpen });
 
-  // ── Render window ────────────────────────────────────────────
-  // Infinite scroll only grows `visible`, so the DOM used to grow without
-  // bound while scrolling a long catalogue (contentVisibility hides the
-  // paint cost, but thousands of live tiles still cost memory + layout).
-  // Keep at most WINDOW tiles mounted: as the user scrolls down we drop the
-  // top of the list from the DOM (it re-mounts on scroll up — cheap, memoised
-  // tiles, and artwork is browser-cached). The date-section layout still
-  // gets every tile for grouping; only rendering is windowed.
-  const WINDOW = 240; // tiles kept mounted around the read position
-  const [windowStart, setWindowStart] = useState(0);
-  useEffect(() => {
-    setWindowStart((s) => {
-      const maxStart = Math.max(0, shown.length - WINDOW);
-      return Math.min(s, maxStart);
-    });
-  }, [shown.length]);
-  const advanceWindow = useCallback(() => {
-    setWindowStart((s) => Math.min(s + PAGE, Math.max(0, shown.length - WINDOW)));
-  }, [shown.length]);
-  const visibleShown = useMemo(
-    () => (shown.length <= WINDOW ? shown : shown.slice(windowStart, windowStart + WINDOW)),
-    [shown, windowStart]
-  );
+  // ── No render window ─────────────────────────────────────────
+  // This used to keep at most 240 tiles mounted, dropping the top of the list
+  // as you scrolled down and promising it would "re-mount on scroll up". Nothing
+  // ever moved the window back: after 240 tiles the start of the feed was gone
+  // for good, the page jumped as the dropped rows collapsed, and the flat grid
+  // read tile sizes by window position, so every tile's span and "For You"
+  // badge shifted each time it slid. Tiles already use content-visibility:
+  // auto, which skips paint and layout off-screen, so the list is rendered
+  // whole; it only grows as fast as infinite scroll pages it in.
+  const visibleShown = shown;
 
   const dateSections = useMemo(
     () => (grouping === "none" ? null : buildDateSections(visibleShown, grouping)),
@@ -486,8 +485,6 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       (entries) => {
         if (entries[0]?.isIntersecting) {
           setVisible((v) => v + PAGE);
-          // Also slide the render window down so the DOM stays bounded.
-          advanceWindow();
         }
       },
       { rootMargin: "800px 0px" } // prefetch well before the bottom
@@ -498,7 +495,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     // IntersectionObserver only fires on a *transition*, so if the sentinel is
     // still inside the 800px band after loading (a short filtered list), it
     // would otherwise never fire again and "Loading more" would stall forever.
-  }, [hasMore, filtered.length, visible, advanceWindow]);
+  }, [hasMore, filtered.length, visible]);
 
   // In the half-page detail (tracklist) mode the grid keeps a fixed, calmer
   // column count; in the main browse view columns come from pinch-zoom (`cols`).
@@ -720,6 +717,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                           return (
                             <button
                               key={v}
+                              aria-pressed={isActive}
                               onClick={() => {
                                 setView(v);
                                 resetPage();
@@ -731,7 +729,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                                   layoutId="view-active"
                                   className="absolute inset-0 rounded-md"
                                   style={{
-                                    background: "linear-gradient(160deg, #9dc0e8, #3f9bff)",
+                                    background: "linear-gradient(160deg, #9dc0e8, #4e86c7)",
                                     boxShadow: "0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.5)",
                                   }}
                                   transition={{ type: "spring", stiffness: 400, damping: 32 }}
@@ -774,6 +772,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                         Label
                       </span>
                       <button
+                        aria-pressed={activeLabel === null}
                         onClick={() => {
                           setActiveLabel(null);
                           resetPage();
@@ -789,6 +788,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                       {labels.map((l) => (
                         <button
                           key={l}
+                          aria-pressed={activeLabel === l}
                           onClick={() => {
                             setActiveLabel(activeLabel === l ? null : l);
                             resetPage();
@@ -827,6 +827,18 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
             )}
           </AnimatePresence>
         </motion.div>
+
+        {/* Screen readers heard nothing when a search or filter changed the
+            grid — no live region existed anywhere in the app. This announces
+            the outcome, not every keystroke: it only speaks when the count
+            changes, and it's visually hidden. */}
+        <p className="sr-only" role="status" aria-live="polite">
+          {query.trim() || activeGenre || refineActive
+            ? filtered.length === 0
+              ? `No releases match${query.trim() ? ` “${query.trim()}”` : " these filters"}.`
+              : `${filtered.length} release${filtered.length === 1 ? "" : "s"} found.`
+            : ""}
+        </p>
 
         {/* grid */}
         {shown.length === 0 ? (
@@ -897,7 +909,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                   style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
                 >
                   {section.items.map((release, j) => {
-                    const i = windowStart + section.from + j; // absolute index → stable sizing
+                    const i = section.from + j; // absolute index → stable sizing
                     return (
                       <ReleaseCard
                         key={release.id}

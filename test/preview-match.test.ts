@@ -63,6 +63,30 @@ describe("the original failure", () => {
   });
 });
 
+describe("compilation series", () => {
+  it("refuses another volume of the same series", () => {
+    expect(
+      candidateAcceptable({
+        wantedArtist: "Various Artists",
+        wantedTitle: "Chill Drives",
+        candidateArtist: "Tame Impala",
+        candidateAlbum: "Chill Drives, Vol. 2",
+      })
+    ).toBe(false);
+  });
+
+  it("still accepts an edition of the same record", () => {
+    expect(
+      candidateAcceptable({
+        wantedArtist: "Various Artists",
+        wantedTitle: "Chill Drives",
+        candidateArtist: "Tame Impala",
+        candidateAlbum: "Chill Drives (Deluxe)",
+      })
+    ).toBe(true);
+  });
+});
+
 describe("normal releases are unaffected", () => {
   it("still requires the artist to match", () => {
     expect(

@@ -157,3 +157,14 @@ describe("getLiveFeed — dedup / merge / Apple ranking / enrich", () => {
     expect((feed[0] as unknown as Record<string, unknown>)._noDate).toBeUndefined();
   });
 });
+describe("mapDeezer carries a genre when the caller knows it", () => {
+  it("tags and moods the release instead of defaulting to cinematic", async () => {
+    const { mapDeezer } = await import("@/lib/feed");
+    const a = { id: 1, title: "T", cover_xl: "https://x/a.jpg", release_date: "2026-01-02", artist: { name: "A" } };
+    const withGenre = mapDeezer(a, null, "Jazz")!;
+    expect(withGenre.genre).toBe("Jazz");
+    expect(withGenre.tags).toContain("jazz");
+    const without = mapDeezer(a, null)!;
+    expect(without.genre).toBeNull();
+  });
+});

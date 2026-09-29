@@ -252,14 +252,20 @@ export interface ArtistRow {
 /** Most-sampled source artists — the crate-digger canon. */
 export function mostSampledArtists(limit = 10): ArtistRow[] {
   getGraph();
+  // Keyed on the normalised name, the same identity the rest of the graph
+  // uses. Keyed on the raw spelling, "Sly and the Family Stone" and "Sly & the
+  // Family Stone" were two artists, each with half the count. The first-seen
+  // spelling is kept for display.
   const rows = new Map<string, ArtistRow>();
   for (const c of SAMPLE_CATALOG) {
-    const r = rows.get(c.sourceArtist) ?? { artist: c.sourceArtist, sampledCount: 0, samplingCount: 0 };
+    const rk = norm(c.sourceArtist);
+    const r = rows.get(rk) ?? { artist: c.sourceArtist, sampledCount: 0, samplingCount: 0 };
     r.sampledCount += 1;
-    rows.set(c.sourceArtist, r);
-    const s = rows.get(c.artist) ?? { artist: c.artist, sampledCount: 0, samplingCount: 0 };
+    rows.set(rk, r);
+    const sk = norm(c.artist);
+    const s = rows.get(sk) ?? { artist: c.artist, sampledCount: 0, samplingCount: 0 };
     s.samplingCount += 1;
-    rows.set(c.artist, s);
+    rows.set(sk, s);
   }
   return Array.from(rows.values())
     .filter((r) => r.sampledCount > 0)

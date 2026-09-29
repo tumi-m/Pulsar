@@ -21,6 +21,8 @@ import {
   type BuildResult,
   type DspProvider,
   type ProgressFn,
+  newOAuthState,
+  checkOAuthState,
 } from "./shared";
 
 // Start from the build-time inline; /api/dsp-config overlays the live server
@@ -124,7 +126,7 @@ async function beginAuth() {
     response_type: "code",
     redirect_uri: redirectUri(),
     scope: SCOPES,
-    state: "spotify",
+    state: newOAuthState("spotify"),
     code_challenge_method: "S256",
     code_challenge: challenge,
   });
@@ -372,7 +374,15 @@ export const spotifyProvider: DspProvider = {
 
   async completeRedirect(): Promise<boolean> {
     const url = new URL(window.location.href);
-    if (url.searchParams.get("state") !== "spotify") return false;
+    const stateCheck = checkOAuthState("spotify", url.searchParams.get("state"));
+    if (stateCheck === "other") return false;
+    if (stateCheck === "mismatch") {
+      // Not a sign-in this browser started. Don't spend the code.
+      cleanUrl();
+      clearVerifier();
+      setAuthError("spotify", "Spotify sign-in couldn't be verified. Please try exporting again.");
+      return false;
+    }
 
     // Spotify reports consent denial / misconfiguration here.
     const oauthError = url.searchParams.get("error");
