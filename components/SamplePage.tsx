@@ -16,6 +16,9 @@ import {
   Crosshair,
   Pencil,
   Dna,
+  Pause,
+  Loader2,
+  ArrowDown,
 } from "lucide-react";
 import Link from "next/link";
 import { Artwork } from "./Artwork";
@@ -25,6 +28,8 @@ import { useBackClose } from "@/lib/useBackClose";
 import { useYouTubePlayer } from "@/lib/useYouTubePlayer";
 import { youtubeSearchUrl } from "@/lib/samples-media";
 import { Portal } from "./Portal";
+import { usePlayer } from "./player/PlayerProvider";
+import { MiniPlayer } from "./player/MiniPlayer";
 import { SampleGraph } from "./SampleGraph";
 import { relatedSongs } from "@/lib/samples-graph";
 import { parseCredits, type Credit } from "@/lib/credits";
@@ -100,6 +105,95 @@ function writeMark(key: string, mark: SampleMark) {
   }
 }
 
+/**
+ * A preview-playable stand-in for a record that isn't in the feed. The player
+ * resolves audio by artist + title, so this is all it needs; the id is stable
+ * so the same record shows as playing wherever it appears.
+ */
+function previewRelease(artist: string, title: string, artwork: string, year: string | null): Release {
+  const slug = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  return {
+    id: `sample:${slug(artist)}:${slug(title)}`,
+    artist,
+    title,
+    type: "single",
+    artwork_url: artwork,
+    release_date: year && /^\d{4}$/.test(year) ? `${year}-01-01` : "1900-01-01",
+    genre: null,
+    tags: [],
+    mood: null,
+    spotify: null,
+    apple_music: null,
+    tidal: null,
+    soundcloud: null,
+    youtube_music: null,
+    boomplay: null,
+    created_at: new Date(0).toISOString(),
+    curator_note: null,
+  };
+}
+
+/** One record in the pair: cover, title, artist · year, its timing mark, and a play key. */
+function PairRow({
+  release,
+  year,
+  isSubject,
+  player,
+  mark,
+  onMarkJump,
+}: {
+  release: Release;
+  year: string | null;
+  isSubject: boolean;
+  player: ReturnType<typeof usePlayer>;
+  mark: number | null;
+  onMarkJump?: () => void;
+}) {
+  const isThis = player.current?.id === release.id;
+  const playingThis = isThis && player.playing;
+  const loadingThis = isThis && player.loading;
+  return (
+    <div className="flex items-center gap-3 px-3 py-2.5">
+      <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-md ring-1 ring-white/10" data-playing={playingThis ? "true" : undefined}>
+        <Artwork src={release.artwork_url} artist={release.artist} title={release.title} sizes="48px" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[14px] font-bold leading-tight text-ink">{release.title}</p>
+        <p className="truncate text-[11.5px] text-ink-400">
+          {release.artist}
+          {year ? <span className="text-ink-600"> · {year}</span> : null}
+          {isSubject ? <span className="text-ink-600"> · this track</span> : null}
+        </p>
+        {mark != null && (
+          <button
+            onClick={onMarkJump}
+            className="mt-1 rounded-md px-1.5 py-0.5 font-mono text-[10px] text-lcd hover:bg-lcd/10"
+            style={{ background: "rgba(11,20,16,0.9)", textShadow: "0 0 5px rgba(126,217,174,0.45)" }}
+            title="Marked by a listener on this device — jump there on YouTube"
+          >
+            ▶ {fromSeconds(mark)}
+          </button>
+        )}
+      </div>
+      <button
+        onClick={() => (isThis ? player.toggle() : player.play(release))}
+        aria-label={`${playingThis ? "Pause" : "Play preview of"} ${release.title}`}
+        className={`flex h-10 w-11 flex-shrink-0 items-center justify-center rounded-[10px] border shadow-key transition-[box-shadow,transform] active:translate-y-px active:shadow-keyed ${
+          playingThis ? "border-[#b84516] bg-transport text-deck" : "border-chrome-700/70 bg-deck-600 text-ink"
+        }`}
+      >
+        {loadingThis ? (
+          <Loader2 size={16} className="animate-spin" />
+        ) : playingThis ? (
+          <Pause size={16} fill="currentColor" />
+        ) : (
+          <Play size={16} className="ml-0.5" fill="currentColor" />
+        )}
+      </button>
+    </div>
+  );
+}
+
 /** What to call the connected record, given which way the relationship runs. */
 function otherLabel(role: RelationRole): string {
   switch (role) {
@@ -141,7 +235,7 @@ function SampleCard({
   releases?: Release[];
 }) {
   const [videoId, setVideoId] = useState<string | null>(null);
-  const [state, setState] = useState<"idle" | "loading" | "none">("idle");
+  const [, setState] = useState<"idle" | "loading" | "none">("idle");
   const [playing, setPlaying] = useState(false);
   const [side, setSide] = useState<"other" | "subject">("other");
   const [manual, setManual] = useState(false);
@@ -237,7 +331,7 @@ function SampleCard({
         ? "bg-vu/20 text-vu"
         : "bg-tps/20 text-tps";
   const badgeLabel =
-    sample.role === "samples" ? "Contains sample"
+    sample.role === "samples" ? (sample.partial ? "Interpolation" : "Direct sample")
       : sample.role === "sampledBy" ? "Sampled in"
       : sample.role === "covers" ? "Covers"
       : sample.role === "coveredBy" ? "Covered by"
@@ -274,6 +368,44 @@ function SampleCard({
     // A side switch reloads the video; seek once it's had a moment to swap.
     window.setTimeout(() => yt.seek(seconds), side === target ? 0 : 700);
   };
+
+  const player = usePlayer();
+  const [showVideo, setShowVideo] = useState(false);
+  const hasVideo = Boolean(videoId || subjectVideoId);
+
+  // Which record is the newer one that takes, and which is the source.
+  const subjectTakes = sample.role === "samples" || sample.role === "covers" || sample.role === "remixOf";
+  const otherArtist = sample.artist ?? baseArtist;
+  const otherCover =
+    cover ?? `/api/artwork?artist=${encodeURIComponent(otherArtist)}&title=${encodeURIComponent(sample.title)}`;
+  const subjectSide = {
+    release: previewRelease(subject.artist, subject.title, subject.artwork_url, null),
+    year: null as string | null,
+    isSubject: true,
+  };
+  const otherSide = {
+    release: previewRelease(otherArtist, sample.title, otherCover, sample.year),
+    year: sample.year,
+    isSubject: false,
+  };
+  const top = subjectTakes ? subjectSide : otherSide;
+  const bottom = subjectTakes ? otherSide : subjectSide;
+  const topSide: "subject" | "other" = subjectTakes ? "subject" : "other";
+  const bottomSide: "subject" | "other" = subjectTakes ? "other" : "subject";
+  const markFor = (side: "subject" | "other") => (side === "subject" ? mark.inSong : mark.inSource) ?? null;
+  const topMark = markFor(topSide);
+  const bottomMark = markFor(bottomSide);
+
+  const isSampleRole = sample.role === "samples" || sample.role === "sampledBy";
+  const connector = isSampleRole
+    ? sample.partial ? "interpolates (replayed, not lifted)" : "samples"
+    : isCovers ? "covers" : "remixes";
+  const connectorTone = isSampleRole ? "text-sony" : isCovers ? "text-lcd" : "text-sport";
+  // The API fills `description` with boilerplate ("Samples “X” by Y") when it
+  // has nothing specific; that just repeats the rows above. Keep real notes.
+  const note = /^(Samples|Sampled in|Covers|Covered by|Remix of|Remixed in) \u201C/.test(sample.description)
+    ? null
+    : sample.description;
 
   // If the sampled/original track is itself in the loaded catalog, cross-link
   // to its release page — samples as a doorway into discovery, not a dead end.
@@ -312,9 +444,9 @@ function SampleCard({
             <BadgeIcon size={11} />
             {badgeLabel}
           </span>
-          {sample.partial && (
+          {sample.partial && sample.role !== "samples" && (
             <span className="rounded-full bg-white/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-ink/55">
-              Partial
+              Interpolation
             </span>
           )}
           {catalogHit && (
@@ -326,145 +458,130 @@ function SampleCard({
               In catalog ↗
             </Link>
           )}
-          {sample.year && (
-            <span className="ml-auto font-mono text-[10px] text-ink/35">{sample.year}</span>
-          )}
+
         </div>
 
-        {/* the record itself — cover stays small so the title always has room */}
-        <div className="mt-3 flex items-start gap-3">
-          <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10 sm:h-16 sm:w-16">
-            <Artwork
-              src={
-                cover ??
-                `/api/artwork?artist=${encodeURIComponent(sample.artist ?? baseArtist)}&title=${encodeURIComponent(sample.title)}`
-              }
-              artist={sample.artist ?? baseArtist}
-              title={sample.title}
-              sizes="64px"
-            />
+        {/* ── The pair, WhoSampled-style ──────────────────────────────
+            The song that does the sampling on top, the record it takes from
+            below, joined by what kind of connection it is — each with its own
+            play key. This card used to be a single YouTube player that needed
+            a resolved video id; when none resolved (no API key, spent quota,
+            no upload) the whole card became a "Find it on YouTube" box and you
+            couldn't hear either record in the app. The keys play Pulsar's
+            30-second previews through the main player, which need no key. */}
+        <div className="mt-3 overflow-hidden rounded-xl border border-chrome-700/50 bg-black/25">
+          <PairRow
+            {...top}
+            player={player}
+            mark={topMark}
+            onMarkJump={topMark != null ? () => jumpTo(topSide, topMark) : undefined}
+          />
+          <div className="flex items-center gap-2 border-y border-white/[0.06] bg-white/[0.02] px-3 py-1.5">
+            <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-deck-600 text-ink-400">
+              <ArrowDown size={11} />
+            </span>
+            <span className={`text-[10px] font-bold uppercase tracking-[0.16em] ${connectorTone}`}>
+              {connector}
+            </span>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[15px] font-bold leading-tight text-ink">{sample.title}</p>
-            {sample.artist && (
-              <p className="truncate text-[12px] text-ink/55">{sample.artist}</p>
+          <PairRow
+            {...bottom}
+            player={player}
+            mark={bottomMark}
+            onMarkJump={bottomMark != null ? () => jumpTo(bottomSide, bottomMark) : undefined}
+          />
+        </div>
+
+        {/* What's actually taken, when the catalogue says — the "element" line. */}
+        {note && <p className="mt-2 px-0.5 text-[11px] leading-snug text-ink-400">{note}</p>}
+
+        {/* ── Full tracks, on YouTube ──────────────────────────────────
+            Optional, and the only place timing marks are captured: a moment
+            inside a 30-second preview isn't a moment in the song. */}
+        {hasVideo ? (
+          <div className="mt-3">
+            <button
+              onClick={() => setShowVideo((v) => !v)}
+              aria-expanded={showVideo}
+              className="flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-ink-400 transition-colors hover:text-ink"
+            >
+              <span className="flex items-center gap-1.5">
+                <Youtube size={13} className="text-[#e23b2e]" /> Watch full tracks · mark the timing
+              </span>
+              <span className={`transition-transform ${showVideo ? "rotate-180" : ""}`}>⌄</span>
+            </button>
+            {showVideo && (
+              <>
+                <div className="mt-2 flex rounded-[10px] border border-white/10 bg-black/30 p-1">
+                  {(
+                    [
+                      { id: "other" as const, label: otherLabel(sample.role), enabled: Boolean(videoId) },
+                      { id: "subject" as const, label: "This track", enabled: Boolean(subjectVideoId) },
+                    ]
+                  ).filter((x) => x.enabled).map((x) => (
+                    <button
+                      key={x.id}
+                      onClick={() => {
+                        setSide(x.id);
+                        setPlaying(true);
+                      }}
+                      aria-pressed={side === x.id}
+                      className={`flex-1 truncate rounded-[8px] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                        side === x.id ? "bg-deck-600 text-ink shadow-key" : "text-ink-400 hover:text-ink"
+                      }`}
+                    >
+                      {x.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-2 aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                  {!playing ? (
+                    <button
+                      onClick={() => activeVideoId && setPlaying(true)}
+                      disabled={!activeVideoId}
+                      className="group relative h-full w-full disabled:cursor-default"
+                      aria-label={`Play ${onOther ? sample.title : subject.title} on YouTube`}
+                    >
+                      {activeVideoId ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={`https://i.ytimg.com/vi/${activeVideoId}/hqdefault.jpg`} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center text-ink/25">
+                          <Disc3 size={30} />
+                        </span>
+                      )}
+                      {activeVideoId && (
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/25">
+                          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/60 ring-1 ring-white/40 backdrop-blur transition-transform group-hover:scale-110">
+                            <Play size={18} className="ml-0.5 text-white" fill="currentColor" />
+                          </span>
+                        </span>
+                      )}
+                    </button>
+                  ) : yt.status === "unavailable" ? (
+                    <iframe
+                      key={`${activeVideoId}-${activeStart}`}
+                      className="h-full w-full"
+                      src={`https://www.youtube.com/embed/${activeVideoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1${
+                        activeStart ? `&start=${Math.floor(activeStart)}` : ""
+                      }`}
+                      title={onOther ? sample.title : subject.title}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      referrerPolicy="strict-origin-when-cross-origin"
+                    />
+                  ) : (
+                    <div ref={yt.hostRef} className="h-full w-full" />
+                  )}
+                </div>
+              </>
             )}
-            <p className="mt-1 text-[11px] leading-snug text-ink/45">{sample.description}</p>
           </div>
-        </div>
-
-        {/* ── A/B switch: hear both records without leaving the card ── */}
-        <div className="mt-3 flex rounded-full border border-white/10 bg-black/30 p-1">
-          {(
-            [
-              { id: "other" as const, label: otherLabel(sample.role), enabled: Boolean(videoId) },
-              { id: "subject" as const, label: "This track", enabled: Boolean(subjectVideoId) },
-            ]
-          ).map((s) => (
-            <button
-              key={s.id}
-              onClick={() => {
-                setSide(s.id);
-                setPlaying(true);
-              }}
-              disabled={!s.enabled}
-              className={`flex-1 truncate rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors disabled:opacity-30 ${
-                side === s.id && playing
-                  ? "bg-sony/25 text-sony"
-                  : "text-ink/50 hover:text-ink"
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-
-        {/* player — poster until asked for, then the real thing.
-            When nothing resolves, this becomes a real way out to YouTube
-            rather than a disabled box reading "No video found", which is where
-            the feature used to die. */}
-        <div className="mt-2 aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
-          {!playing && !activeVideoId && state !== "loading" ? (
-            <a
-              href={youtubeSearchUrl(sample.artist ?? baseArtist, sample.title)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group flex h-full w-full flex-col items-center justify-center gap-2 px-4 text-center transition-colors hover:bg-white/[0.04]"
-            >
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ff0000]/15 text-[#e23b2e] transition-transform group-hover:scale-110">
-                <Youtube size={20} />
-              </span>
-              <span className="text-[12px] font-bold text-ink">
-                Find it on YouTube
-              </span>
-              <span className="max-w-[36ch] text-[10px] leading-snug text-ink/45">
-                No upload is pinned for this record yet, so it can&rsquo;t play inline —
-                this opens a YouTube search for it.
-              </span>
-            </a>
-          ) : !playing ? (
-            <button
-              onClick={() => activeVideoId && setPlaying(true)}
-              disabled={!activeVideoId}
-              className="group relative h-full w-full disabled:cursor-default"
-              aria-label={`Play ${sample.title} on YouTube`}
-            >
-              {thumb ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={thumb} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <span className="flex h-full w-full items-center justify-center text-ink/25">
-                  <Disc3 size={30} className={state === "loading" ? "animate-spin" : ""} />
-                </span>
-              )}
-              {activeVideoId && (
-                <span className="absolute inset-0 flex items-center justify-center bg-black/25">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/60 ring-1 ring-white/40 backdrop-blur transition-transform group-hover:scale-110">
-                    <Play size={18} className="ml-0.5 text-white" fill="currentColor" />
-                  </span>
-                </span>
-              )}
-            </button>
-          ) : yt.status === "unavailable" ? (
-            // No IFrame API (blocked script / offline) — a plain embed still
-            // plays, it just can't report a playhead for one-tap marking.
-            <iframe
-              key={`${activeVideoId}-${activeStart}`}
-              className="h-full w-full"
-              src={`https://www.youtube.com/embed/${activeVideoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1${
-                activeStart ? `&start=${Math.floor(activeStart)}` : ""
-              }`}
-              title={onOther ? sample.title : subject.title}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              referrerPolicy="strict-origin-when-cross-origin"
-            />
-          ) : (
-            <div ref={yt.hostRef} className="h-full w-full" />
-          )}
-        </div>
+        ) : null}
 
         {/* timestamps + actions */}
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-          {mark.inSong != null && (
-            <button
-              onClick={() => jumpTo("subject", mark.inSong!)}
-              className="rounded-full bg-sony/20 px-2.5 py-1 font-mono text-[10px] text-sony hover:bg-sony/30"
-              title={`Sample lands at ${fromSeconds(mark.inSong)} in ${subject.title}`}
-            >
-              ▶ {fromSeconds(mark.inSong)} in this track
-            </button>
-          )}
-          {mark.inSource != null && (
-            <button
-              onClick={() => jumpTo("other", mark.inSource!)}
-              className="rounded-full bg-tps/20 px-2.5 py-1 font-mono text-[10px] text-tps hover:bg-tps/30"
-              title={`Taken from ${fromSeconds(mark.inSource)} in ${sample.title}`}
-            >
-              ▶ {fromSeconds(mark.inSource)} in {otherLabel(sample.role).toLowerCase()}
-            </button>
-          )}
-
+          {showVideo && (
           <button
             onClick={markNow}
             disabled={!playing}
@@ -482,14 +599,15 @@ function SampleCard({
             <Crosshair size={11} />
             {flash ? `Marked ${flash}` : "Mark this moment"}
           </button>
+          )}
 
           <button
             onClick={() => setManual((v) => !v)}
-            aria-label="Type timestamps by hand"
-            className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 text-ink/45 hover:border-white/40 hover:text-ink"
-            title="Type timestamps by hand"
+            aria-expanded={manual}
+            className="flex min-h-8 items-center gap-1.5 rounded-full border border-white/15 px-2.5 text-[10px] font-bold uppercase tracking-wide text-ink-400 hover:border-white/40 hover:text-ink"
+            title="Type where the sample lands in each track"
           >
-            <Pencil size={10} />
+            <Pencil size={11} /> Add timing
           </button>
 
           {/* Always a way out to YouTube: the exact video when one is pinned,
@@ -507,7 +625,7 @@ function SampleCard({
             rel="noopener noreferrer"
             className="ml-auto flex items-center gap-1 rounded-full bg-[#ff0000]/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#e23b2e] hover:bg-[#ff0000]/25"
           >
-            <Youtube size={12} /> {videoId ? "YouTube" : "Search"}
+            <Youtube size={12} /> {videoId ? "Open on YouTube" : "Find on YouTube"}
           </a>
         </div>
 
@@ -627,7 +745,16 @@ export function SamplePage({
 
   // Related tracks — songs that share sample DNA (WhoSampled's "related" strip).
   // Pure + cheap, so computed inline (no hook) after the null guard above.
-  const related = relatedSongs(subject.artist, subject.title, 6);
+  // Excluding the records already on this page: the sampled source came back
+  // as a "related track" that "shares 1 source" — itself — so the same record
+  // was listed twice, once as the sample and once as related. Related should
+  // mean OTHER songs built on the same DNA.
+  const onPage = new Set(
+    samples.map((x) => `${(x.artist ?? subject.artist).toLowerCase()}::${x.title.toLowerCase()}`)
+  );
+  const related = relatedSongs(subject.artist, subject.title, 12)
+    .filter((r) => !onPage.has(`${r.artist.toLowerCase()}::${r.title.toLowerCase()}`))
+    .slice(0, 6);
 
   // Credits for the subject — prefer the release's pre-computed credits, else
   // parse the artist + title on the spot (deterministic, keyless).
@@ -836,11 +963,17 @@ export function SamplePage({
         )}
 
         <p className="mt-6 text-center text-[10px] leading-relaxed text-ink/30">
-          Connections from a hand-checked catalog + MusicBrainz · originals played from YouTube.
+          Connections from a hand-checked catalog + MusicBrainz · 30-second previews from the stores.
           <br />
-          Timings are marked by listeners — hit{" "}
-          <span className="text-ink/50">Mark this moment</span> while it plays.
+          Timings are marked by listeners on the full track — open{" "}
+          <span className="text-ink/50">Watch full tracks</span> and hit Mark this moment.
         </p>
+      </div>
+      {/* On phones this overlay covers the main transport, so a preview started
+          from a card would play with nothing on screen to pause it. The panel
+          carries its own, as the Selector does. */}
+      <div className="flex-shrink-0 border-t border-white/10 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] empty:hidden">
+        <MiniPlayer />
       </div>
     </motion.div>
     </Portal>
