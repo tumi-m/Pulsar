@@ -48,12 +48,14 @@ export interface DspProvider {
 export interface DspRuntimeConfig {
   spotifyClientId: string;
   googleClientId: string;
+  tidalClientId: string;
   appleEnabled: boolean;
 }
 
 const BUILD_TIME_CONFIG: DspRuntimeConfig = {
   spotifyClientId: process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ?? "",
   googleClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "",
+  tidalClientId: process.env.NEXT_PUBLIC_TIDAL_CLIENT_ID ?? "",
   appleEnabled: process.env.NEXT_PUBLIC_APPLE_MUSIC_ENABLED === "true",
 };
 
@@ -68,6 +70,7 @@ export function loadDspConfig(force = false): Promise<DspRuntimeConfig> {
     .then((c: Partial<DspRuntimeConfig>) => ({
       spotifyClientId: c.spotifyClientId || BUILD_TIME_CONFIG.spotifyClientId,
       googleClientId: c.googleClientId || BUILD_TIME_CONFIG.googleClientId,
+      tidalClientId: c.tidalClientId || BUILD_TIME_CONFIG.tidalClientId,
       appleEnabled: c.appleEnabled ?? BUILD_TIME_CONFIG.appleEnabled,
     }))
     .catch(() => BUILD_TIME_CONFIG);
@@ -97,6 +100,46 @@ export function takeAuthError(provider: string): string | null {
   } catch {
     return null;
   }
+}
+
+// ── OAuth state ─────────────────────────────────────────────────
+// `state` used to be the provider's name — "spotify", "tidal", "youtube" — so
+// it identified which flow was returning but carried no nonce: nothing tied a
+// returning redirect to a sign-in THIS browser started (the CSRF protection
+// `state` exists for). It is now "<provider>.<nonce>", with the nonce kept
+// beside the PKCE verifier and checked, once, on return.
+const STATE_PREFIX = "pulsar_oauth_state_";
+
+export function newOAuthState(provider: string): string {
+  const nonce = randomString(16);
+  try {
+    // Mirrored into localStorage for the same reason as the verifier: some
+    // mobile browsers drop sessionStorage across the OAuth round-trip.
+    sessionStorage.setItem(STATE_PREFIX + provider, nonce);
+    localStorage.setItem(STATE_PREFIX + provider, nonce);
+  } catch {
+    /* storage unavailable — the check below then fails closed */
+  }
+  return `${provider}.${nonce}`;
+}
+
+/**
+ * "other"    — this redirect isn't for `provider`; leave it alone.
+ * "ok"       — ours, and the nonce matches the one we issued.
+ * "mismatch" — claims to be ours but we didn't start it (or storage was lost).
+ * The stored nonce is consumed either way.
+ */
+export function checkOAuthState(provider: string, state: string | null): "other" | "ok" | "mismatch" {
+  if (!state || (state !== provider && !state.startsWith(provider + "."))) return "other";
+  let expected: string | null = null;
+  try {
+    expected = sessionStorage.getItem(STATE_PREFIX + provider) ?? localStorage.getItem(STATE_PREFIX + provider);
+    sessionStorage.removeItem(STATE_PREFIX + provider);
+    localStorage.removeItem(STATE_PREFIX + provider);
+  } catch {
+    /* fall through to mismatch */
+  }
+  return expected && state === `${provider}.${expected}` ? "ok" : "mismatch";
 }
 
 // ── PKCE helpers (Spotify, Tidal) ───────────────────────────────

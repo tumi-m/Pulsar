@@ -31,14 +31,16 @@ export default async function SamplesPage({
     sp.artist && sp.title ? { artist: sp.artist, title: sp.title } : null;
 
   // Releases are used for catalog cross-links + search suggestions only, so a
-  // modest slice is plenty (deduped, DB first).
+  // modest slice is plenty (deduped, DB first). Capped: every entry here is
+  // serialised into the RSC payload.
+  const PAYLOAD_CAP = 220;
   const db = await getReleases({ limit: 200 }).catch(() => [] as Release[]);
   const byKey = new Map<string, Release>();
   for (const r of [...db, ...CATALOG]) {
     const k = `${r.artist}::${r.title}`.toLowerCase();
     if (!byKey.has(k)) byKey.set(k, r);
   }
-  const releases = Array.from(byKey.values());
+  const releases = Array.from(byKey.values()).slice(0, PAYLOAD_CAP);
 
   return <SamplesClient releases={releases} initial={initial} />;
 }

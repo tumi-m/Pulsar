@@ -21,6 +21,8 @@ import {
   type BuildResult,
   type DspProvider,
   type ProgressFn,
+  newOAuthState,
+  checkOAuthState,
 } from "./shared";
 
 // Start from the build-time inline; /api/dsp-config overlays the live server
@@ -124,7 +126,7 @@ async function beginAuth() {
     response_type: "code",
     redirect_uri: redirectUri(),
     scope: SCOPES,
-    state: "spotify",
+    state: newOAuthState("spotify"),
     code_challenge_method: "S256",
     code_challenge: challenge,
   });
@@ -136,7 +138,31 @@ class SpotifyAuthError extends Error {}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function api(path: string, token: string, init?: RequestInit, attempt = 0): Promise<any> {
+/** Minimal shapes of the Spotify API responses this code reads. */
+interface SpotifyArtist {
+  name?: string;
+}
+interface SpotifyAlbumItem {
+  id?: string;
+  name?: string;
+  artists?: SpotifyArtist[];
+}
+interface SpotifyTrackItem {
+  uri?: string;
+  artists?: SpotifyArtist[];
+}
+interface SpotifyPlaylist {
+  id?: string;
+  external_urls?: { spotify?: string };
+  uri?: string;
+}
+
+async function api(
+  path: string,
+  token: string,
+  init?: RequestInit,
+  attempt = 0
+): Promise<Record<string, unknown>> {
   const res = await fetch(`https://api.spotify.com/v1${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init?.headers ?? {}) },
@@ -171,7 +197,8 @@ async function api(path: string, token: string, init?: RequestInit, attempt = 0)
     return api(path, token, init, attempt + 1);
   }
   if (!res.ok) throw new Error(`Spotify API ${res.status}`);
-  return res.status === 204 ? null : res.json();
+  // 204 = no content (some POSTs) — callers only branch on `?.id` etc.
+  return res.status === 204 ? {} : ((await res.json()) as Record<string, unknown>);
 }
 
 const normalise = (s: string) =>
@@ -203,16 +230,19 @@ export async function urisForRelease(r: Release, token: string): Promise<string[
         `/search?q=${encodeURIComponent(term)}&type=album&limit=5`,
         token
       );
-      const items = found?.albums?.items ?? [];
+      const items = ((found?.albums as { items?: SpotifyAlbumItem[] } | undefined)?.items ??
+        []) as SpotifyAlbumItem[];
       const album =
         items.find(
-          (a: any) =>
+          (a) =>
             artistMatches(r.artist, a.artists) &&
             normalise(a.name ?? "").includes(normalise(r.title).slice(0, 12))
-        ) ?? items.find((a: any) => artistMatches(r.artist, a.artists));
+        ) ?? items.find((a) => artistMatches(r.artist, a.artists));
       if (album?.id) {
         const tracks = await api(`/albums/${album.id}/tracks?limit=50`, token);
-        const uris = (tracks?.items ?? []).map((t: { uri: string }) => t.uri).filter(Boolean);
+        const trackItems =
+          ((tracks?.items as { uri?: string }[] | undefined) ?? []).filter(Boolean) ?? [];
+        const uris = trackItems.map((t) => t.uri).filter((u): u is string => Boolean(u));
         if (uris.length) return uris;
       }
     } catch (e) {
@@ -226,8 +256,9 @@ export async function urisForRelease(r: Release, token: string): Promise<string[
       `/search?q=${encodeURIComponent(term)}&type=track&limit=5`,
       token
     );
-    const items = found?.tracks?.items ?? [];
-    const track = items.find((t: any) => artistMatches(r.artist, t.artists)) ?? null;
+    const items = ((found?.tracks as { items?: SpotifyTrackItem[] } | undefined)?.items ??
+      []) as SpotifyTrackItem[];
+    const track = items.find((t) => artistMatches(r.artist, t.artists)) ?? null;
     return track?.uri ? [track.uri] : [];
   } catch (e) {
     if (e instanceof SpotifyAuthError) throw e;
@@ -283,14 +314,18 @@ export const spotifyProvider: DspProvider = {
     // which needs the id from GET /v1/me. If that profile read is refused for
     // any reason, fall back to POST /v1/me/playlists rather than failing the
     // whole export — Spotify accepts it and infers the user from the token.
-    let playlist: any = null;
+    let playlist: SpotifyPlaylist | null = null;
     try {
-      const me = await api("/me", token.access_token);
+      const me = await api("/me", token.access_token) as { id?: string };
       if (me?.id) {
-        playlist = await api(`/users/${encodeURIComponent(me.id)}/playlists`, token.access_token, {
-          method: "POST",
-          body,
-        });
+        playlist = (await api(
+          `/users/${encodeURIComponent(me.id)}/playlists`,
+          token.access_token,
+          {
+            method: "POST",
+            body,
+          }
+        )) as SpotifyPlaylist;
       }
     } catch (e) {
       if (e instanceof SpotifyAuthError && /expired/i.test(e.message)) throw e; // 401 is fatal
@@ -298,7 +333,10 @@ export const spotifyProvider: DspProvider = {
     }
 
     if (!playlist?.id) {
-      playlist = await api("/me/playlists", token.access_token, { method: "POST", body });
+      playlist = (await api("/me/playlists", token.access_token, {
+        method: "POST",
+        body,
+      })) as SpotifyPlaylist;
     }
     if (!playlist?.id) throw new Error("Spotify didn't return a playlist.");
 
@@ -336,7 +374,15 @@ export const spotifyProvider: DspProvider = {
 
   async completeRedirect(): Promise<boolean> {
     const url = new URL(window.location.href);
-    if (url.searchParams.get("state") !== "spotify") return false;
+    const stateCheck = checkOAuthState("spotify", url.searchParams.get("state"));
+    if (stateCheck === "other") return false;
+    if (stateCheck === "mismatch") {
+      // Not a sign-in this browser started. Don't spend the code.
+      cleanUrl();
+      clearVerifier();
+      setAuthError("spotify", "Spotify sign-in couldn't be verified. Please try exporting again.");
+      return false;
+    }
 
     // Spotify reports consent denial / misconfiguration here.
     const oauthError = url.searchParams.get("error");

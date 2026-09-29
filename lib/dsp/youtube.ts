@@ -24,6 +24,10 @@ import {
   type BuildResult,
   type DspProvider,
   type ProgressFn,
+  newOAuthState,
+  checkOAuthState,
+  setAuthError,
+  takeAuthError,
 } from "./shared";
 
 // Build-time inline, overlaid at runtime by /api/dsp-config (see
@@ -80,7 +84,7 @@ async function beginAuth() {
     redirect_uri: redirectUri(),
     response_type: "code",
     scope: SCOPE,
-    state: "youtube",
+    state: newOAuthState("youtube"),
     include_granted_scopes: "true",
     prompt: "consent",
     access_type: "online",
@@ -151,6 +155,10 @@ export const youtubeProvider: DspProvider = {
   async createPlaylist(name, releases, onProgress?: ProgressFn): Promise<BuildResult | "redirecting"> {
     const token = readToken("youtube");
     if (!token) {
+      // A failed sign-in left a reason: show it rather than bouncing the user
+      // back to Google's consent screen, which is what made this a loop.
+      const authErr = takeAuthError("youtube");
+      if (authErr) throw new Error(authErr);
       beginAuth();
       return "redirecting";
     }
@@ -200,14 +208,38 @@ export const youtubeProvider: DspProvider = {
 
   async completeRedirect(): Promise<boolean> {
     const url = new URL(window.location.href);
-    if (url.searchParams.get("state") !== "youtube") return false;
+    const stateCheck = checkOAuthState("youtube", url.searchParams.get("state"));
+    if (stateCheck === "other") return false;
+    if (stateCheck === "mismatch") {
+      // Not a sign-in this browser started. Don't spend the code.
+      cleanUrl();
+      clearVerifier();
+      setAuthError("youtube", "YouTube sign-in couldn't be verified. Please try exporting again.");
+      return false;
+    }
 
     const oauthError = url.searchParams.get("error");
     const code = url.searchParams.get("code");
     const verifier = getVerifier();
     cleanUrl(); // tidy the address bar whatever the outcome
 
-    if (oauthError || !code || !verifier) {
+    // Every failure below used to be a bare `return false`: no message, and on
+    // a failed exchange the spent verifier was left behind. The export then
+    // found no token and sent the user straight back to Google's consent
+    // screen — a silent loop with no way to learn what was wrong. Each exit
+    // now leaves a reason the export surfaces instead of redirecting again.
+    if (oauthError) {
+      setAuthError(
+        "youtube",
+        oauthError === "access_denied"
+          ? "YouTube sign-in was cancelled. Export again to retry."
+          : `Google refused the sign-in ("${oauthError}"). Check the OAuth client's authorised redirect URI is exactly ${redirectUri()}.`
+      );
+      clearVerifier();
+      return false;
+    }
+    if (!code || !verifier) {
+      setAuthError("youtube", "YouTube sign-in didn't complete (the browser lost its sign-in state). Please try again.");
       clearVerifier();
       return false;
     }
@@ -218,13 +250,22 @@ export const youtubeProvider: DspProvider = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, verifier, redirectUri: redirectUri() }),
       });
-      const data = await res.json();
-      if (!res.ok || !data.access_token) return false;
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.access_token) {
+        setAuthError(
+          "youtube",
+          `YouTube sign-in failed: ${data.error || `the token exchange returned ${res.status}`}.`
+        );
+        return false;
+      }
       saveToken("youtube", data.access_token, data.expires_in ?? 3600);
-      clearVerifier();
       return true;
     } catch {
+      setAuthError("youtube", "YouTube sign-in failed: couldn't reach the server to finish it. Please try again.");
       return false;
+    } finally {
+      // A verifier is single-use. Leaving a spent one behind poisoned the next attempt.
+      clearVerifier();
     }
   },
 };

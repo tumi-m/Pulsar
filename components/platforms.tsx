@@ -3,7 +3,7 @@ import type { Release } from "@/lib/types";
 export interface PlatformDef {
   key: keyof Pick<
     Release,
-    "spotify" | "apple_music" | "tidal" | "soundcloud" | "youtube_music"
+    "spotify" | "apple_music" | "tidal" | "soundcloud" | "youtube_music" | "boomplay"
   >;
   label: string;
   hint: string;
@@ -64,6 +64,28 @@ export const PLATFORMS: PlatformDef[] = [
     Icon: () => (
       <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
         <path d="M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm0 19.104c-3.924 0-7.104-3.18-7.104-7.104S8.076 4.896 12 4.896s7.104 3.18 7.104 7.104-3.18 7.104-7.104 7.104zm0-13.332c-3.432 0-6.228 2.796-6.228 6.228S8.568 18.228 12 18.228s6.228-2.796 6.228-6.228S15.432 5.772 12 5.772zM9.684 15.54V8.46L15.816 12l-6.132 3.54z" />
+      </svg>
+    ),
+  },
+  {
+    key: "boomplay",
+    label: "Boomplay",
+    hint: "Find on Boomplay",
+    // Africa's largest streaming service — roughly 95M monthly active users,
+    // an order of magnitude more reach than Tidal, and where much of Pulsar's
+    // amapiano, gqom, kwaito and SA gospel catalogue actually lives.
+    color: "#2F6BFF",
+    // A plain lettermark, NOT a reproduction of Boomplay's logo. This session
+    // could not reach boomplay.com to obtain the official asset, and drawing an
+    // approximation from memory would ship a subtly wrong version of someone
+    // else's trademark. Swap in the real SVG when you can fetch it.
+    Icon: () => (
+      <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
+        <circle cx="12" cy="12" r="10.25" stroke="currentColor" strokeWidth="1.6" />
+        <path
+          d="M9.1 7.3h3.5a2.35 2.35 0 0 1 0 4.7H9.1V7.3Zm0 4.7h3.9a2.35 2.35 0 0 1 0 4.7H9.1V12Z"
+          fill="currentColor"
+        />
       </svg>
     ),
   },

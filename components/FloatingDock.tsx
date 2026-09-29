@@ -21,6 +21,7 @@ import { PhysicalMedia } from "./PhysicalMedia";
 import { PLATFORMS } from "./platforms";
 import { usePlayer } from "./player/PlayerProvider";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { useDialog } from "@/lib/useDialog";
 import { useBackClose } from "@/lib/useBackClose";
 import { Portal } from "./Portal";
 import { useIsTouch } from "@/lib/useIsTouch";
@@ -46,10 +47,11 @@ type Panel = "favorites" | "playlist" | null;
  * "crate" panel where the collection is displayed as physical media.
  */
 export function FloatingDock({ format, onOpen }: FloatingDockProps) {
-  const { current, shuffle, toggleShuffle, play } = usePlayer();
+  const { shuffle, toggleShuffle, play } = usePlayer();
   const [panel, setPanel] = useState<Panel>(null);
   // Lock background scroll while the crate sheet is open (mobile).
   useScrollLock(Boolean(panel));
+  const dialogRef = useDialog<HTMLDivElement>(Boolean(panel));
   useBackClose(Boolean(panel), () => setPanel(null));
   // Hover never fires on touch, so play / favourite / share / remove would be
   // permanently hidden on a phone — reveal them instead.
@@ -127,8 +129,14 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       // build-time inlines.
       await ensureDspConfig().catch(() => {});
       setCfgTick((t) => t + 1);
-      const pending = await handleDspRedirect();
-      if (!pending) return;
+      const outcome = await handleDspRedirect();
+      if (!outcome) return;
+      if ("failed" in outcome) {
+        const plat = PLATFORMS.find((p) => p.key === outcome.failed);
+        flash(outcome.message ?? `${plat?.label ?? "The"} sign-in didn't complete, so the crate wasn't exported. Try again.`);
+        return;
+      }
+      const pending = outcome;
       const plat = PLATFORMS.find((p) => p.key === pending.provider);
       const label = plat?.label ?? "your DSP";
       const color = plat?.color ?? "#1DB954";
@@ -152,7 +160,6 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
         flash(err instanceof Error ? err.message : `${label} export failed`);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -318,7 +325,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
     >
       {renderIcon(active)}
       {count != null && count > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon-pink px-1 text-[9px] font-bold text-void">
+        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-vu px-1 text-[9px] font-bold text-deck">
           {count}
         </span>
       )}
@@ -334,13 +341,8 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
         className={`fixed right-4 z-40 flex flex-col items-end gap-2 transition-all duration-300 ${
           detailOpen || panel ? "pointer-events-none translate-x-6 opacity-0" : "opacity-100"
         } ${
-          navHidden
-            ? current
-              ? "bottom-[200px]"
-              : "bottom-[128px]"
-            : current
-              ? "bottom-24"
-              : "bottom-5"
+          // Offsets from the transport's measured height, not a guess at it.
+          navHidden ? "bottom-[calc(var(--player-h,0px)_+_128px)]" : "bottom-[calc(var(--player-h,0px)_+_20px)]"
         }`}
       >
         {/* Curator flies in when the navbar hides. Shuffle also lives here on
@@ -360,11 +362,11 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                 aria-label="Curator"
                 className="flex h-14 w-14 items-center justify-center rounded-full"
                 style={{
-                  background: "linear-gradient(120deg, #9b5de5, #ff5fa2 60%, #ffb347)",
-                  boxShadow: "0 6px 18px rgba(155,93,229,0.5), inset 0 1px 0 rgba(255,255,255,0.3)",
+                  background: "var(--grad-transport)",
+                  boxShadow: "0 6px 18px rgba(242,102,44,0.5), inset 0 1px 0 rgba(255,255,255,0.3)",
                 }}
               >
-                <Sparkles size={22} className="text-white" />
+                <Sparkles size={22} className="text-deck" />
               </motion.button>
               )}
               <motion.button
@@ -404,7 +406,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
         )}
         {dockBtn(
           "fav",
-          (active) => <Heart size={22} className={active ? "text-void" : "text-star-white/85"} />,
+          (active) => <Heart size={22} className={active ? "text-deck" : "text-ink/85"} />,
           "Your favorites",
           favs.length,
           () => setPanel(panel === "favorites" ? null : "favorites"),
@@ -423,9 +425,12 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setPanel(null)}
-              className="fixed inset-0 z-[54] bg-void/80 backdrop-blur-md"
+              className="fixed inset-0 z-[54] bg-deck/80 backdrop-blur-md"
             />
             <motion.div
+              ref={dialogRef}
+              role="dialog"
+              aria-label="Your crate"
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
@@ -435,11 +440,11 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               <div className="border-b border-white/10 px-5 py-4">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
-                    <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-star-white/40">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-ink/40">
                       {panel === "favorites" ? "Favorites" : "Crate"}
                     </p>
                     {panel === "favorites" ? (
-                      <h3 className="text-lg font-bold uppercase tracking-tight text-star-white">
+                      <h3 className="text-lg font-bold uppercase tracking-tight text-ink">
                         Loved · {items.length}
                       </h3>
                     ) : renaming ? (
@@ -452,15 +457,15 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                           refresh();
                         }}
                         onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-                        className="w-full rounded-md border border-white/20 bg-white/[0.06] px-2 py-1 text-lg font-bold uppercase tracking-tight text-star-white focus:outline-none"
+                        className="w-full rounded-md border border-white/20 bg-white/[0.06] px-2 py-1 text-lg font-bold uppercase tracking-tight text-ink focus:outline-none"
                       />
                     ) : (
                       <button
                         onClick={() => setRenaming(true)}
-                        className="flex items-center gap-2 text-left text-lg font-bold uppercase tracking-tight text-star-white"
+                        className="flex items-center gap-2 text-left text-lg font-bold uppercase tracking-tight text-ink"
                       >
                         <span className="truncate">{activeCrate?.name ?? "Crate"} · {items.length}</span>
-                        <Pencil size={12} className="flex-shrink-0 text-star-white/30" />
+                        <Pencil size={12} className="flex-shrink-0 text-ink/30" />
                       </button>
                     )}
                   </div>
@@ -469,7 +474,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                       <button
                         onClick={() => setExporting(true)}
                         aria-label={`Export ${items.length} to a playlist`}
-                        className="relative z-10 flex min-h-[44px] items-center gap-1.5 rounded-full border border-neon-green/50 bg-neon-green/15 px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-neon-green transition-colors hover:bg-neon-green/25 active:scale-95"
+                        className="relative z-10 flex min-h-[44px] items-center gap-1.5 rounded-full border border-lcd/50 bg-lcd/15 px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-lcd transition-colors hover:bg-lcd/25 active:scale-95"
                       >
                         <Upload size={15} />
                         Export
@@ -478,7 +483,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                     <button
                       onClick={() => setPanel(null)}
                       aria-label="Close"
-                      className="flex h-11 w-11 items-center justify-center rounded-full text-star-white/60 hover:bg-white/10 hover:text-star-white"
+                      className="flex h-11 w-11 items-center justify-center rounded-full text-ink/60 hover:bg-white/10 hover:text-ink"
                     >
                       <X size={18} />
                     </button>
@@ -495,11 +500,11 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                         className={`flex-shrink-0 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide transition-colors ${
                           c.id === activeCrateId
                             ? "border-[#c08a4e]/60 bg-[#c08a4e]/15 text-[#e0b070]"
-                            : "border-white/[0.12] text-star-white/50 hover:text-star-white"
+                            : "border-white/[0.12] text-ink/50 hover:text-ink"
                         }`}
                       >
                         {c.name}
-                        <span className="ml-1.5 text-star-white/40">{c.releases.length}</span>
+                        <span className="ml-1.5 text-ink/40">{c.releases.length}</span>
                       </button>
                     ))}
                     <button
@@ -509,7 +514,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                         setActiveCrateId(c.id);
                       }}
                       aria-label="New crate"
-                      className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/15 text-star-white/60 hover:border-white/40 hover:text-star-white"
+                      className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/15 text-ink/60 hover:border-white/40 hover:text-ink"
                     >
                       <Plus size={14} />
                     </button>
@@ -520,7 +525,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                           refresh();
                         }}
                         aria-label="Delete this crate"
-                        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/15 text-star-white/50 hover:border-neon-pink/50 hover:text-neon-pink"
+                        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/15 text-ink/50 hover:border-vu/50 hover:text-vu"
                       >
                         <Trash2 size={13} />
                       </button>
@@ -538,20 +543,20 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       onClick={() => setExporting(false)}
-                      className="absolute inset-0 z-10 bg-void/70 backdrop-blur-sm"
+                      className="absolute inset-0 z-10 bg-deck/70 backdrop-blur-sm"
                     />
                     <motion.div
                       initial={{ opacity: 0, y: 16 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 16 }}
                       transition={{ type: "spring", stiffness: 460, damping: 34 }}
-                      className="absolute inset-x-3 bottom-3 top-16 z-20 overflow-y-auto overscroll-contain rounded-2xl border border-white/15 bg-[#0d0d16]/[0.97] p-4 backdrop-blur-2xl sm:inset-x-4 sm:bottom-auto sm:top-20"
+                      className="absolute inset-x-3 bottom-3 top-16 z-20 overflow-y-auto overscroll-contain rounded-2xl border border-white/15 bg-[#1a2027]/[0.97] p-4 backdrop-blur-2xl sm:inset-x-4 sm:bottom-auto sm:top-20"
                       style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 24px 60px rgba(0,0,0,0.6)" }}
                     >
-                      <p className="text-sm font-bold uppercase tracking-wide text-star-white">
+                      <p className="text-sm font-bold uppercase tracking-wide text-ink">
                         Export {items.length} to a playlist
                       </p>
-                      <p className="mt-1 text-[11px] leading-relaxed text-star-white/45">
+                      <p className="mt-1 text-[11px] leading-relaxed text-ink/45">
                         {PLATFORMS.some((p) => providerConfigured(p.key)) ? (
                           <>
                             Services marked <span className="text-[#1DB954]">Creates playlist</span>{" "}
@@ -582,7 +587,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                               >
                                 <p.Icon />
                               </span>
-                              <span className="flex-1 text-sm font-medium text-star-white">
+                              <span className="flex-1 text-sm font-medium text-ink">
                                 {p.label}
                               </span>
                               {live ? (
@@ -590,7 +595,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                                   Creates playlist
                                 </span>
                               ) : (
-                                <span className="text-star-white/30">→</span>
+                                <span className="text-ink/30">→</span>
                               )}
                             </button>
                           );
@@ -599,7 +604,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                       <div className="mt-3 flex gap-2">
                         <button
                           onClick={copyList}
-                          className="flex-1 rounded-lg border border-white/15 py-2 text-[10px] font-bold uppercase tracking-widest text-star-white/70 hover:text-star-white"
+                          className="flex-1 rounded-lg border border-white/15 py-2 text-[10px] font-bold uppercase tracking-widest text-ink/70 hover:text-ink"
                         >
                           Copy list
                         </button>
@@ -608,7 +613,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                             downloadCsv();
                             flash("CSV downloaded");
                           }}
-                          className="flex-1 rounded-lg border border-white/15 py-2 text-[10px] font-bold uppercase tracking-widest text-star-white/70 hover:text-star-white"
+                          className="flex-1 rounded-lg border border-white/15 py-2 text-[10px] font-bold uppercase tracking-widest text-ink/70 hover:text-ink"
                         >
                           Download CSV
                         </button>
@@ -621,10 +626,10 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                           where the user is stuck. */}
                       {!providerConfigured("spotify") && (
                         <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-star-white/55">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-ink/55">
                             Turn on 1-tap Spotify playlists
                           </p>
-                          <ol className="mt-1.5 list-decimal space-y-0.5 pl-4 text-[10px] leading-relaxed text-star-white/40">
+                          <ol className="mt-1.5 list-decimal space-y-0.5 pl-4 text-[10px] leading-relaxed text-ink/40">
                             <li>
                               Create an app at{" "}
                               <a
@@ -636,7 +641,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                                 developer.spotify.com
                               </a>{" "}
                               and copy its Client ID into this deployment&apos;s{" "}
-                              <span className="font-mono text-star-white/60">SPOTIFY_CLIENT_ID</span>{" "}
+                              <span className="font-mono text-ink/60">SPOTIFY_CLIENT_ID</span>{" "}
                               env var.
                             </li>
                             <li>
@@ -653,12 +658,12 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                             }}
                             className="mt-2 flex w-full items-center gap-2 overflow-hidden rounded-lg border border-white/[0.12] bg-white/[0.04] px-2.5 py-2 text-left transition-colors hover:border-white/25"
                           >
-                            <Copy size={11} className="flex-shrink-0 text-star-white/50" />
-                            <span className="truncate font-mono text-[10px] text-star-white/75">
+                            <Copy size={11} className="flex-shrink-0 text-ink/50" />
+                            <span className="truncate font-mono text-[10px] text-ink/75">
                               {typeof window !== "undefined" ? `${window.location.origin}/` : "/"}
                             </span>
                           </button>
-                          <p className="mt-2 text-[9px] leading-relaxed text-star-white/35">
+                          <p className="mt-2 text-[9px] leading-relaxed text-ink/35">
                             Env changes are picked up live — no redeploy needed. While the app is
                             in Development mode, also add your Spotify account under Users &amp;
                             Access.
@@ -672,12 +677,19 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
 
               {items.length === 0 ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-                  <p className="text-sm font-bold uppercase tracking-widest text-star-white/40">
+                  <p className="text-sm font-bold uppercase tracking-widest text-ink/40">
                     Empty {panel === "favorites" ? "loved" : "crate"}
                   </p>
-                  <p className="text-xs text-star-white/35">
-                    Hover any album and tap the {panel === "favorites" ? "♥ heart" : "＋ plus"} to
-                    add it here.
+                  {/* The instruction said "hover any album" — read almost
+                      always on a phone, where there is no hover and the
+                      controls are shown outright. It described a gesture the
+                      reader could not perform. */}
+                  <p className="max-w-[16rem] text-xs leading-relaxed text-ink/35">
+                    {isTouch ? "Tap the " : "Hover any album and tap the "}
+                    <span className="text-ink/60">
+                      {panel === "favorites" ? "♥ heart" : "＋ plus"}
+                    </span>
+                    {isTouch ? " on any album" : ""} to add it here.
                   </p>
                 </div>
               ) : (
@@ -700,10 +712,10 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                             hovered={false}
                           />
                         </div>
-                        <p className="mt-1 truncate text-[10px] font-bold uppercase text-star-white">
+                        <p className="mt-1 truncate text-[10px] font-bold uppercase text-ink">
                           {r.title}
                         </p>
-                        <p className="truncate text-[9px] text-star-white/50">{r.artist}</p>
+                        <p className="truncate text-[9px] text-ink/50">{r.artist}</p>
                       </button>
 
                       {/* liquid-glass play triangle — like the home tiles */}
@@ -732,7 +744,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                             toggleFavorite(r);
                           }}
                           aria-label="Favorite"
-                          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-void/80 text-star-white/70 backdrop-blur hover:text-neon-pink"
+                          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-deck/80 text-ink/70 backdrop-blur hover:text-vu"
                         >
                           <Heart size={13} />
                         </button>
@@ -742,7 +754,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                             shareRelease(r);
                           }}
                           aria-label="Share"
-                          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-void/80 text-star-white/70 backdrop-blur hover:text-star-white"
+                          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-deck/80 text-ink/70 backdrop-blur hover:text-ink"
                         >
                           <Share2 size={13} />
                         </button>
@@ -753,7 +765,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                             else removeFromCrate(activeCrateId, r.id);
                           }}
                           aria-label="Remove"
-                          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-void/80 text-star-white/60 backdrop-blur hover:text-neon-pink"
+                          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-deck/80 text-ink/60 backdrop-blur hover:text-vu"
                         >
                           <Trash2 size={13} />
                         </button>
@@ -796,14 +808,14 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setBuilt(null)}
-              className="fixed inset-0 z-[70] flex items-center justify-center bg-void/85 backdrop-blur-md"
+              className="fixed inset-0 z-[70] flex items-center justify-center bg-deck/85 backdrop-blur-md"
             >
               <motion.div
                 initial={{ scale: 0.9, y: 10 }}
                 animate={{ scale: 1, y: 0 }}
                 exit={{ scale: 0.9, opacity: 0 }}
                 onClick={(e) => e.stopPropagation()}
-                className="w-[min(88vw,360px)] rounded-2xl border bg-[#0d0d16]/[0.97] p-6 text-center"
+                className="w-[min(88vw,360px)] rounded-2xl border bg-[#1a2027]/[0.97] p-6 text-center"
                 style={{ borderColor: `${color}66`, boxShadow: "0 24px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.15)" }}
               >
                 {/* celebratory burst behind the badge */}
@@ -830,16 +842,16 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                     initial={{ scale: 0, rotate: -140 }}
                     animate={{ scale: 1, rotate: 0 }}
                     transition={{ type: "spring", stiffness: 300, damping: 16, delay: 0.05 }}
-                    className="absolute inset-0 flex items-center justify-center rounded-full text-void"
+                    className="absolute inset-0 flex items-center justify-center rounded-full text-deck"
                     style={{ backgroundColor: color, boxShadow: `0 0 34px ${color}80` }}
                   >
                     {plat?.Icon?.() ?? null}
                   </motion.span>
                 </div>
-                <p className="text-base font-bold uppercase tracking-wide text-star-white">
+                <p className="text-base font-bold uppercase tracking-wide text-ink">
                   Playlist created 🎉
                 </p>
-                <p className="mt-1 text-[12px] leading-relaxed text-star-white/55">
+                <p className="mt-1 text-[12px] leading-relaxed text-ink/55">
                   “{built.name}” is now on your {label} with{" "}
                   <span style={{ color }}>{built.trackCount} tracks</span>
                   {built.addedReleases < built.totalReleases && (
@@ -852,14 +864,14 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                     href={built.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 rounded-full py-2.5 text-[11px] font-bold uppercase tracking-widest text-void transition-transform hover:scale-105"
+                    className="flex-1 rounded-full py-2.5 text-[11px] font-bold uppercase tracking-widest text-deck transition-transform hover:scale-105"
                     style={{ backgroundColor: color }}
                   >
                     Open in {label}
                   </a>
                   <button
                     onClick={() => setBuilt(null)}
-                    className="rounded-full border border-white/15 px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-star-white/60 hover:text-star-white"
+                    className="rounded-full border border-white/15 px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-ink/60 hover:text-ink"
                   >
                     Done
                   </button>
@@ -878,20 +890,20 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setBuildError(null)}
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-void/85 p-4 backdrop-blur-md"
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-deck/85 p-4 backdrop-blur-md"
           >
             <motion.div
               initial={{ scale: 0.92, y: 10 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.92, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-[min(92vw,380px)] rounded-2xl border border-neon-pink/40 bg-[#0d0d16]/[0.97] p-6 text-center"
+              className="w-[min(92vw,380px)] rounded-2xl border border-vu/40 bg-[#1a2027]/[0.97] p-6 text-center"
               style={{ boxShadow: "0 24px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.15)" }}
             >
-              <p className="text-base font-bold uppercase tracking-wide text-star-white">
+              <p className="text-base font-bold uppercase tracking-wide text-ink">
                 {buildError.label} export failed
               </p>
-              <p className="mt-2 text-[12px] leading-relaxed text-star-white/60">
+              <p className="mt-2 text-[12px] leading-relaxed text-ink/60">
                 {buildError.message}
               </p>
               {/* A permission/session failure can't be retried with the same
@@ -917,7 +929,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                       setBuildError(null);
                       buildDsp(e.key, e.label, e.color, items, crateName());
                     }}
-                    className="min-h-[44px] rounded-full py-2.5 text-[11px] font-bold uppercase tracking-widest text-void transition-transform hover:scale-105"
+                    className="min-h-[44px] rounded-full py-2.5 text-[11px] font-bold uppercase tracking-widest text-deck transition-transform hover:scale-105"
                     style={{ backgroundColor: buildError.color }}
                   >
                     Reconnect to Spotify
@@ -940,13 +952,13 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                     setBuildError(null);
                     csvFallback(e.key, e.label);
                   }}
-                  className="min-h-[44px] rounded-full border border-white/15 py-2.5 text-[11px] font-bold uppercase tracking-widest text-star-white/70 hover:text-star-white"
+                  className="min-h-[44px] rounded-full border border-white/15 py-2.5 text-[11px] font-bold uppercase tracking-widest text-ink/70 hover:text-ink"
                 >
                   Download CSV instead
                 </button>
                 <button
                   onClick={() => setBuildError(null)}
-                  className="py-1 text-[10px] font-bold uppercase tracking-widest text-star-white/40 hover:text-star-white/70"
+                  className="py-1 text-[10px] font-bold uppercase tracking-widest text-ink/40 hover:text-ink/70"
                 >
                   Cancel
                 </button>
@@ -963,7 +975,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-full border border-neon-green/40 bg-void/90 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-neon-green backdrop-blur"
+            className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-full border border-lcd/40 bg-deck/90 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-lcd backdrop-blur"
           >
             {toast}
           </motion.div>

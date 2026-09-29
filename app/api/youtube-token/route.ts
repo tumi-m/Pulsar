@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guard } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -20,6 +21,11 @@ export const runtime = "nodejs";
  */
 
 export async function POST(req: NextRequest) {
+  // Every call spends the app's client secret, so it gets the same per-IP
+  // ceiling as the other credentialed routes (apple-token, ask, agent).
+  const limited = guard(req, "youtube-token", { limit: 20, windowMs: 3_600_000 });
+  if (limited) return limited;
+
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
@@ -42,6 +48,19 @@ export async function POST(req: NextRequest) {
       { error: "code, verifier and redirectUri are all required." },
       { status: 400 }
     );
+  }
+
+  // The redirect URI was taken from the request body and signed with our
+  // secret unexamined. The client only ever sends its own origin + "/" (see
+  // lib/dsp/shared.ts redirectUri()), so require exactly that, and require the
+  // browser's Origin — when it sends one — to be this same site. Google would
+  // reject an unregistered URI and PKCE binds the code to its verifier, so this
+  // is defence in depth; but there is no reason to let another site use this
+  // endpoint with our credentials at all.
+  const self = req.nextUrl.origin;
+  const origin = req.headers.get("origin");
+  if (redirectUri !== `${self}/` || (origin && origin !== self)) {
+    return NextResponse.json({ error: "Redirect URI does not match this site." }, { status: 400 });
   }
 
   try {

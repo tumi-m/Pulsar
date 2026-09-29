@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
+import { guard } from "@/lib/rate-limit";
+import type { NextRequest } from "next/server";
 
 /**
  * Mints an Apple Music developer token (a short-lived ES256 JWT) from a MusicKit
@@ -23,7 +25,11 @@ function b64url(input: Buffer | string): string {
     .replace(/=+$/, "");
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Mints 12-hour developer JWTs — strictly ration them.
+  const limited = guard(req, "apple-token", { limit: 10, windowMs: 3_600_000 });
+  if (limited) return limited;
+
   const teamId = process.env.APPLE_TEAM_ID;
   const keyId = process.env.APPLE_KEY_ID;
   let privateKey = process.env.APPLE_PRIVATE_KEY;

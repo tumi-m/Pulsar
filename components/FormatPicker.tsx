@@ -15,7 +15,7 @@ interface FormatPickerProps {
 export function FormatPicker({ active, onChange }: FormatPickerProps) {
   return (
     <div className="flex items-center gap-2">
-      <span className="hidden text-[10px] font-bold uppercase tracking-[0.24em] text-[#8cc6ff]/70 sm:block">
+      <span className="hidden text-[10px] font-bold uppercase tracking-[0.24em] text-[#9dc0e8]/70 sm:block">
         Format
       </span>
       <div
@@ -42,13 +42,13 @@ export function FormatPicker({ active, onChange }: FormatPickerProps) {
                   layoutId="format-active"
                   className="absolute inset-0 rounded-md"
                   style={{
-                    background: "linear-gradient(160deg, #8cc6ff, #3f9bff)",
+                    background: "linear-gradient(160deg, #9dc0e8, #3f9bff)",
                     boxShadow: "0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.5)",
                   }}
                   transition={{ type: "spring", stiffness: 400, damping: 32 }}
                 />
               )}
-              <span className={`relative ${isActive ? "text-void" : "text-[#a9d5ff]"}`}>
+              <span className={`relative ${isActive ? "text-deck" : "text-[#bcd4f0]"}`}>
                 {f.label}
               </span>
             </button>

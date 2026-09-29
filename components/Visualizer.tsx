@@ -94,7 +94,7 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 30 }}
           transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-          className="fixed left-1/2 top-16 z-40 transform-gpu overflow-hidden rounded-2xl border border-white/15 bg-[#0a0a14]/55 backdrop-blur-2xl"
+          className="fixed left-1/2 top-16 z-40 transform-gpu overflow-hidden rounded-2xl border border-white/15 bg-[#12161a]/55 backdrop-blur-2xl"
           style={{
             width: `min(${size.w}px, 92vw)`,
             height: size.h,
@@ -116,15 +116,15 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
             }}
           >
             <div className="flex min-w-0 items-center gap-2">
-              <Move size={12} className="flex-shrink-0 text-star-white/40" />
-              <span className="text-[9px] font-bold uppercase tracking-[0.24em] text-star-white/45">
+              <Move size={12} className="flex-shrink-0 text-ink/40" />
+              <span className="text-[9px] font-bold uppercase tracking-[0.24em] text-ink/45">
                 Visualize
               </span>
-              <span className="text-star-white/25">·</span>
-              <span className="truncate text-[12px] font-bold uppercase tracking-tight text-star-white">
+              <span className="text-ink/25">·</span>
+              <span className="truncate text-[12px] font-bold uppercase tracking-tight text-ink">
                 {release.title}
               </span>
-              <span className="hidden truncate text-[11px] text-star-white/55 sm:inline">
+              <span className="hidden truncate text-[11px] text-ink/55 sm:inline">
                 — {release.artist}
               </span>
             </div>
@@ -132,7 +132,7 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
               onClick={handleClose}
               onPointerDown={(e) => e.stopPropagation()}
               aria-label="Close visualizer"
-              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/25 text-star-white/80 transition-colors hover:border-white/60 hover:text-star-white"
+              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/25 text-ink/80 transition-colors hover:border-white/60 hover:text-ink"
               style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
             >
               <X size={13} strokeWidth={2.5} />
@@ -145,7 +145,7 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
               <button
                 onClick={() => cycleMode(-1)}
                 aria-label="Previous visualisation"
-                className="flex h-7 w-7 items-center justify-center rounded-full text-star-white/60 hover:bg-white/10 hover:text-star-white"
+                className="flex h-7 w-7 items-center justify-center rounded-full text-ink/60 hover:bg-white/10 hover:text-ink"
               >
                 <ChevronLeft size={16} />
               </button>
@@ -168,8 +168,8 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
                       onClick={() => setMode(mo.id)}
                       className={`flex-shrink-0 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] transition-all duration-200 ${
                         active
-                          ? "scale-105 bg-white text-void shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
-                          : "scale-90 text-star-white/45 hover:text-star-white"
+                          ? "scale-105 bg-white text-deck shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
+                          : "scale-90 text-ink/45 hover:text-ink"
                       }`}
                     >
                       {mo.label}
@@ -180,7 +180,7 @@ export function Visualizer({ release, onClose }: VisualizerProps) {
               <button
                 onClick={() => cycleMode(1)}
                 aria-label="Next visualisation"
-                className="flex h-7 w-7 items-center justify-center rounded-full text-star-white/60 hover:bg-white/10 hover:text-star-white"
+                className="flex h-7 w-7 items-center justify-center rounded-full text-ink/60 hover:bg-white/10 hover:text-ink"
               >
                 <ChevronRight size={16} />
               </button>

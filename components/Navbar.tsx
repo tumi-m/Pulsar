@@ -62,14 +62,21 @@ export function Navbar() {
       initial={{ opacity: 0, y: 0 }}
       animate={{ opacity: 1, y: hidden ? -64 : 0 }}
       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      // The header only slides out of sight — it stays at full opacity, so its
+      // buttons remained clickable and, worse, tabbable while off-screen: a
+      // keyboard visitor scrolling down would focus Selector, Samples and
+      // Crate with nothing visible on the page. `inert` takes the whole bar out
+      // of the tab order and out of hit-testing while it's away, and gives it
+      // back the moment a scroll up brings it down.
+      inert={hidden}
       className={`
         fixed inset-x-0 top-0 z-40 h-14 transform-gpu px-5 md:px-10
         transition-colors duration-500
-        ${scrolled ? "border-b border-star-white/[0.06] bg-void/70 backdrop-blur-xl" : "bg-transparent"}
+        ${scrolled ? "border-b border-ink/[0.06] bg-deck/70 backdrop-blur-xl" : "bg-transparent"}
       `}
     >
       <div
-        className={`mx-auto flex h-full max-w-screen-2xl items-center justify-between transition-[padding,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        className={`mx-auto flex h-full max-w-screen-2xl items-center justify-between transition-[padding,opacity] duration-500 ease-settle ${
           detailOpen || crateOpen || samplesOpen ? "lg:pr-[50vw]" : ""
         } ${
           // The crate sheet covers this area on phones — get out of its way so
@@ -117,31 +124,39 @@ export function Navbar() {
         <button
           onClick={() => window.dispatchEvent(new CustomEvent("pulsar-ai-activate"))}
           aria-label="Selector — pick music by chat or visual survey"
-          className="flex items-center gap-2 rounded-full px-4 py-2 transition-transform hover:scale-105 active:scale-95"
+          // The one lit key in the header. Orange means "the thing to press",
+          // so it has to be the only orange up here.
+          className="flex min-h-9 items-center gap-2 rounded-[11px] border border-[#b84516] px-4 py-2 shadow-key transition-[box-shadow,transform,filter] hover:brightness-110 active:translate-y-px active:shadow-keyed"
           style={{
-            background: "linear-gradient(120deg, #9b5de5, #ff5fa2 60%, #ffb347)",
-            boxShadow: "0 4px 16px rgba(155,93,229,0.45)",
+            background: "var(--grad-transport)",
+            boxShadow:
+              "inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -1px 0 rgba(0,0,0,0.3), 0 4px 16px rgba(242,102,44,0.4)",
           }}
         >
-          <Sparkles size={14} className="text-white" />
-          <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white">Selector</span>
+          <Sparkles size={14} className="text-deck" />
+          <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-deck">Selector</span>
         </button>
         <button
           onClick={() => window.dispatchEvent(new CustomEvent("pulsar-open-samples"))}
           aria-label="Samples — songs built from other records"
           title="Samples"
-          className="flex items-center gap-2 rounded-full border border-neon-violet/40 bg-neon-violet/15 px-4 py-2 transition-all hover:scale-105 hover:border-neon-violet/70 hover:bg-neon-violet/25 active:scale-95"
-          style={{ boxShadow: "0 0 16px rgba(155,93,229,0.28)" }}
+          // Housing blue, not orange: after the palette swap this sat beside
+          // Selector in the same colour, two keys claiming the same meaning.
+          // Samples is exploration — information — which is what blue is for.
+          className="flex min-h-9 items-center gap-2 rounded-[11px] border border-tps/45 bg-tps/15 px-4 py-2 shadow-key transition-[box-shadow,transform,background-color] hover:bg-tps/25 active:translate-y-px active:shadow-keyed"
         >
-          <AudioLines size={15} className="text-neon-violet" />
-          <span className="hidden text-[11px] font-bold uppercase tracking-[0.2em] text-neon-violet sm:inline">
+          <AudioLines size={15} className="text-[#9dc0e8]" />
+          <span className="hidden text-[11px] font-bold uppercase tracking-[0.2em] text-[#bcd4f0] sm:inline">
             Samples
           </span>
         </button>
+        {/* data-crate-target is where flyToCrate() lands a saved record. A data
+            attribute, so the animation never has to import this component. */}
         <button
           onClick={() => window.dispatchEvent(new CustomEvent("pulsar-open-crate", { detail: "playlist" }))}
           aria-label="Open your crate"
-          className="flex items-center gap-2 rounded-full border border-[#c08a4e]/40 bg-[#c08a4e]/10 px-4 py-2 transition-all hover:scale-105 hover:border-[#c08a4e]/70 hover:bg-[#c08a4e]/20 active:scale-95"
+          data-crate-target=""
+          className="flex min-h-9 items-center gap-2 rounded-[11px] border border-[#c08a4e]/45 bg-[#c08a4e]/[0.12] px-4 py-2 shadow-key transition-[box-shadow,transform,background-color] hover:bg-[#c08a4e]/20 active:translate-y-px active:shadow-keyed"
         >
           <CrateIcon size={16} filled className="text-[#d69a5c]" />
           <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#e0b070]">Crate</span>

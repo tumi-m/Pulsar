@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useDragControls } from "framer-motion";
+import dynamic from "next/dynamic";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { useDialog } from "@/lib/useDialog";
 import { useBackClose } from "@/lib/useBackClose";
 import { Portal } from "./Portal";
 import { X, Check, Link as LinkIcon, Play, Pause, ChevronLeft, ChevronRight, Maximize2, Share2, Mic2, AudioLines } from "lucide-react";
@@ -12,8 +14,19 @@ import { Artwork } from "./Artwork";
 import { PLATFORMS } from "./platforms";
 import { usePlayer } from "./player/PlayerProvider";
 import { VisualCanvas, VISUAL_MODES, type VisualMode } from "./VisualCanvas";
-import { SamplePage, type SampleRef, type SampleSubject } from "./SamplePage";
-import { LyricsPanel, type LyricsSubject } from "./LyricsPanel";
+import { type SampleRef, type SampleSubject } from "./SamplePage";
+import { type LyricsSubject } from "./LyricsPanel";
+
+// The lyrics sheet only mounts on demand — keep it out of the main bundle.
+const LyricsPanel = dynamic(
+  () => import("./LyricsPanel").then((m) => m.LyricsPanel),
+  { ssr: false }
+);
+// The sample-breakdown sheet (YouTube player + graph) also mounts on demand.
+const SamplePage = dynamic(
+  () => import("./SamplePage").then((m) => m.SamplePage),
+  { ssr: false }
+);
 
 interface Track {
   number: number;
@@ -88,8 +101,15 @@ function TrackRow({
   const rowRef = useRef<HTMLDivElement | null>(null);
   const [samples, setSamples] = useState<SampleRef[] | null>(null);
 
-  const trackDisplay: Release = { ...release, title: track.title };
-  const isThis = player.current?.artist === release.artist && player.current?.title === track.title;
+  // Unique identity for this track — the album's id alone is shared by every
+  // row of the tracklist, which used to make shuffle mark the whole album
+  // played and made "open release" open the track as if it were the album.
+  const trackDisplay: Release = {
+    ...release,
+    id: `${release.id}#${track.number}`,
+    title: track.title,
+  };
+  const isThis = player.current?.id === trackDisplay.id;
   const playingThis = isThis && player.playing;
   const hasSample = Boolean(samples && samples.length > 0);
 
@@ -125,7 +145,7 @@ function TrackRow({
       ref={rowRef}
       className={`group flex items-center gap-2.5 rounded-xl border px-2.5 py-1.5 backdrop-blur-md transition-colors ${
         isThis
-          ? "border-neon-blue/30 bg-neon-blue/[0.10]"
+          ? "border-tps/30 bg-tps/[0.10]"
           : "border-white/10 bg-white/[0.05] hover:bg-white/[0.09]"
       }`}
     >
@@ -136,11 +156,11 @@ function TrackRow({
         }}
         disabled={!track.previewUrl}
         aria-label={playingThis ? "Pause" : "Play track"}
-        className="flex h-6 w-6 flex-shrink-0 items-center justify-center text-star-white/45 transition-colors group-hover:text-star-white disabled:opacity-30"
+        className="relative -my-3 flex h-6 w-6 flex-shrink-0 items-center justify-center text-ink/45 transition-colors group-hover:text-ink disabled:opacity-30 before:absolute before:inset-[-9px] before:content-['']"
       >
         <span className="group-hover:hidden">
           {playingThis ? (
-            <Pause size={12} className="text-neon-blue" fill="currentColor" />
+            <Pause size={12} className="text-tps" fill="currentColor" />
           ) : (
             <span className="text-[11px] font-mono">{track.number || "•"}</span>
           )}
@@ -150,7 +170,7 @@ function TrackRow({
         </span>
       </button>
 
-      <span className={`flex-1 truncate text-[13px] ${isThis ? "text-neon-blue" : "text-star-white/85"}`}>
+      <span className={`flex-1 truncate text-[13px] ${isThis ? "text-tps" : "text-ink/85"}`}>
         {track.title}
       </span>
 
@@ -160,8 +180,8 @@ function TrackRow({
           onClick={() => onOpenSample({ artist: release.artist, title: track.title, artwork_url: release.artwork_url }, samples!)}
           aria-label="View sample breakdown"
           title="Contains a sample — see the breakdown"
-          className="flex flex-shrink-0 items-center gap-1 rounded-full border border-neon-violet/40 bg-neon-violet/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] text-neon-violet transition-transform hover:scale-105 active:scale-95"
-          style={{ boxShadow: "0 0 12px rgba(155,93,229,0.35)" }}
+          className="relative -my-3 flex flex-shrink-0 items-center gap-1 rounded-full border border-sony/40 bg-sony/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] text-sony transition-transform hover:scale-105 active:scale-95 before:absolute before:inset-[-10px] before:content-['']"
+          style={{ boxShadow: "0 0 12px rgba(242,102,44,0.35)" }}
         >
           <AudioLines size={10} />
           Smp
@@ -173,12 +193,12 @@ function TrackRow({
         onClick={() => onOpenLyrics({ artist: release.artist, title: track.title })}
         aria-label="View lyrics"
         title="Lyrics"
-        className="flex h-6 w-6 flex-shrink-0 items-center justify-center text-star-white/25 transition-colors hover:text-neon-blue"
+        className="relative -my-3 flex h-6 w-6 flex-shrink-0 items-center justify-center text-ink/45 transition-colors hover:text-tps before:absolute before:inset-[-9px] before:content-['']"
       >
         <Mic2 size={13} />
       </button>
 
-      <span className="w-9 flex-shrink-0 text-right font-mono text-[10px] text-star-white/30">
+      <span className="w-9 flex-shrink-0 text-right font-mono text-[10px] text-ink/30">
         {fmtDur(track.durationMs)}
       </span>
     </div>
@@ -193,6 +213,9 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
   const player = usePlayer();
   // Lock the page behind the sheet on mobile (no scroll-bleed / jump).
   useScrollLock(Boolean(release));
+  // aria-modal stays false below: on desktop this is a side panel and the grid
+  // beside it is still meant to be used, so Tab must be able to leave.
+  const dialogRef = useDialog<HTMLDivElement>(Boolean(release));
   // Android Back / browser back closes the sheet instead of leaving the site.
   useBackClose(Boolean(release), onClose);
   // Drag-to-dismiss only from the grab handle / title bar, so scrolling the
@@ -303,11 +326,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
       return VISUAL_MODES[(i + dir + VISUAL_MODES.length) % VISUAL_MODES.length].id;
     });
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  // Escape is handled by useBackClose (shared across every overlay).
 
   // The now-playing bar can ask us to jump straight to the discography.
   useEffect(() => {
@@ -385,7 +404,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-40 cursor-default bg-void/60 backdrop-blur-sm lg:bg-transparent lg:backdrop-blur-0"
+            className="fixed inset-0 z-40 cursor-default bg-deck/60 backdrop-blur-sm lg:bg-transparent lg:backdrop-blur-0"
           />
 
           <motion.aside
@@ -402,8 +421,9 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
             onDragEnd={(_e, info) => {
               if (info.offset.y > 120 || info.velocity.y > 700) onClose();
             }}
-            className="fixed inset-x-0 bottom-0 z-40 flex h-[72dvh] transform-gpu flex-col rounded-t-2xl border border-b-0 border-white/15 bg-[#0a0a14]/70 backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-16 lg:bottom-3 lg:h-auto lg:w-1/2 lg:rounded-l-2xl lg:border lg:border-r-0"
+            className="fixed inset-x-0 bottom-0 z-40 flex h-[72dvh] transform-gpu flex-col rounded-t-2xl border border-b-0 border-white/15 bg-[#12161a]/70 backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-16 lg:bottom-3 lg:h-auto lg:w-1/2 lg:rounded-l-2xl lg:border lg:border-r-0"
             style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35), 0 -20px 60px rgba(0,0,0,0.5)" }}
+            ref={dialogRef}
             role="dialog"
             aria-modal="false"
             aria-label={`${release.title} by ${release.artist}`}
@@ -414,7 +434,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
               className="flex-shrink-0 cursor-grab touch-none py-2 lg:hidden"
               style={{ touchAction: "none" }}
             >
-              <div className="mx-auto h-1 w-10 rounded-full bg-star-white/25" />
+              <div className="mx-auto h-1 w-10 rounded-full bg-ink/25" />
             </div>
             {/* translucent liquid-glass title bar — also starts the drag */}
             <div
@@ -427,10 +447,10 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                 boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35)",
               }}
             >
-              <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-star-white/80">
+              <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-ink/80">
                 Album
-                <span className="text-star-white/25">·</span>
-                <span className="max-w-[46vw] truncate normal-case tracking-tight text-star-white lg:max-w-[16vw]">
+                <span className="text-ink/25">·</span>
+                <span className="max-w-[46vw] truncate normal-case tracking-tight text-ink lg:max-w-[16vw]">
                   {release.title}
                 </span>
               </span>
@@ -438,7 +458,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                 onClick={onClose}
                 onPointerDown={(e) => e.stopPropagation()}
                 aria-label="Close"
-                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/25 text-star-white/80 transition-colors hover:border-white/60 hover:text-star-white"
+                className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/25 text-ink/80 transition-colors hover:border-white/60 hover:text-ink"
                 style={{
                   background: "rgba(255,255,255,0.12)",
                   backdropFilter: "blur(8px)",
@@ -450,7 +470,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
             </div>
 
             {/* header row — artwork, meta */}
-            <div className="flex items-start gap-4 border-b border-star-white/5 p-5">
+            <div className="flex items-start gap-4 border-b border-ink/5 p-5">
               <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg">
                 <Artwork src={release.artwork_url} artist={release.artist} title={release.title} sizes="96px" />
               </div>
@@ -460,24 +480,24 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                     onClick={openParentProject}
                     disabled={parentLoading}
                     title="Open the full project"
-                    className="text-left text-lg font-bold uppercase leading-tight tracking-tight text-star-white underline decoration-star-white/25 underline-offset-[3px] transition-colors hover:decoration-star-white/60 disabled:opacity-60"
+                    className="text-left text-lg font-bold uppercase leading-tight tracking-tight text-ink underline decoration-ink/25 underline-offset-[3px] transition-colors hover:decoration-ink/60 disabled:opacity-60"
                   >
                     {release.title}
-                    {parentLoading && <span className="ml-2 text-[10px] text-star-white/40">…</span>}
+                    {parentLoading && <span className="ml-2 text-[10px] text-ink/40">…</span>}
                   </button>
                 ) : (
-                  <h2 className="text-lg font-bold uppercase leading-tight tracking-tight text-star-white">
+                  <h2 className="text-lg font-bold uppercase leading-tight tracking-tight text-ink">
                     {release.title}
                   </h2>
                 )}
                 <button
                   onClick={openDiscography}
-                  className="mt-0.5 text-left text-sm text-star-white/65 underline decoration-star-white/25 underline-offset-[3px] transition-colors hover:text-star-white hover:decoration-star-white/50"
+                  className="mt-0.5 text-left text-sm text-ink/65 underline decoration-ink/25 underline-offset-[3px] transition-colors hover:text-ink hover:decoration-ink/50"
                   title={`See ${release.artist}'s discography`}
                 >
                   {release.artist}
                 </button>
-                <p className="mt-2 text-[10px] font-mono uppercase tracking-[0.18em] text-star-white/35">
+                <p className="mt-2 text-[10px] font-mono uppercase tracking-[0.18em] text-ink/35">
                   {release.type} · {formatDate(origDate ?? release.release_date)}
                   {release.genre ? ` · ${release.genre}` : ""}
                 </p>
@@ -503,7 +523,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                   </div>
                 )}
                 {release.label && (
-                  <p className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-neon-green/70">
+                  <p className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-lcd/70">
                     ▪ {release.label}
                   </p>
                 )}
@@ -519,8 +539,8 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                             singleSamples
                           )
                         }
-                        className="flex items-center gap-1.5 rounded-full border border-neon-violet/40 bg-neon-violet/15 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-neon-violet transition-transform hover:scale-105 active:scale-95"
-                        style={{ boxShadow: "0 0 14px rgba(155,93,229,0.35)" }}
+                        className="flex items-center gap-1.5 rounded-full border border-sony/40 bg-sony/15 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-sony transition-transform hover:scale-105 active:scale-95"
+                        style={{ boxShadow: "0 0 14px rgba(242,102,44,0.35)" }}
                       >
                         <AudioLines size={12} />
                         {singleSamples.length} Sample{singleSamples.length > 1 ? "s" : ""}
@@ -528,7 +548,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                     )}
                     <button
                       onClick={() => setLyricsSubject({ artist: release.artist, title: release.title })}
-                      className="flex items-center gap-1.5 rounded-full border border-neon-blue/40 bg-neon-blue/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-neon-blue transition-transform hover:scale-105 active:scale-95"
+                      className="flex items-center gap-1.5 rounded-full border border-tps/40 bg-tps/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-tps transition-transform hover:scale-105 active:scale-95"
                     >
                       <Mic2 size={12} />
                       Lyrics
@@ -541,9 +561,9 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
             {/* scrollable body */}
             {/* pad past the now-playing bar (z-50) so the last rows are never
                 hidden underneath it */}
-            <div className={`flex-1 overflow-y-auto ${player.current ? "pb-[76px]" : ""}`}>
+            <div className="flex-1 overflow-y-auto pb-[var(--player-h,0px)]">
               {release.curator_note && (
-                <p className="border-b border-star-white/5 px-5 py-4 text-sm italic leading-relaxed text-star-white/60">
+                <p className="border-b border-ink/5 px-5 py-4 text-sm italic leading-relaxed text-ink/60">
                   {release.curator_note}
                 </p>
               )}
@@ -551,7 +571,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
               {/* visualiser — sits ABOVE the tracklist (above the first track).
                   OFF by default; only shown once the user taps Visualise. */}
               {onVisualize && (
-                <div className="border-b border-star-white/5 p-3">
+                <div className="border-b border-ink/5 p-3">
                   {!showVisual ? (
                     <button
                       onClick={() => {
@@ -577,7 +597,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                       {/* hover aurora glow */}
                       <span
                         className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-                        style={{ background: "radial-gradient(130% 130% at 50% 130%, rgba(155,93,229,0.4), rgba(0,212,255,0.12) 45%, transparent 65%)" }}
+                        style={{ background: "radial-gradient(130% 130% at 50% 130%, rgba(242,102,44,0.4), rgba(78,134,199,0.12) 45%, transparent 65%)" }}
                       />
                       {/* live light sweep */}
                       <motion.span
@@ -589,7 +609,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                       {/* animated equalizer icon */}
                       <span
                         className="relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-white/25 transition-transform group-hover:scale-105"
-                        style={{ background: "linear-gradient(140deg, rgba(155,93,229,0.55), rgba(0,212,255,0.3))" }}
+                        style={{ background: "linear-gradient(140deg, rgba(242,102,44,0.55), rgba(78,134,199,0.3))" }}
                       >
                         <span className="flex items-end gap-[3px]" aria-hidden>
                           {[0, 1, 2, 3].map((i) => (
@@ -620,7 +640,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                   ) : (
                     <>
                       <div className="mb-2 flex items-center justify-between px-1">
-                        <span className="text-[10px] font-mono uppercase tracking-[0.22em] text-star-white/35">
+                        <span className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink/35">
                           Visualise
                         </span>
                         <div className="flex items-center gap-1.5">
@@ -631,7 +651,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                             }}
                             aria-label="Expand visualiser"
                             title="Expand"
-                            className="flex h-6 w-6 items-center justify-center rounded-full border border-white/20 text-star-white/70 transition-colors hover:border-white/50 hover:text-star-white"
+                            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 text-ink/70 transition-colors hover:border-white/50 hover:text-ink"
                           >
                             <Maximize2 size={12} strokeWidth={2.5} />
                           </button>
@@ -639,7 +659,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                             onClick={() => setShowVisual(false)}
                             aria-label="Hide visualiser"
                             title="Hide"
-                            className="flex h-6 w-6 items-center justify-center rounded-full border border-white/20 text-star-white/70 transition-colors hover:border-white/50 hover:text-star-white"
+                            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 text-ink/70 transition-colors hover:border-white/50 hover:text-ink"
                           >
                             <X size={12} strokeWidth={2.5} />
                           </button>
@@ -660,17 +680,17 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                             <button
                               onClick={() => cycleVisual(-1)}
                               aria-label="Previous visualisation"
-                              className="flex h-6 w-6 items-center justify-center rounded-full text-star-white/70 hover:bg-white/10 hover:text-star-white"
+                              className="flex h-8 w-8 items-center justify-center rounded-full text-ink/70 hover:bg-white/10 hover:text-ink"
                             >
                               <ChevronLeft size={15} />
                             </button>
-                            <span className="min-w-[64px] text-center text-[10px] font-bold uppercase tracking-[0.14em] text-star-white">
+                            <span className="min-w-[64px] text-center text-[10px] font-bold uppercase tracking-[0.14em] text-ink">
                               {VISUAL_MODES.find((m) => m.id === visualMode)?.label}
                             </span>
                             <button
                               onClick={() => cycleVisual(1)}
                               aria-label="Next visualisation"
-                              className="flex h-6 w-6 items-center justify-center rounded-full text-star-white/70 hover:bg-white/10 hover:text-star-white"
+                              className="flex h-8 w-8 items-center justify-center rounded-full text-ink/70 hover:bg-white/10 hover:text-ink"
                             >
                               <ChevronRight size={15} />
                             </button>
@@ -684,11 +704,11 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
 
               {/* whole-album tracklist (albums / EPs) — collapsible */}
               {(release.type === "album" || release.type === "ep") && (
-                <div className="border-b border-star-white/5 p-3">
+                <div className="border-b border-ink/5 p-3">
                   <button
                     onClick={() => setTracksOpen((v) => !v)}
                     aria-expanded={tracksOpen}
-                    className="flex w-full items-center justify-between px-2 pb-2 pt-1 text-[10px] font-mono uppercase tracking-[0.22em] text-star-white/35 transition-colors hover:text-star-white/60"
+                    className="flex w-full items-center justify-between px-2 pb-2 pt-1 text-[10px] font-mono uppercase tracking-[0.22em] text-ink/35 transition-colors hover:text-ink/60"
                   >
                     <span className="flex items-center gap-1.5">
                       <span className={`transition-transform ${tracksOpen ? "rotate-90" : ""}`}>›</span>
@@ -697,10 +717,10 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                     {tracks && tracks.length > 0 && <span>{tracks.length} tracks</span>}
                   </button>
                   {tracksLoading && (
-                    <p className="px-2 py-3 text-[11px] text-star-white/30">Loading tracks…</p>
+                    <p className="px-2 py-3 text-[11px] text-ink/30">Loading tracks…</p>
                   )}
                   {!tracksLoading && tracks && tracks.length === 0 && (
-                    <p className="px-2 py-3 text-[11px] text-star-white/30">
+                    <p className="px-2 py-3 text-[11px] text-ink/30">
                       Tracklist unavailable for this release.
                     </p>
                   )}
@@ -732,16 +752,16 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
 
               <div className="p-3">
                 <div className="flex items-center justify-between px-2 pb-2 pt-1">
-                  <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-star-white/35">
+                  <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-ink/35">
                     Listen on your service
                   </p>
                   <button
                     onClick={shareRelease}
                     aria-label="Share"
-                    className="flex items-center gap-1.5 rounded-full border border-white/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-star-white/75 transition-colors hover:border-white/50 hover:text-star-white"
+                    className="flex items-center gap-1.5 rounded-full border border-white/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-ink/75 transition-colors hover:border-white/50 hover:text-ink"
                   >
                     {copied === "share" ? (
-                      <Check size={12} className="text-neon-green" />
+                      <Check size={12} className="text-lcd" />
                     ) : (
                       <Share2 size={12} />
                     )}
@@ -761,7 +781,7 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                         href={release[p.key]!}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex flex-1 items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-star-white/[0.06]"
+                        className="flex flex-1 items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-ink/[0.06]"
                       >
                         <span
                           className="flex h-9 w-9 items-center justify-center rounded-lg"
@@ -769,10 +789,10 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                         >
                           <p.Icon />
                         </span>
-                        <span className="flex-1 text-sm font-medium text-star-white">{p.label}</span>
+                        <span className="flex-1 text-sm font-medium text-ink">{p.label}</span>
                         <svg
                           viewBox="0 0 16 16"
-                          className="h-3.5 w-3.5 text-star-white/25 transition-all group-hover:translate-x-0.5 group-hover:text-star-white/70"
+                          className="h-3.5 w-3.5 text-ink/25 transition-all group-hover:translate-x-0.5 group-hover:text-ink/70"
                           fill="none"
                           stroke="currentColor"
                           strokeWidth="1.8"
@@ -783,10 +803,10 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                       <button
                         onClick={() => copyLink(p.key, release[p.key]!)}
                         aria-label={`Copy ${p.label} link`}
-                        className="flex w-9 items-center justify-center rounded-xl text-star-white/25 transition-colors hover:bg-star-white/[0.06] hover:text-star-white/70"
+                        className="flex w-9 items-center justify-center rounded-xl text-ink/25 transition-colors hover:bg-ink/[0.06] hover:text-ink/70"
                       >
                         {copied === p.key ? (
-                          <Check size={14} className="text-neon-green" />
+                          <Check size={14} className="text-lcd" />
                         ) : (
                           <LinkIcon size={13} />
                         )}
@@ -807,48 +827,52 @@ export function ReleaseDetail({ release, onClose, onOpen, onVisualize }: Release
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
                 transition={{ type: "spring", stiffness: 480, damping: 40 }}
-                className="fixed inset-x-0 bottom-0 top-0 z-[45] flex flex-col bg-[#0a0a14]/[0.97] backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-14 lg:w-1/2"
+                className="fixed inset-x-0 bottom-0 top-0 z-[45] flex flex-col bg-[#12161a]/[0.97] backdrop-blur-2xl lg:inset-x-auto lg:right-0 lg:top-14 lg:w-1/2"
               >
                 <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
                   <button
                     onClick={() => setDiscog(null)}
                     aria-label="Back"
-                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-white/20 text-star-white/75 hover:border-white/50 hover:text-star-white"
+                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-white/20 text-ink/75 hover:border-white/50 hover:text-ink"
                   >
                     <span className="text-lg leading-none">‹</span>
                   </button>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-star-white/40">Discography</p>
-                    <h3 className="truncate text-base font-bold uppercase tracking-tight text-star-white">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-ink/40">Discography</p>
+                    <h3 className="truncate text-base font-bold uppercase tracking-tight text-ink">
                       {release.artist}
                     </h3>
                   </div>
                   <button
                     onClick={onClose}
                     aria-label="Close"
-                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-star-white/50 hover:bg-white/10 hover:text-star-white"
+                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-ink/50 hover:bg-white/10 hover:text-ink"
                   >
                     <X size={16} />
                   </button>
                 </div>
                 {discogLoading ? (
                   <div className="flex flex-1 flex-col items-center justify-center gap-2">
-                    <span className="h-1.5 w-1.5 animate-ping rounded-full bg-neon-violet" />
-                    <p className="text-[11px] uppercase tracking-widest text-star-white/40">Loading discography…</p>
+                    <span className="h-1.5 w-1.5 animate-ping rounded-full bg-sony" />
+                    <p className="text-[11px] uppercase tracking-widest text-ink/40">Loading discography…</p>
                   </div>
                 ) : discog.length === 0 ? (
-                  <p className="flex flex-1 items-center justify-center px-6 text-center text-[11px] uppercase tracking-widest text-star-white/40">
+                  <p className="flex flex-1 items-center justify-center px-6 text-center text-[11px] uppercase tracking-widest text-ink/40">
                     No discography found
                   </p>
                 ) : (
-                  <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto overscroll-contain p-4 sm:grid-cols-3">
+                  // Bottom padding clears the transport: this overlay sits at
+                  // z-[45], under the z-50 player bar, and unlike its sibling
+                  // sheet it never padded for it — so the discography's last row
+                  // was permanently hidden behind the bar.
+                  <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto overscroll-contain p-4 pb-[calc(var(--player-h,0px)_+_1rem)] sm:grid-cols-3">
                     {discog.map((r) => (
                       <button key={r.id} onClick={() => onOpen?.(r)} className="group block text-left">
                         <div className="relative aspect-square w-full overflow-hidden rounded-lg ring-1 ring-white/10 transition-transform active:scale-95 group-hover:scale-[1.03]">
                           <Artwork src={r.artwork_url} artist={r.artist} title={r.title} sizes="160px" />
                         </div>
-                        <p className="mt-1 truncate text-[11px] font-bold uppercase text-star-white">{r.title}</p>
-                        <p className="truncate text-[9px] uppercase tracking-wide text-star-white/45">
+                        <p className="mt-1 truncate text-[11px] font-bold uppercase text-ink">{r.title}</p>
+                        <p className="truncate text-[9px] uppercase tracking-wide text-ink/45">
                           {r.type}
                           {r.release_date && r.release_date !== "1900-01-01"
                             ? ` · ${r.release_date.slice(0, 4)}`

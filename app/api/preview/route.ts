@@ -2,17 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-/**
- * GET /api/preview?artist=...&title=...
- *
- * Finds a free 30-second preview MP3 for a release via keyless APIs
- * (iTunes Search primary, Deezer fallback). Returns metadata plus a
- * same-origin proxied stream URL so the Web Audio analyser can read the
- * waveform cross-origin-safely. Powers the live visualizer.
- */
-
-const norm = (s: string) =>
-  s.toLowerCase().replace(/\(.*?\)|\[.*?\]/g, "").replace(/&/g, "and").replace(/[^a-z0-9]/g, "");
+import { isCompilation, titleCloseness, artistMatches } from "@/lib/preview-match";
 
 interface Preview {
   previewUrl: string; // proxied
@@ -26,25 +16,18 @@ function proxied(src: string): string {
   return `/api/preview/stream?src=${encodeURIComponent(src)}`;
 }
 
-// The artist MUST reasonably match, or we don't return a preview at all —
-// better silent than the wrong song.
-const artistMatches = (candidate: string, wanted: string): boolean => {
-  const c = norm(candidate);
-  const w = norm(wanted);
-  if (!c || !w) return false;
-  const cw = c.slice(0, 12);
-  const ww = w.slice(0, 12);
-  return c.includes(ww) || w.includes(cw);
-};
-const titleCloseness = (candidate: string, wanted: string): number => {
-  const c = norm(candidate);
-  const w = norm(wanted);
-  if (!c || !w) return 0;
-  if (c === w) return 2;
-  return c.includes(w) || w.includes(c) ? 1 : 0;
-};
+
+/**
+ * GET /api/preview?artist=...&title=...
+ *
+ * Finds a free 30-second preview MP3 for a release via keyless APIs
+ * (iTunes Search primary, Deezer fallback). Returns metadata plus a
+ * same-origin proxied stream URL so the Web Audio analyser can read the
+ * waveform cross-origin-safely. Powers the live visualizer.
+ */
 
 async function fromITunes(artist: string, title: string): Promise<Preview | null> {
+  const compilation = isCompilation(artist);
   try {
     // Prefer tracks from the matching album, else a plain song search.
     const urls = [
@@ -58,6 +41,7 @@ async function fromITunes(artist: string, title: string): Promise<Preview | null
       const results: Array<{
         artistName?: string;
         trackName?: string;
+        collectionName?: string;
         previewUrl?: string;
         artworkUrl100?: string;
       }> = data.results ?? [];
@@ -65,8 +49,20 @@ async function fromITunes(artist: string, title: string): Promise<Preview | null
       let best: (typeof results)[number] | null = null;
       let bestScore = -1;
       for (const r of results) {
-        if (!r.previewUrl || !artistMatches(r.artistName ?? "", artist)) continue;
-        const score = titleCloseness(r.trackName ?? "", title);
+        if (!r.previewUrl) continue;
+        if (compilation) {
+          // No performer to verify against, so the ALBUM has to be the one we
+          // asked for. That keeps the guarantee that matters — never the wrong
+          // record — without demanding an artist match that cannot succeed.
+          if (titleCloseness(r.collectionName ?? "", title) < 1) continue;
+        } else if (!artistMatches(r.artistName ?? "", artist)) {
+          continue;
+        }
+        // For a compilation any track ON that album is a fair preview of it,
+        // so an album hit scores 1 even when the track name differs.
+        const score = compilation
+          ? titleCloseness(r.collectionName ?? "", title)
+          : titleCloseness(r.trackName ?? "", title);
         if (score > bestScore) {
           bestScore = score;
           best = r;
@@ -89,9 +85,12 @@ async function fromITunes(artist: string, title: string): Promise<Preview | null
 }
 
 async function fromDeezer(artist: string, title: string): Promise<Preview | null> {
+  const compilation = isCompilation(artist);
   try {
     const res = await fetch(
-      `https://api.deezer.com/search?q=${encodeURIComponent(`${artist} ${title}`)}&limit=10`,
+      // "Various Artists <album>" matches nothing on Deezer; search the album
+      // title alone and verify it via the album name on each result.
+      `https://api.deezer.com/search?q=${encodeURIComponent(compilation ? title : `${artist} ${title}`)}&limit=25`,
       { signal: AbortSignal.timeout(8000), next: { revalidate: 86400 } }
     );
     if (!res.ok) return null;
@@ -100,14 +99,21 @@ async function fromDeezer(artist: string, title: string): Promise<Preview | null
       preview?: string;
       title?: string;
       artist?: { name?: string };
-      album?: { cover_big?: string };
+      album?: { title?: string; cover_big?: string };
     }> = data.data ?? [];
     // Require the artist to match; pick the closest title among those.
     let best: (typeof results)[number] | null = null;
     let bestScore = -1;
     for (const r of results) {
-      if (!r.preview || !artistMatches(r.artist?.name ?? "", artist)) continue;
-      const score = titleCloseness(r.title ?? "", title);
+      if (!r.preview) continue;
+      if (compilation) {
+        if (titleCloseness(r.album?.title ?? "", title) < 1) continue;
+      } else if (!artistMatches(r.artist?.name ?? "", artist)) {
+        continue;
+      }
+      const score = compilation
+        ? titleCloseness(r.album?.title ?? "", title)
+        : titleCloseness(r.title ?? "", title);
       if (score > bestScore) {
         bestScore = score;
         best = r;
