@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rateLimit, clientKey } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -84,15 +85,30 @@ export async function POST(req: NextRequest) {
   if (!prompt || candidates.length === 0) return passthrough("empty");
   if (!BASE_URL || !API_KEY) return passthrough("no-model");
 
+  // Every call here is a paid model request, and this was the only such route
+  // without a per-IP ceiling (ask, agent and apple-token all have one) — an
+  // open, unmetered proxy with caller-controlled prompt text. Over the limit
+  // it degrades rather than failing: the Selector already treats a null order
+  // as "keep the keyword ranking", so a heavy user sees results, not an error.
+  // The ceiling is generous because one Selector turn is one call.
+  if (!rateLimit(`rerank:${clientKey(req)}`, { limit: 60, windowMs: 3_600_000 }).ok) {
+    return passthrough("rate-limited");
+  }
+
   // One line per candidate. Descriptors are included because they are often the
   // only thing distinguishing two records of the same genre.
   const list = candidates
     .map((c, i) => {
+      // Each field is clamped: they arrive from the request body, so without
+      // this the prompt size — and the bill — was set by the caller.
+      const clip = (v: unknown, n: number) => String(v ?? "").slice(0, n);
       const bits = [
-        `${i}. ${c.artist} — ${c.title}`,
-        c.genre ? `[${c.genre}]` : "",
-        c.year ? `(${c.year})` : "",
-        c.tags?.length ? `tags: ${c.tags.slice(0, 8).join(", ")}` : "",
+        `${i}. ${clip(c.artist, 120)} — ${clip(c.title, 200)}`,
+        c.genre ? `[${clip(c.genre, 60)}]` : "",
+        c.year ? `(${clip(c.year, 4)})` : "",
+        Array.isArray(c.tags) && c.tags.length
+          ? `tags: ${c.tags.slice(0, 8).map((t) => clip(t, 40)).join(", ")}`
+          : "",
       ].filter(Boolean);
       return bits.join(" ");
     })

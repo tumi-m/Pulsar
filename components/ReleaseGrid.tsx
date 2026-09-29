@@ -529,7 +529,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       {/* everything that reflows when the detail sheet opens. Bottom padding
           (Fibonacci: 34 / 89px) keeps the last row clear of the player bar. */}
       <div
-        className={`transition-[padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        className={`transition-[padding] duration-500 ease-settle ${
           detailOpen ? "lg:pr-[50vw]" : ""
         } pb-[calc(var(--player-h,0px)_+_110px)]`}
       >

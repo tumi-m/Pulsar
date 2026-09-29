@@ -485,7 +485,10 @@ body {
   background: linear-gradient(180deg, #07090b, #111519);
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.06);
 }
-/* Two reels: cream hub with its spindle hole, then wound oxide. */
+/* Two reels: a spindle hole, a cream hub with six teeth, then wound oxide.
+   The teeth are what make rotation visible — the first version was radially
+   symmetric, so spinning it would have looked like nothing at all. The left
+   reel carries more tape than the right, as a tape part-way through does. */
 .jcard-window::before,
 .jcard-window::after {
   content: "";
@@ -495,17 +498,41 @@ body {
   aspect-ratio: 1;
   translate: -50% -50%;
   border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    #0b0d10 0 9%,
-    #efe4cc 10% 24%,
-    #0b0d10 25% 30%,
-    #3a2a20 31% 70%,
-    transparent 71%
-  );
+  --tape-edge: 70%;
+  background:
+    radial-gradient(circle, #0b0d10 0 8%, transparent 9%),
+    radial-gradient(
+      circle,
+      transparent 0 25%,
+      #0b0d10 26% 31%,
+      #3a2a20 32% var(--tape-edge),
+      transparent calc(var(--tape-edge) + 1%)
+    ),
+    repeating-conic-gradient(#efe4cc 0deg 44deg, #7a6a55 44deg 60deg);
+  /* Clip the teeth to the hub: without this the conic layer shows through
+     beyond the tape as a ring of spikes. */
+  -webkit-mask-image: radial-gradient(circle, #000 0 25.5%, transparent 26%),
+    radial-gradient(circle, #000 0 calc(var(--tape-edge) + 0.5%), transparent calc(var(--tape-edge) + 1%));
+  mask-image: radial-gradient(circle, #000 0 25.5%, transparent 26%),
+    radial-gradient(circle, #000 0 calc(var(--tape-edge) + 0.5%), transparent calc(var(--tape-edge) + 1%));
 }
-.jcard-window::before { left: 28%; }
-.jcard-window::after { left: 72%; }
+.jcard-window::before { left: 28%; --tape-edge: 74%; }
+.jcard-window::after { left: 72%; --tape-edge: 46%; }
+
+/* The reels turn while that record is playing. Set by whoever knows playback
+   (a tile, the transport) with data-playing on any ancestor. Under reduced
+   motion the global rule below stops it, and a still reel says the same. */
+@keyframes reelTurn {
+  to { rotate: 360deg; }
+}
+[data-playing="true"] .jcard-window::before,
+[data-playing="true"] .jcard-window::after {
+  animation: reelTurn 2.6s linear infinite;
+}
+/* The take-up reel spins faster: less tape on it, same tape speed. */
+[data-playing="true"] .jcard-window::after {
+  animation-duration: 1.6s;
+}
 
 /* Wide tiles turn sideways: label on the left, window standing on the right. */
 @container (aspect-ratio >= 3 / 2) {

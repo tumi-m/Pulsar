@@ -85,3 +85,10 @@ describe("every channel variable the config reads is declared", () => {
     }
   });
 });
+
+describe("named easing compiles", () => {
+  it("emits a rule for ease-settle (the arbitrary cubic-bezier form emitted none)", async () => {
+    const css = await compile(["ease-settle"]);
+    expect(css).toMatch(/\.ease-settle\s*\{[^}]*cubic-bezier\(0\.22, 1, 0\.36, 1\)/);
+  });
+});

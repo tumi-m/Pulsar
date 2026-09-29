@@ -263,7 +263,10 @@ export function NowPlayingBar() {
                 aria-label={`${current.title} by ${current.artist} — open options`}
                 className="group flex min-w-0 flex-1 items-center gap-3 rounded-lg py-1 pr-2 text-left transition-colors hover:bg-white/[0.05]"
               >
-                <span className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-md">
+                <span
+                  className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-md"
+                  data-playing={playing ? "true" : undefined}
+                >
                   <Artwork src={current.artwork_url} artist={current.artist} title={current.title} sizes="44px" />
                   {/* The only thing in Pulsar that moves in time with what's
                       playing. Sits over the artwork's foot so it reads as part

@@ -32,7 +32,7 @@ export function HeroSection() {
   // pill's fixed top offset in ReleaseGrid — change them together.
   return (
     <section
-      className={`px-5 pb-[132px] pt-[89px] text-center transition-[padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] md:px-10 md:pb-[140px] md:pt-[120px] ${
+      className={`px-5 pb-[132px] pt-[89px] text-center transition-[padding] duration-500 ease-settle md:px-10 md:pb-[140px] md:pt-[120px] ${
         detailOpen || samplesOpen ? "lg:pr-[50vw]" : ""
       }`}
     >

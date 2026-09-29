@@ -76,7 +76,7 @@ export function Navbar() {
       `}
     >
       <div
-        className={`mx-auto flex h-full max-w-screen-2xl items-center justify-between transition-[padding,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        className={`mx-auto flex h-full max-w-screen-2xl items-center justify-between transition-[padding,opacity] duration-500 ease-settle ${
           detailOpen || crateOpen || samplesOpen ? "lg:pr-[50vw]" : ""
         } ${
           // The crate sheet covers this area on phones — get out of its way so

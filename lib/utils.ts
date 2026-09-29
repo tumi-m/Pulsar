@@ -15,14 +15,30 @@ export function formatDate(dateStr: string): string {
   });
 }
 
-export function isToday(dateStr: string): boolean {
-  const today = new Date().toISOString().split("T")[0];
-  return dateStr === today;
+/**
+ * YYYY-MM-DD for the VIEWER's calendar day, `offsetDays` from `now`.
+ *
+ * These comparisons used toISOString(), which is the UTC date. In Johannesburg
+ * a record released "today" stopped being Fresh at 02:00; in Los Angeles,
+ * tomorrow's releases were marked Today from 17:00 the evening before. Release
+ * dates are calendar days, so compare them to the viewer's calendar day.
+ * Built from the local date parts (not now − 86400000) so a DST change can't
+ * land "yesterday" on the same day.
+ */
+export function localISODate(now: number = Date.now(), offsetDays = 0): string {
+  const d = new Date(now);
+  const day = new Date(d.getFullYear(), d.getMonth(), d.getDate() + offsetDays);
+  const mm = String(day.getMonth() + 1).padStart(2, "0");
+  const dd = String(day.getDate()).padStart(2, "0");
+  return `${day.getFullYear()}-${mm}-${dd}`;
 }
 
-export function isYesterday(dateStr: string): boolean {
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
-  return dateStr === yesterday;
+export function isToday(dateStr: string, now: number = Date.now()): boolean {
+  return dateStr === localISODate(now);
+}
+
+export function isYesterday(dateStr: string, now: number = Date.now()): boolean {
+  return dateStr === localISODate(now, -1);
 }
 
 export const MOOD_COLORS: Record<string, { text: string; glow: string; bg: string }> = {

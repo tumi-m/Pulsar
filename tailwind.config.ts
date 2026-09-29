@@ -64,6 +64,13 @@ const config: Config = {
           "repeating-linear-gradient(90deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 3px), " +
           "linear-gradient(180deg, #2a323b 0%, #1a2027 55%, #151b21 100%)",
       },
+      /* `ease-[cubic-bezier(0.22,1,0.36,1)]` emitted NO CSS: tailwindcss-animate
+         also registers ease-*, the arbitrary value is ambiguous, and Tailwind
+         drops it. Three layout transitions ran on the default curve instead.
+         A named token is unambiguous; it is lib/motion.ts EASE.out. */
+      transitionTimingFunction: {
+        settle: "cubic-bezier(0.22, 1, 0.36, 1)",
+      },
       animation: {
         "float": "float 6s ease-in-out infinite",
         "float-slow": "float 10s ease-in-out infinite",

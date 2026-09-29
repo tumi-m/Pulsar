@@ -13,6 +13,7 @@ import { PLATFORMS } from "./platforms";
 import { toggleFavorite } from "@/lib/collection";
 import { useCollectionState } from "@/lib/useCollectionState";
 import { usePlayer } from "./player/PlayerProvider";
+import { useReducedMotion } from "@/lib/motion";
 import { useIsTouch } from "@/lib/useIsTouch";
 
 interface ReleaseCardProps {
@@ -31,6 +32,7 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
   const player = usePlayer();
   const isCurrent = player.current?.id === release.id;
   const isPlayingThis = isCurrent && player.playing;
+  const reduce = useReducedMotion();
   const [hovered, setHovered] = useState(false);
   // Touch devices never fire hover, so the quick actions (share / favourite /
   // crate) and the play triangle would be permanently invisible — show them.
@@ -116,10 +118,15 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 24 }}
+      // Reels on a coverless tile turn while it plays (see .jcard in globals).
+      data-playing={isPlayingThis ? "true" : undefined}
+      // The global reduced-motion CSS rule can't reach framer's JS-driven
+      // transforms, so every tile still slid up 24px for a visitor who asked
+      // for no motion. It now just fades in for them.
+      initial={{ opacity: 0, y: reduce ? 0 : 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{
-        duration: 0.45,
+        duration: reduce ? 0.12 : 0.45,
         // Only the first screenful staggers. Beyond that a tile has scrolled
         // into view and should simply be there.
         delay: index < 12 ? index * 0.035 : 0,

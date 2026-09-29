@@ -651,8 +651,14 @@ export async function getLiveFeed(): Promise<Release[]> {
 
   // Sort newest-first by REAL date; albums we still couldn't date are pushed
   // below the dated ones so they never sit at the top of "Latest".
+  // Return 0 on a tie. This returned -1 for equal dates, which makes the
+  // comparator inconsistent (compare(a,b) and compare(b,a) both said "first"),
+  // so same-day releases came out in an arbitrary order instead of the source
+  // priority they were assembled in. Array.prototype.sort is stable, so a real
+  // tie now preserves that order.
   all.sort((a, b) => {
     if (Boolean(a._noDate) !== Boolean(b._noDate)) return a._noDate ? 1 : -1;
+    if (a.release_date === b.release_date) return 0;
     return a.release_date < b.release_date ? 1 : -1;
   });
 

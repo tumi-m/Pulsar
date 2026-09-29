@@ -11,9 +11,56 @@ import { useEffect, useRef } from "react";
  * When the overlay is dismissed some other way (a close button, the scrim) the
  * pushed entry is popped back off so Back doesn't have to be pressed twice.
  *
- * Stacked overlays each push their own entry, so Back peels them off one at a
- * time — top-most first — which is the behaviour users expect on mobile.
+ * Overlays stack — the tracklist opens over a release, which opens over the
+ * grid — and only the TOP one may react. Each instance used to listen for
+ * itself, which broke stacking two ways:
+ *
+ *  - Closing the inner overlay with its button called history.back(); the
+ *    resulting popstate reached the OUTER overlay's still-attached listener,
+ *    which closed as well. One tap on ✕ closed both.
+ *  - Every instance listened for Escape on `window`. stopPropagation() can't
+ *    stop other listeners on the same target, so one Escape closed the lot.
+ *
+ * Now there is one popstate and one keydown listener for the whole app, and
+ * they act on the top of a stack. The history.back() a button-close issues is
+ * counted and swallowed, so it can't be mistaken for the user pressing Back.
  */
+
+interface Entry {
+  id: number;
+  close: () => void;
+  /** Set when the user pressed Back for this overlay (its entry is already gone). */
+  popped: boolean;
+}
+
+const stack: Entry[] = [];
+let nextId = 0;
+/** history.back() calls we issued ourselves, whose popstate must be ignored. */
+let selfPops = 0;
+let installed = false;
+
+function install() {
+  if (installed || typeof window === "undefined") return;
+  installed = true;
+  window.addEventListener("popstate", () => {
+    if (selfPops > 0) {
+      selfPops -= 1;
+      return;
+    }
+    const top = stack[stack.length - 1];
+    if (!top) return;
+    top.popped = true;
+    top.close();
+  });
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const top = stack[stack.length - 1];
+    if (!top) return;
+    e.stopPropagation();
+    top.close();
+  });
+}
+
 export function useBackClose(active: boolean, onClose: () => void) {
   const closeRef = useRef(onClose);
   useEffect(() => {
@@ -22,30 +69,20 @@ export function useBackClose(active: boolean, onClose: () => void) {
 
   useEffect(() => {
     if (!active || typeof window === "undefined") return;
+    install();
 
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        closeRef.current();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-
-    // Marked so we can tell our own entry apart from real navigation.
-    window.history.pushState({ pulsarOverlay: true }, "");
-    let poppedByUser = false;
-
-    const onPop = () => {
-      poppedByUser = true;
-      closeRef.current();
-    };
-    window.addEventListener("popstate", onPop);
+    const entry: Entry = { id: ++nextId, close: () => closeRef.current(), popped: false };
+    stack.push(entry);
+    // Marked with our id so we can tell our own entry from real navigation.
+    window.history.pushState({ pulsarOverlay: entry.id }, "");
 
     return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("popstate", onPop);
-      // Closed by a button/scrim rather than Back — remove the entry we added.
-      if (!poppedByUser && window.history.state?.pulsarOverlay) {
+      const i = stack.indexOf(entry);
+      if (i !== -1) stack.splice(i, 1);
+      // Closed by a button/scrim rather than Back — remove the entry we added,
+      // and make sure the popstate that causes isn't read as a Back press.
+      if (!entry.popped && window.history.state?.pulsarOverlay === entry.id) {
+        selfPops += 1;
         window.history.back();
       }
     };
