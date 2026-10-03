@@ -5,7 +5,7 @@
  * Regenerate with:  npm run grammy
  * Source: Wikidata (award received → Grammy Award and all category subclasses).
  *
- * 1328 winners.
+ * 1336 winners.
  */
 
 export const GRAMMY_ARTISTS: string[] = [
@@ -373,6 +373,7 @@ export const GRAMMY_ARTISTS: string[] = [
   "Dudley Moore",
   "Duffy",
   "Duke Ellington",
+  "Duncan Sheik",
   "Dwan Hill",
   "Dweezil Zappa",
   "Eagles",
@@ -612,6 +613,7 @@ export const GRAMMY_ARTISTS: string[] = [
   "Jay-Z",
   "Jazmine Sullivan",
   "Jeff Beck",
+  "Jeff Scott",
   "Jelly Roll Morton",
   "Jennifer Hudson",
   "Jennifer Lopez",
@@ -730,6 +732,7 @@ export const GRAMMY_ARTISTS: string[] = [
   "Kris Kristofferson",
   "Kristen Anderson-Lopez",
   "Krzysztof Penderecki",
+  "La Capella Reial de Catalunya",
   "La Mafia",
   "Lady A",
   "Lady Gaga",
@@ -874,6 +877,7 @@ export const GRAMMY_ARTISTS: string[] = [
   "Merle Travis",
   "Meshell Ndegeocello",
   "Metallica",
+  "Method Man",
   "MGMT",
   "Michael Apted",
   "Michael Bolton",
@@ -1166,10 +1170,12 @@ export const GRAMMY_ARTISTS: string[] = [
   "Steve Earle",
   "Steve Fishell",
   "Steve Goodman",
+  "Steve Jobs",
   "Steve Stevens",
   "Steve Vai",
   "Steven Gizicki",
   "Steven Paul",
+  "Steven Spielberg",
   "Stevie Ray Vaughan",
   "Stevie Wonder",
   "Sting",
@@ -1281,6 +1287,7 @@ export const GRAMMY_ARTISTS: string[] = [
   "Turnstile",
   "Twenty One Pilots",
   "Tyla",
+  "Tylana Renga Enomoto",
   "Tyler, The Creator",
   "U2",
   "Underworld",
@@ -1312,6 +1319,7 @@ export const GRAMMY_ARTISTS: string[] = [
   "Whoopi Goldberg",
   "Wilco",
   "Will Smith",
+  "will.i.am",
   "William Primrose",
   "Willie Mitchell",
   "Willie Nelson",
