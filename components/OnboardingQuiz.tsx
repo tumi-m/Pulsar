@@ -5,6 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { QUIZ, buildProfile, saveProfile, type TasteProfile } from "@/lib/taste";
 import { saveTheme } from "@/lib/theme";
 import { Portal } from "./Portal";
+import { useBackClose } from "@/lib/useBackClose";
+import { useScrollLock } from "@/lib/useScrollLock";
+import { useDialog } from "@/lib/useDialog";
 
 // Each vibe choice leans toward a theme; the majority wins.
 const OPTION_THEME: Record<string, string> = {
@@ -184,6 +187,11 @@ export function OnboardingQuiz({ onComplete, onSkip }: OnboardingQuizProps) {
   const [step, setStep] = useState(0);
   const [picks, setPicks] = useState<string[]>([]);
   const question = QUIZ[step];
+  // Escape and the phone's back gesture used to do nothing here — or, worse,
+  // navigate off the site — leaving SKIP as the only way out.
+  useBackClose(true, onSkip);
+  useScrollLock(true);
+  const dialogRef = useDialog(true, { modal: true });
 
   function pick(optionId: string) {
     const next = [...picks, optionId];
@@ -207,6 +215,10 @@ export function OnboardingQuiz({ onComplete, onSkip }: OnboardingQuizProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Visual survey"
         className="fixed inset-0 z-[60] flex flex-col bg-deck"
       >
       {/* industrial header */}

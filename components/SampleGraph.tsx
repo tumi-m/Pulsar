@@ -59,6 +59,11 @@ export function SampleGraph({
   const nodesRef = useRef<GraphNode[]>([]);
   const edgesRef = useRef<GraphEdge[]>([]);
   const rafRef = useRef<number>(0);
+  // True while the simulation loop is scheduled. It used to run — and
+  // re-render the whole SVG — sixty times a second for as long as the panel
+  // was open, long after every node had stopped moving.
+  const runningRef = useRef(false);
+  const draggingRef = useRef(false);
   const [, setTick] = useState(0); // re-render trigger (value never read)
   const [ready, setReady] = useState(false);
   // The request failed, as opposed to succeeding with nothing to draw. Both
@@ -144,8 +149,21 @@ export function SampleGraph({
     }
 
     setTick((t) => (t + 1) % 1000000);
+    // Sleep once the graph has come to rest; drag, expand and resize wake it.
+    let energy = 0;
+    for (const n of nodes) energy += n.vx * n.vx + n.vy * n.vy;
+    if (!draggingRef.current && nodes.length > 0 && energy / nodes.length < 0.002) {
+      runningRef.current = false;
+      return;
+    }
     rafRef.current = requestAnimationFrame(step);
   }, []);
+
+  const wake = useCallback(() => {
+    if (runningRef.current) return;
+    runningRef.current = true;
+    rafRef.current = requestAnimationFrame(step);
+  }, [step]);
 
   // ── load initial chain ───────────────────────────────────
   useEffect(() => {
@@ -185,7 +203,9 @@ export function SampleGraph({
         nodesRef.current = gnodes;
         edgesRef.current = gedges;
         setReady(true);
-        rafRef.current = requestAnimationFrame(step);
+        cancelAnimationFrame(rafRef.current);
+        runningRef.current = false;
+        wake();
       } catch {
         if (!cancelled) {
           setFailed(true);
@@ -196,6 +216,7 @@ export function SampleGraph({
     return () => {
       cancelled = true;
       cancelAnimationFrame(rafRef.current);
+      runningRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [artist, title, attempt]);
@@ -208,10 +229,11 @@ export function SampleGraph({
       const rect = svg.getBoundingClientRect();
       widthRef.current = rect.width;
       heightRef.current = rect.height;
+      if (nodesRef.current.length) wake();
     });
     ro.observe(svg);
     return () => ro.disconnect();
-  }, []);
+  }, [wake]);
 
   // ── expand a node: fetch its ancestors and graft them on ─
   const expandNode = async (node: GraphNode) => {
@@ -263,6 +285,7 @@ export function SampleGraph({
     } finally {
       node.loading = false;
       setTick((t) => t + 1);
+      wake();
     }
   };
 
@@ -274,19 +297,27 @@ export function SampleGraph({
     const svg = svgRef.current;
     if (!svg) return;
     const start = { x: node.x, y: node.y };
+    draggingRef.current = true;
+    wake();
     const onMove = (e: PointerEvent) => {
       const rect = svg.getBoundingClientRect();
       node.fx = e.clientX - rect.left;
       node.fy = e.clientY - rect.top;
     };
     const onUp = () => {
+      draggingRef.current = false;
       node.fx = null;
       node.fy = null;
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    // A touch the browser takes over (a scroll, a system gesture) ends in
+    // pointercancel, not pointerup — which left the node stuck to a finger
+    // that had already gone.
+    window.addEventListener("pointercancel", onUp);
     void start;
   };
 

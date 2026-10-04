@@ -347,11 +347,35 @@ export function AiChat({ releases }: AiChatProps) {
                     <X size={16} />
                   </button>
                 </div>
-                <div className="mt-5 grid grid-cols-2 gap-3 sm:my-auto lg:mx-auto lg:w-full lg:max-w-4xl lg:gap-6">
+                {/* Centred at every size. On a phone the two keys sat under the
+                    masthead with the rest of a full-height sheet empty. */}
+                <div className="my-auto lg:mx-auto lg:w-full lg:max-w-4xl">
+                <motion.p
+                  initial={reduce ? false : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                  className="mb-1 text-center text-lg font-black uppercase tracking-[0.12em] text-ink sm:text-xl"
+                >
+                  How do you want to dig?
+                </motion.p>
+                <motion.p
+                  initial={reduce ? false : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
+                  className="mx-auto mb-5 max-w-xs text-center text-[11px] leading-relaxed text-ink/45"
+                >
+                  Either way you get a stack of records to play, crate and export.
+                </motion.p>
+                <div className="grid grid-cols-2 gap-3 lg:gap-6">
+                  {/* No whileTap: framer's tap scale under a finger misroutes
+                      touch clicks elsewhere in the app; the keyed shadow is
+                      the press. */}
                   <motion.button
-                    whileTap={{ scale: 0.96 }}
+                    initial={reduce ? false : { opacity: 0, y: 14, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ type: "spring", stiffness: 420, damping: 32, delay: 0.08 }}
                     onClick={chooseSurvey}
-                    className="group relative flex flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border border-chrome-700/60 bg-deck-700/70 p-5 text-center shadow-key transition-[border-color,background-color,box-shadow] hover:border-sony/50 hover:bg-sony/[0.07] active:shadow-keyed lg:min-h-[19rem] lg:gap-4 lg:p-9"
+                    className="group relative flex min-h-[11rem] flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border border-chrome-700/60 bg-deck-700/70 p-5 text-center shadow-key transition-[border-color,background-color,box-shadow] hover:border-sony/50 hover:bg-sony/[0.07] active:shadow-keyed lg:min-h-[19rem] lg:gap-4 lg:p-9"
                   >
                     <span
                       className="pointer-events-none absolute -inset-8 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
@@ -374,9 +398,11 @@ export function AiChat({ releases }: AiChatProps) {
                     </span>
                   </motion.button>
                   <motion.button
-                    whileTap={{ scale: 0.96 }}
+                    initial={reduce ? false : { opacity: 0, y: 14, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ type: "spring", stiffness: 420, damping: 32, delay: 0.14 }}
                     onClick={() => setView("chat")}
-                    className="group relative flex flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border border-chrome-700/60 bg-deck-700/70 p-5 text-center shadow-key transition-[border-color,background-color,box-shadow] hover:border-tps/50 hover:bg-tps/[0.07] active:shadow-keyed lg:min-h-[19rem] lg:gap-4 lg:p-9"
+                    className="group relative flex min-h-[11rem] flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border border-chrome-700/60 bg-deck-700/70 p-5 text-center shadow-key transition-[border-color,background-color,box-shadow] hover:border-tps/50 hover:bg-tps/[0.07] active:shadow-keyed lg:min-h-[19rem] lg:gap-4 lg:p-9"
                   >
                     <span
                       className="pointer-events-none absolute -inset-8 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
@@ -398,6 +424,7 @@ export function AiChat({ releases }: AiChatProps) {
                       Describe a mood in words
                     </span>
                   </motion.button>
+                </div>
                 </div>
               </div>
             ) : (
