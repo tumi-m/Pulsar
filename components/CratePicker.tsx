@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { X, Plus } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { getCrates, createCrate, toggleInCrate, inCrate, type Crate } from "@/lib/collection";
@@ -9,6 +9,7 @@ import { flyToCrate } from "@/lib/flyToCrate";
 import { CrateIcon } from "./CrateIcon";
 import { useScrollLock } from "@/lib/useScrollLock";
 import { useBackClose } from "@/lib/useBackClose";
+import { useDialog } from "@/lib/useDialog";
 import { Portal } from "./Portal";
 
 /**
@@ -24,7 +25,9 @@ export function CratePicker() {
   const [tick, setTick] = useState(0); // re-render after toggles
   useScrollLock(Boolean(release));
   useBackClose(Boolean(release), () => setRelease(null));
+  const dialogRef = useDialog(Boolean(release), { modal: true });
 
+  const reduce = useReducedMotion();
   const refresh = () => setCrates(getCrates());
 
   useEffect(() => {
@@ -53,12 +56,20 @@ export function CratePicker() {
             onClick={close}
             className="fixed inset-0 z-[60] bg-deck/70 backdrop-blur-sm"
           />
+          {/* Centred by a flex wrapper: framer-motion writes `transform` to
+              animate y/scale, which wiped -translate-x/y-1/2 and pinned the
+              picker's top-left corner to the middle of the screen. */}
+          <div className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center p-4">
           <motion.div
             initial={{ opacity: 0, y: 16, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.97 }}
             transition={{ type: "spring", stiffness: 520, damping: 40 }}
-            className="fixed left-1/2 top-1/2 z-[60] flex max-h-[80dvh] w-[min(90vw,22rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#1a2027]/95 backdrop-blur-2xl"
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Add ${release.title} to a crate`}
+            className="pointer-events-auto flex max-h-[80dvh] w-[min(90vw,22rem)] flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#1a2027]/95 backdrop-blur-2xl"
             style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.35), 0 24px 70px rgba(0,0,0,0.6)" }}
           >
             <div className="flex items-center justify-between border-b border-white/[0.08] p-4">
@@ -91,13 +102,17 @@ export function CratePicker() {
                     }}
                     className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-colors hover:bg-white/[0.05]"
                   >
-                    <span
-                      className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border ${
+                    <motion.span
+                      key={on ? "on" : "off"}
+                      initial={on && !reduce ? { scale: 0.7, rotate: -10 } : false}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ type: "spring", stiffness: 520, damping: 14 }}
+                      className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border transition-colors ${
                         on ? "border-[#c08a4e]/50 bg-[#c08a4e]/15" : "border-white/[0.12] bg-white/[0.03]"
                       }`}
                     >
                       <CrateIcon size={18} filled={on} className={on ? "text-[#c08a4e]" : "text-ink/50"} />
-                    </span>
+                    </motion.span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] font-bold text-ink">{c.name}</span>
                       <span className="block text-[10px] text-ink/40">{c.releases.length} saved</span>
@@ -140,6 +155,7 @@ export function CratePicker() {
             </form>
             <span className="hidden">{tick}</span>
           </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>

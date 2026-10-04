@@ -366,7 +366,16 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
           aria-label={fav ? "Remove from favorites" : "Add to favorites"}
           className={`flex flex-1 items-center justify-center transition-colors hover:bg-vu/15 ${big ? "h-12" : "h-10"}`}
         >
-          <Heart size={big ? 22 : 19} className={`drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] ${fav ? "fill-vu text-vu" : "text-vu"}`} />
+          {/* Pops when it fills, so a tap visibly "took". */}
+          <motion.span
+            key={fav ? "fav" : "not"}
+            className="flex"
+            initial={fav && !reduce ? { scale: 0.4 } : false}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 600, damping: 12 }}
+          >
+            <Heart size={big ? 22 : 19} className={`drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] ${fav ? "fill-vu text-vu" : "text-vu"}`} />
+          </motion.span>
         </button>
         <span className="my-2 w-px bg-white/25" />
         <button
@@ -377,7 +386,15 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
           aria-label="Add to a crate"
           className={`flex flex-1 items-center justify-center transition-colors hover:bg-[#c08a4e]/20 ${big ? "h-12" : "h-10"}`}
         >
-          <CrateIcon size={big ? 22 : 19} filled={inList} className="text-[#e0a45c] drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]" />
+          <motion.span
+            key={inList ? "in" : "out"}
+            className="flex"
+            initial={inList && !reduce ? { scale: 0.5, rotate: -14 } : false}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 560, damping: 13 }}
+          >
+            <CrateIcon size={big ? 22 : 19} filled={inList} className="text-[#e0a45c] drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]" />
+          </motion.span>
         </button>
       </div>
 

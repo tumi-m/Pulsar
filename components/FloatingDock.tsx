@@ -414,34 +414,6 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
     csvFallback(key, label);
   };
 
-  const dockBtn = (
-    key: string,
-    renderIcon: (active: boolean) => React.ReactNode,
-    label: string,
-    count: number | null,
-    onClick: () => void,
-    active: boolean
-  ) => (
-    <button
-      key={key}
-      onClick={onClick}
-      aria-label={label}
-      className="glass group relative flex h-14 w-14 items-center justify-center rounded-full ring-1 ring-white/45 transition-transform hover:scale-110 active:scale-95"
-      style={{
-        background: active ? "rgba(255,255,255,0.92)" : "rgba(24,24,34,0.78)",
-        boxShadow:
-          "0 8px 24px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 6px rgba(0,0,0,0.3)",
-      }}
-    >
-      {renderIcon(active)}
-      {count != null && count > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-vu px-1 text-[9px] font-bold text-deck">
-          {count}
-        </span>
-      )}
-    </button>
-  );
-
   return (
     <>
       {/* the dock — rides higher when the bottom search bar is showing, and
@@ -504,24 +476,24 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
           )}
         </AnimatePresence>
 
-        {dockBtn(
-          "playlist",
-          (active) => (
-            <CrateIcon size={22} filled className={active ? "text-[#7a4a1f]" : "text-[#c08a4e]"} />
-          ),
-          "Your crate",
-          list.length,
-          () => setPanel(panel === "playlist" ? null : "playlist"),
-          panel === "playlist"
-        )}
-        {dockBtn(
-          "fav",
-          (active) => <Heart size={22} className={active ? "text-deck" : "text-ink/85"} />,
-          "Your favorites",
-          favs.length,
-          () => setPanel(panel === "favorites" ? null : "favorites"),
-          panel === "favorites"
-        )}
+        <DockButton
+          label="Your crate"
+          count={list.length}
+          active={panel === "playlist"}
+          reduce={reduceMotion}
+          onClick={() => setPanel(panel === "playlist" ? null : "playlist")}
+        >
+          {(active) => <CrateIcon size={22} filled className={active ? "text-[#7a4a1f]" : "text-[#c08a4e]"} />}
+        </DockButton>
+        <DockButton
+          label="Your favorites"
+          count={favs.length}
+          active={panel === "favorites"}
+          reduce={reduceMotion}
+          onClick={() => setPanel(panel === "favorites" ? null : "favorites")}
+        >
+          {(active) => <Heart size={22} className={active ? "text-deck" : "text-ink/85"} />}
+        </DockButton>
       </div>
 
       {/* crate panel — portalled to <body> so it escapes `main`'s z-10
@@ -610,14 +582,22 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                       <button
                         key={c.id}
                         onClick={() => setActiveCrateId(c.id)}
-                        className={`flex-shrink-0 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide transition-colors ${
+                        className={`relative flex-shrink-0 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide transition-colors ${
                           c.id === activeCrateId
-                            ? "border-[#c08a4e]/60 bg-[#c08a4e]/15 text-[#e0b070]"
+                            ? "border-[#c08a4e]/60 text-[#e0b070]"
                             : "border-white/[0.12] text-ink/50 hover:text-ink"
                         }`}
                       >
-                        {c.name}
-                        <span className="ml-1.5 text-ink/40">{c.releases.length}</span>
+                        {/* the lit tab slides between crates */}
+                        {c.id === activeCrateId && (
+                          <motion.span
+                            layoutId={reduceMotion ? undefined : "crate-tab"}
+                            className="absolute inset-0 rounded-full bg-[#c08a4e]/15"
+                            transition={{ type: "spring", stiffness: 480, damping: 38 }}
+                          />
+                        )}
+                        <span className="relative">{c.name}</span>
+                        <span className="relative ml-1.5 text-ink/40">{c.releases.length}</span>
                       </button>
                     ))}
                     <button
@@ -708,9 +688,26 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                   </p>
                 </div>
               ) : (
-                <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto p-4 sm:grid-cols-3">
-                  {items.map((r) => (
-                    <div key={r.id} className="group relative">
+                <div className="grid flex-1 grid-cols-2 content-start gap-3 overflow-y-auto p-4 sm:grid-cols-3">
+                  <AnimatePresence mode="popLayout">
+                  {items.map((r, i) => (
+                    <motion.div
+                      key={`${panel}-${activeCrateId}-${r.id}`}
+                      layout={!reduceMotion}
+                      // Records deal in when the panel opens or the crate tab
+                      // changes; removing one shrinks it out and the rest close
+                      // the gap instead of jumping.
+                      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 14, scale: 0.94 }}
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                        scale: 1,
+                        transition: { type: "spring", stiffness: 420, damping: 34, delay: Math.min(i, 12) * 0.025 },
+                      }}
+                      exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.8, transition: { duration: 0.18 } }}
+                      transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                      className="group relative"
+                    >
                       <button
                         onClick={() => {
                           setPanel(null);
@@ -783,8 +780,9 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                           <Trash2 size={13} />
                         </button>
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
+                  </AnimatePresence>
                 </div>
               )}
             </motion.div>
@@ -867,17 +865,27 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                     {plat?.Icon?.() ?? null}
                   </motion.span>
                 </div>
-                <p className="text-base font-bold uppercase tracking-wide text-ink">
-                  Playlist created 🎉
-                </p>
-                <p className="mt-1 text-[12px] leading-relaxed text-ink/55">
+                <motion.p
+                  initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.22, duration: 0.3 }}
+                  className="text-base font-bold uppercase tracking-wide text-ink"
+                >
+                  Playlist created
+                </motion.p>
+                <motion.p
+                  initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3, duration: 0.3 }}
+                  className="mt-1 text-[12px] leading-relaxed text-ink/55"
+                >
                   “{built.name}” is now on your {label} with{" "}
                   <span style={{ color }}>
                     {built.trackCount} track{built.trackCount === 1 ? "" : "s"}
                   </span>{" "}
                   from {built.addedReleases} of {built.totalReleases} record
                   {built.totalReleases === 1 ? "" : "s"}.
-                </p>
+                </motion.p>
                 {/* It stopped early but kept what it made (a quota ran out). */}
                 {built.note && (
                   <p className="mt-2 rounded-lg border border-sport/30 bg-sport/10 px-3 py-2 text-left text-[11px] leading-relaxed text-sport">
@@ -932,7 +940,9 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
           >
             <motion.div
               initial={{ scale: 0.92, y: 10 }}
-              animate={{ scale: 1, y: 0 }}
+              // A small head-shake: "no" without an alarm.
+              animate={reduceMotion ? { scale: 1, y: 0 } : { scale: 1, y: 0, x: [0, -7, 6, -4, 2, 0] }}
+              transition={{ x: { duration: 0.45, delay: 0.12 }, default: { type: "spring", stiffness: 420, damping: 30 } }}
               exit={{ scale: 0.92, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
               className="w-[min(92vw,380px)] rounded-2xl border border-vu/40 bg-[#1a2027]/[0.97] p-6 text-center"
@@ -1031,5 +1041,105 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       </AnimatePresence>
       </Portal>
     </>
+  );
+}
+
+/**
+ * A dock key. When its count goes up — a record dropped into the crate from
+ * anywhere in the app — the key hops and a "+1" floats off it, so adding
+ * something gives feedback where the thing actually went. The count itself
+ * rolls over rather than silently changing.
+ */
+function DockButton({
+  label,
+  count,
+  active,
+  reduce,
+  onClick,
+  children,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  reduce: boolean | null;
+  onClick: () => void;
+  children: (active: boolean) => React.ReactNode;
+}) {
+  const prev = useRef(count);
+  const mountedAt = useRef(0);
+  const [bump, setBump] = useState(0);
+  useEffect(() => {
+    mountedAt.current = Date.now();
+  }, []);
+  useEffect(() => {
+    // Only growth is news. The first read from storage also "grows" the count
+    // from 0 shortly after mount; that isn't the listener adding anything.
+    if (count > prev.current && Date.now() - mountedAt.current > 800) setBump((b) => b + 1);
+    prev.current = count;
+  }, [count]);
+
+  return (
+    <button
+      onClick={onClick}
+      aria-label={count > 0 ? `${label} (${count})` : label}
+      className="glass group relative flex h-14 w-14 items-center justify-center rounded-full ring-1 ring-white/45 transition-transform hover:scale-110 active:scale-95"
+      style={{
+        background: active ? "rgba(255,255,255,0.92)" : "rgba(24,24,34,0.78)",
+        boxShadow:
+          "0 8px 24px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 6px rgba(0,0,0,0.3)",
+      }}
+    >
+      <motion.span
+        key={bump}
+        className="flex"
+        initial={bump && !reduce ? { scale: 1, rotate: 0, y: 0 } : false}
+        animate={bump && !reduce ? { scale: [1, 1.32, 0.92, 1], rotate: [0, -12, 8, 0], y: [0, -5, 0, 0] } : undefined}
+        transition={{ duration: 0.55, ease: "easeOut" }}
+      >
+        {children(active)}
+      </motion.span>
+      {/* the ripple ring and the floating +1 */}
+      <AnimatePresence>
+        {bump > 0 && !reduce && (
+          <motion.span
+            key={`ring-${bump}`}
+            aria-hidden
+            className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-[#e0a45c]"
+            initial={{ scale: 1, opacity: 0.8 }}
+            animate={{ scale: 1.7, opacity: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {bump > 0 && !reduce && (
+          <motion.span
+            key={`plus-${bump}`}
+            aria-hidden
+            className="pointer-events-none absolute -top-2 left-1/2 -ml-3 w-6 text-center font-mono text-[11px] font-bold text-sport drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
+            initial={{ y: 0, opacity: 0 }}
+            animate={{ y: -22, opacity: [0, 1, 0] }}
+            transition={{ duration: 0.9, ease: "easeOut" }}
+          >
+            +1
+          </motion.span>
+        )}
+      </AnimatePresence>
+      {count > 0 && (
+        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center overflow-hidden rounded-full bg-vu px-1 text-[9px] font-bold text-deck">
+          <AnimatePresence initial={false} mode="popLayout">
+            <motion.span
+              key={count}
+              initial={reduce ? { opacity: 0 } : { y: 9, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={reduce ? { opacity: 0 } : { y: -9, opacity: 0 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {count}
+            </motion.span>
+          </AnimatePresence>
+        </span>
+      )}
+    </button>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Copy, Download, ChevronDown } from "lucide-react";
 import { PLATFORMS } from "./platforms";
 import { providerConfigured, providerMissing } from "@/lib/dsp";
@@ -70,6 +70,7 @@ const SETUP: Record<string, { console: string; consoleLabel: string; steps: stri
 };
 
 export function ExportSheet({ count, crateName, cfgTick, onPick, onCopy, onCsv, onCopyRedirect }: Props) {
+  const reduce = useReducedMotion();
   const anyLive = PLATFORMS.some((p) => providerConfigured(p.key));
   const origin = typeof window !== "undefined" ? `${window.location.origin}/` : "/";
 
@@ -93,9 +94,9 @@ export function ExportSheet({ count, crateName, cfgTick, onPick, onCopy, onCsv, 
           return (
             <motion.button
               key={p.key}
-              initial={{ opacity: 0, y: 6 }}
+              initial={reduce ? { opacity: 0 } : { opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.03 * i, duration: 0.22 }}
+              transition={{ delay: 0.04 * i, duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
               onClick={() => onPick(p.key, p.label)}
               className={`flex min-h-[56px] items-center gap-3 rounded-xl border px-3 py-2.5 text-left shadow-key transition-[background-color,box-shadow,transform] active:translate-y-px active:shadow-keyed ${
                 live ? "border-lcd/30 bg-deck-600 hover:bg-[#2c353f]" : "border-chrome-700/50 bg-deck-700/70 hover:bg-deck-600"
@@ -122,7 +123,7 @@ export function ExportSheet({ count, crateName, cfgTick, onPick, onCopy, onCsv, 
               <span
                 aria-label={live ? "Ready" : "Tracklist only"}
                 className={`h-2 w-2 flex-shrink-0 rounded-full ${
-                  live ? "bg-lcd shadow-[0_0_8px_rgba(126,217,174,0.85)]" : "bg-deck-600 ring-1 ring-chrome-700"
+                  live ? "lamp-live bg-lcd shadow-[0_0_8px_rgba(126,217,174,0.85)]" : "bg-deck-600 ring-1 ring-chrome-700"
                 }`}
               />
             </motion.button>

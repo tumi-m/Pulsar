@@ -181,6 +181,28 @@ export function PlaylistBuildOverlay({
           Building your playlist
         </p>
 
+        {/* the two phases, lit in turn: match every record, then write it */}
+        <div className="mt-2 flex items-center justify-center gap-2 text-[9px] font-bold uppercase tracking-[0.2em]">
+          {(["Matching", "Saving"] as const).map((step, i) => {
+            const on = i === 0 ? !saving : saving;
+            const past = i === 0 && saving;
+            return (
+              <span key={step} className="flex items-center gap-2">
+                {i > 0 && <span className="h-px w-5 bg-white/15" />}
+                <span className={`flex items-center gap-1.5 transition-colors duration-300 ${on ? "text-ink" : past ? "text-ink/50" : "text-ink/25"}`}>
+                  <motion.span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ backgroundColor: on || past ? color : "rgba(255,255,255,0.18)" }}
+                    animate={on && !reduce ? { opacity: [1, 0.35, 1] } : { opacity: 1 }}
+                    transition={on && !reduce ? { duration: 1.1, repeat: Infinity } : { duration: 0.2 }}
+                  />
+                  {step}
+                </span>
+              </span>
+            );
+          })}
+        </div>
+
         {/* now-matching line */}
         <div className="mt-1.5 h-4 overflow-hidden">
           <AnimatePresence mode="wait">

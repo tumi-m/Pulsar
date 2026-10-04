@@ -581,3 +581,15 @@ body {
   animation: auroraDrift 9s ease-in-out infinite;
   will-change: transform, opacity;
 }
+
+/* ─── Ready lamp ─────────────────────────────
+   A service that can build the playlist glows like a powered LED — a slow
+   breath, not a blink. */
+@keyframes lampBreath {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(126, 217, 174, 0.85); }
+  50% { opacity: 0.7; box-shadow: 0 0 3px rgba(126, 217, 174, 0.4); }
+}
+.lamp-live { animation: lampBreath 2.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .lamp-live { animation: none; }
+}
