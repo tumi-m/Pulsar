@@ -47,8 +47,12 @@ test("search filters the grid", async ({ page }) => {
   await search.waitFor({ state: "visible", timeout: 8000 });
   await search.click();
   await search.fill("Beatles");
-  await page.waitForTimeout(600);
-  // The catalog has "The Beatles" entries; the client filter matches.
+
+  // The catalog has "The Beatles" entries; the client filter matches. Wait for
+  // the filtered grid to actually re-render (the debounced server search +
+  // image loading can exceed a fixed sleep on slow CI runners) instead of
+  // asserting a raw count after an arbitrary timeout.
+  await expect(page.locator("main img").first()).toBeVisible({ timeout: 10000 });
   const visible = await page.locator("main img").count();
   expect(visible).toBeGreaterThan(0);
 });

@@ -86,7 +86,7 @@ describe("tailwind opacity modifiers", () => {
   });
 
   it("leaves valid steps and layout fractions alone", () => {
-    const ok = `className="w-1/2 top-1/2 bg-white/10 border-neon-violet/40 lg:w-1/3"`;
+    const ok = `className="w-1/2 top-1/2 bg-white/10 border-sony/40 lg:w-1/3"`;
     const bad = [...ok.matchAll(PATTERN)].filter((m) => !SCALE.has(m[2]));
     expect(bad).toEqual([]);
   });

@@ -13,6 +13,7 @@ import { PLATFORMS } from "./platforms";
 import { toggleFavorite } from "@/lib/collection";
 import { useCollectionState } from "@/lib/useCollectionState";
 import { usePlayer } from "./player/PlayerProvider";
+import { useReducedMotion } from "@/lib/motion";
 import { useIsTouch } from "@/lib/useIsTouch";
 
 interface ReleaseCardProps {
@@ -31,6 +32,7 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
   const player = usePlayer();
   const isCurrent = player.current?.id === release.id;
   const isPlayingThis = isCurrent && player.playing;
+  const reduce = useReducedMotion();
   const [hovered, setHovered] = useState(false);
   // Touch devices never fire hover, so the quick actions (share / favourite /
   // crate) and the play triangle would be permanently invisible — show them.
@@ -104,15 +106,27 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
   // DSP deep links available for this release (shown full-colour on 3s dwell).
   const dsps = PLATFORMS.filter((p) => Boolean(release[p.key]));
 
-  // No artwork could be resolved → don't show this release at all.
-  if (artHidden) return null;
+  // A release with no resolvable cover used to remove itself from the grid
+  // entirely. That was only survivable while the fallback chain was broken and
+  // never reported failure; once it worked, a single iTunes hiccup could empty
+  // a fifth of the page. The record is still worth showing — <Artwork> has a
+  // designed letter tile carrying the artist and title, and every control on
+  // the card (play, crate, DSP links) works without a cover. All that is
+  // suppressed is the physical-media dwell, which frames a sleeve around art
+  // that doesn't exist.
+  const canShowPhysical = armed && !artHidden;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 24 }}
+      // Reels on a coverless tile turn while it plays (see .jcard in globals).
+      data-playing={isPlayingThis ? "true" : undefined}
+      // The global reduced-motion CSS rule can't reach framer's JS-driven
+      // transforms, so every tile still slid up 24px for a visitor who asked
+      // for no motion. It now just fades in for them.
+      initial={{ opacity: 0, y: reduce ? 0 : 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{
-        duration: 0.45,
+        duration: reduce ? 0.12 : 0.45,
         // Only the first screenful staggers. Beyond that a tile has scrolled
         // into view and should simply be there.
         delay: index < 12 ? index * 0.035 : 0,
@@ -124,13 +138,36 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
       onPointerUp={endPress}
       onPointerCancel={endPress}
       onPointerLeave={endPress}
-      whileTap={scrolling ? undefined : { scale: 0.95 }}
+      // No whileTap here. Framer's press gesture captures the pointer on touch,
+      // and a captured press delivers its `click` to this wrapper instead of the
+      // cover button inside it — so on phones, tapping a tile did nothing at all
+      // (mouse clicks were unaffected, which is why it went unnoticed). The press
+      // feedback is a CSS :active scale on the button instead.
+      // Focus is tracked on the whole tile, like :focus-within. It used to sit
+      // on the cover button alone, so tabbing from the cover to its own Play
+      // button fired the cover's blur, which hid the overlay — the control
+      // that had just received focus went invisible as it got it.
+      // Capture-phase: framer-motion claims onFocus/onBlur on a motion
+      // component for its own focus gesture, so the plain handlers never ran.
+      // KEYBOARD focus only (:focus-visible). A tap focuses the cover too, and
+      // revealing on that put the play triangle under the finger between press
+      // and release — the browser then sent the click to the wrapper, the two
+      // elements' common ancestor, and tapping a tile on a phone did nothing.
+      onFocusCapture={(e) => {
+        if ((e.target as HTMLElement).matches?.(":focus-visible")) enter();
+      }}
+      onBlurCapture={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) leave();
+      }}
       className={`group relative ${size === 2 ? "col-span-2 row-span-2" : size === 1 ? "col-span-2" : ""}`}
       style={{
         contentVisibility: "auto",
         // Reserve the tile's box so skipping paint never collapses the grid or
         // makes the scrollbar jump.
         containIntrinsicSize: size === 1 ? "auto 180px" : "auto 320px",
+        // content-visibility implies paint containment, which clipped the hover
+        // scale, ring and glow exactly at the tile's edge. Let them spill.
+        overflowClipMargin: "48px",
       }}
     >
       <button
@@ -145,34 +182,47 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
           player.play(release);
           onOpen(release);
         }}
-        onFocus={enter}
-        onBlur={leave}
         aria-label={`${release.artist} — ${release.title}. Open album`}
-        className="block w-full outline-none focus-visible:ring-2 focus-visible:ring-star-white/40"
+        className={`block w-full outline-none transition-transform duration-150 focus-visible:ring-2 focus-visible:ring-ink/40 ${
+          scrolling ? "" : "active:scale-[0.96]"
+        }`}
       >
         <div
-          className={`relative w-full overflow-hidden rounded-2xl ring-1 ring-star-white/[0.06] transition-[transform,box-shadow,ring-color] duration-300 ${
+          className={`relative w-full overflow-hidden rounded-xl ring-1 ring-ink/[0.06] transition-[transform,box-shadow,ring-color] duration-300 ${
             size === 1 ? "aspect-[2/1]" : "aspect-square"
           } ${size > 0 ? "tile-float" : ""} ${
-            revealed ? "scale-[1.03] ring-2 ring-neon-violet/50" : ""
+            revealed ? "scale-[1.03] ring-2 ring-sony/50" : ""
           }`}
           style={{
             ...(size > 0 ? { animationDelay: `${(index % 5) * 0.8}s` } : {}),
             boxShadow: revealed
-              ? "0 18px 50px -12px rgba(155,93,229,0.45), 0 0 0 1px rgba(155,93,229,0.25)"
+              ? "0 18px 50px -12px rgba(242,102,44,0.45), 0 0 0 1px rgba(242,102,44,0.25)"
               : undefined,
           }}
         >
-          {/* default: plain album cover */}
-          <Artwork
-            src={release.artwork_url}
-            artist={release.artist}
-            title={release.title}
-            className={`object-cover transition-opacity duration-300 ${armed ? "opacity-0" : "opacity-100"}`}
-            onUnavailable={() => setArtHidden(true)}
-          />
+          {/* default: plain album cover.
+
+              The dwell fade lives on this wrapper, not on the <Artwork>'s
+              className: passing `opacity-100` in there put two conflicting
+              opacity utilities on one element, and Tailwind's source order let
+              the outer one win. That silently defeated Artwork's own fade-up —
+              every cover snapped in, and a cover that had failed to decode was
+              forced to full opacity, showing the browser's broken-image glyph
+              instead of staying hidden behind the placeholder. */}
+          <div
+            className={`absolute inset-0 transition-opacity duration-300 ${
+              canShowPhysical ? "opacity-0" : "opacity-100"
+            }`}
+          >
+            <Artwork
+              src={release.artwork_url}
+              artist={release.artist}
+              title={release.title}
+              onUnavailable={() => setArtHidden(true)}
+            />
+          </div>
           {/* physical object appears only after a 3-second dwell */}
-          {armed && (
+          {canShowPhysical && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -184,7 +234,7 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
                 artist={release.artist}
                 title={release.title}
                 format={format}
-                hovered={armed}
+                hovered={canShowPhysical}
                 big={big}
               />
             </motion.div>
@@ -192,9 +242,13 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
 
           {/* fresh-drop pill — more visible than a dot */}
           {isFresh && !armed && (
+            // A shop sticker on the case: Sports-Walkman yellow, dark type,
+            // a couple of degrees off square. Yellow is the palette's "new",
+            // and at 7px white-on-translucent it was the least legible text
+            // on the tile.
             <span
-              className="absolute right-1.5 top-1.5 z-10 rounded-full border border-white/40 bg-void/55 px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.18em] text-white backdrop-blur-sm"
-              style={{ boxShadow: "0 0 12px rgba(232,232,244,0.35)" }}
+              className="absolute right-1.5 top-1.5 z-10 -rotate-3 rounded-[3px] bg-sport px-1.5 py-0.5 text-[7px] font-black uppercase tracking-[0.16em] text-deck"
+              style={{ boxShadow: "0 1px 0 rgba(255,255,255,0.45) inset, 0 2px 6px rgba(0,0,0,0.5)" }}
             >
               Fresh
             </span>
@@ -213,7 +267,7 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
                 boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.28), 0 2px 8px rgba(0,0,0,0.5)",
               }}
             >
-              <Sparkles size={11} className="text-neon-violet" />
+              <Sparkles size={11} className="text-sony" />
             </span>
           )}
 
@@ -223,12 +277,12 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
               armed ? "opacity-100" : "opacity-0"
             }`}
           >
-            <p className={`font-bold uppercase leading-tight text-star-white ${big ? "text-base" : "text-[11px]"} line-clamp-1`}>
+            <p className={`font-bold uppercase leading-tight text-ink ${big ? "text-base" : "text-[11px]"} line-clamp-1`}>
               {release.title}
             </p>
-            <p className="truncate text-[10px] text-star-white/60">{release.artist}</p>
+            <p className="truncate text-[10px] text-ink/70">{release.artist}</p>
             {release.label && (
-              <p className="mt-0.5 truncate text-[8px] font-bold uppercase tracking-[0.2em] text-neon-green/70">
+              <p className="mt-0.5 truncate text-[8px] font-bold uppercase tracking-[0.2em] text-lcd/70">
                 {release.label}
               </p>
             )}
@@ -246,9 +300,18 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
           else player.play(release);
         }}
         aria-label={isPlayingThis ? "Pause" : "Play preview"}
+        // Compact tiles never show their overlay controls, but they stayed in
+        // the tab order: five-plus invisible stops per tile. Out of the tab
+        // order and the accessibility tree when they can't be seen. (A tile
+        // that's playing still shows its triangle, so it stays reachable.)
+        inert={compact && !isCurrent}
         className={`absolute left-1/2 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full ring-1 ring-white/40 transition-all duration-200 ${
           big ? "h-20 w-20" : "h-14 w-14"
-        } ${isCurrent || revealed ? "scale-100 opacity-100" : "scale-90 opacity-0"}`}
+        } ${
+          // pointer-events-none while hidden: an opacity-0 button still takes
+          // taps, so tapping a tile's centre played it instead of opening the album.
+          isCurrent || revealed ? "scale-100 opacity-100" : "pointer-events-none scale-90 opacity-0"
+        }`}
         style={{
           background: "rgba(12,12,20,0.72)",
           boxShadow:
@@ -265,8 +328,11 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
       {/* quick actions — a full-width liquid-glass bar (matches the play
           triangle): Share · Favorite · Crate, spanning the tile's width */}
       <div
+        inert={compact}
         className={`absolute inset-x-2 top-2 z-20 flex items-stretch overflow-hidden rounded-full ring-1 ring-white/45 transition-all duration-200 ${
-          revealed ? "translate-y-0 opacity-100" : "-translate-y-1.5 opacity-0"
+          // Hidden means untouchable. Invisible, these took taps: on a phone,
+          // tapping near the top of any tile silently favourited it.
+          revealed ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-1.5 opacity-0"
         }`}
         style={{
           background: "rgba(12,12,20,0.72)",
@@ -287,9 +353,9 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
             }
           }}
           aria-label="Share"
-          className={`flex flex-1 items-center justify-center transition-colors hover:bg-neon-blue/15 ${big ? "h-12" : "h-10"}`}
+          className={`flex flex-1 items-center justify-center transition-colors hover:bg-tps/15 ${big ? "h-12" : "h-10"}`}
         >
-          <Share2 size={big ? 20 : 17} className="text-neon-blue drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]" />
+          <Share2 size={big ? 20 : 17} className="text-tps drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]" />
         </button>
         <span className="my-2 w-px bg-white/25" />
         <button
@@ -298,9 +364,18 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
             toggleFavorite(release);
           }}
           aria-label={fav ? "Remove from favorites" : "Add to favorites"}
-          className={`flex flex-1 items-center justify-center transition-colors hover:bg-neon-pink/15 ${big ? "h-12" : "h-10"}`}
+          className={`flex flex-1 items-center justify-center transition-colors hover:bg-vu/15 ${big ? "h-12" : "h-10"}`}
         >
-          <Heart size={big ? 22 : 19} className={`drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] ${fav ? "fill-neon-pink text-neon-pink" : "text-neon-pink"}`} />
+          {/* Pops when it fills, so a tap visibly "took". */}
+          <motion.span
+            key={fav ? "fav" : "not"}
+            className="flex"
+            initial={fav && !reduce ? { scale: 0.4 } : false}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 600, damping: 12 }}
+          >
+            <Heart size={big ? 22 : 19} className={`drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)] ${fav ? "fill-vu text-vu" : "text-vu"}`} />
+          </motion.span>
         </button>
         <span className="my-2 w-px bg-white/25" />
         <button
@@ -311,7 +386,15 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
           aria-label="Add to a crate"
           className={`flex flex-1 items-center justify-center transition-colors hover:bg-[#c08a4e]/20 ${big ? "h-12" : "h-10"}`}
         >
-          <CrateIcon size={big ? 22 : 19} filled={inList} className="text-[#e0a45c] drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]" />
+          <motion.span
+            key={inList ? "in" : "out"}
+            className="flex"
+            initial={inList && !reduce ? { scale: 0.5, rotate: -14 } : false}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 560, damping: 13 }}
+          >
+            <CrateIcon size={big ? 22 : 19} filled={inList} className="text-[#e0a45c] drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]" />
+          </motion.span>
         </button>
       </div>
 
@@ -319,8 +402,8 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
           each linking straight to this release on that service */}
       {dsps.length > 0 && (
         <div
-          className={`pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-center justify-around gap-1 rounded-b-2xl px-2 py-2 transition-all duration-300 ${
-            showDsp ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
+          className={`pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-center justify-around gap-0.5 rounded-b-2xl px-1.5 py-2 transition-all duration-300 sm:gap-1 sm:px-2 ${
+            showDsp ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0 group-focus-within:translate-y-0 group-focus-within:opacity-100"
           }`}
           style={{
             background: "linear-gradient(0deg, rgba(4,4,10,0.95), rgba(4,4,10,0.62) 70%, transparent)",
@@ -335,12 +418,22 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
               onClick={(e) => e.stopPropagation()}
               aria-label={p.hint}
               title={p.label}
-              className={`flex items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95 ${
+              // shrink-0 matters: six badges on the narrowest tile overflowed
+              // the row, and flex resolved that by squashing them from 28px
+              // circles into 23px ellipses. They now hold their shape and the
+              // row is sized to fit all six instead.
+              className={`relative flex shrink-0 items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95 before:absolute before:inset-[-8px] before:content-[''] ${
                 showDsp ? "pointer-events-auto" : ""
-              } ${big ? "h-9 w-9" : "h-7 w-7"}`}
+              } ${big ? "h-9 w-9" : "h-6 w-6 sm:h-7 sm:w-7"}`}
               style={{ backgroundColor: `${p.color}2e`, color: p.color }}
             >
-              <span className={big ? "[&>svg]:h-5 [&>svg]:w-5" : "[&>svg]:h-4 [&>svg]:w-4"}>
+              <span
+                className={
+                  big
+                    ? "[&>svg]:h-5 [&>svg]:w-5"
+                    : "[&>svg]:h-3.5 [&>svg]:w-3.5 sm:[&>svg]:h-4 sm:[&>svg]:w-4"
+                }
+              >
                 <p.Icon />
               </span>
             </a>

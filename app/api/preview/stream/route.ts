@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guard } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -20,6 +21,10 @@ const ALLOWED = [
 ];
 
 export async function GET(req: NextRequest) {
+  // Unthrottled audio proxy — bound the bandwidth an IP can pull.
+  const limited = guard(req, "stream", { limit: 240, windowMs: 60_000 });
+  if (limited) return limited;
+
   const src = new URL(req.url).searchParams.get("src");
   if (!src) return NextResponse.json({ error: "src required" }, { status: 400 });
 
@@ -44,8 +49,10 @@ export async function GET(req: NextRequest) {
     }
     return new NextResponse(upstream.body, {
       headers: {
-        "Content-Type": upstream.headers.get("content-type") ?? "audio/mpeg",
-        "Access-Control-Allow-Origin": "*",
+        // Only audio passes through; never let the CDN dictate the type.
+        "Content-Type": "audio/mpeg",
+        "X-Content-Type-Options": "nosniff",
+        "Access-Control-Allow-Origin": req.headers.get("origin") ?? "*",
         "Cache-Control": "public, max-age=86400, immutable",
         "Netlify-Vary": "query",
         "Netlify-CDN-Cache-Control": "public, durable, s-maxage=604800, immutable",

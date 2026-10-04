@@ -4,7 +4,7 @@
  * SyncBridge — invisible client component that keeps a signed-in user's
  * collection mirrored to Supabase.
  *
- *   • On sign-in        → pull the remote collection down over localStorage
+ *   • On sign-in        → merge the remote collection with the local one
  *   • On collection change → push the local copy up (debounced)
  *
  * Renders nothing; mounted once in the root layout. Entirely inert when
@@ -19,7 +19,7 @@ import {
   pushCollection,
   syncConfigured,
 } from "@/lib/sync";
-import { getCrates, getFavorites } from "@/lib/collection";
+import { getCrates, getFavorites, mergeCollections } from "@/lib/collection";
 
 // Persist a pulled-down collection back into the same localStorage the UI
 // already reads, then broadcast so every surface refreshes.
@@ -48,10 +48,18 @@ export function SyncBridge() {
     const syncOnSignIn = async (uid: string | null) => {
       userId = uid;
       if (!uid) return;
-      // Pull the remote copy; if they have one, it becomes local truth.
+      // Merge, never overwrite: the remote copy is combined with what's on
+      // this device and the union is pushed back up. Overwriting used to wipe
+      // every local crate on sign-in (see mergeCollections).
       const remote = await pullCollection(uid);
-      if (remote) writeLocal(remote.favorites, remote.crates);
-      else await pushCollection(uid); // first sign-in: upload the local library
+      if (remote) {
+        const merged = mergeCollections(
+          { favorites: getFavorites(), crates: getCrates() },
+          remote
+        );
+        writeLocal(merged.favorites, merged.crates);
+      }
+      await pushCollection(uid);
     };
 
     // Subscribe to local collection writes (same event the UI dispatches).
@@ -68,7 +76,7 @@ export function SyncBridge() {
       unsub();
       if (pushTimer) clearTimeout(pushTimer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   return null;

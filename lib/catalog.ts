@@ -8,6 +8,7 @@
  * Grammy winners (recent years, major categories)
  */
 
+import { boomplaySearchUrl } from "./utils";
 import type { Release } from "./types";
 
 const sp = (q: string) =>
@@ -20,10 +21,11 @@ const sc = (q: string) =>
   `https://soundcloud.com/search?q=${encodeURIComponent(q)}`;
 const yt = (q: string) =>
   `https://music.youtube.com/search?q=${encodeURIComponent(q)}`;
+const bp = (q: string) => boomplaySearchUrl(q);
 
 function links(artist: string, title: string) {
   const q = `${artist} ${title}`;
-  return { spotify: sp(q), apple_music: am(q), tidal: td(q), soundcloud: sc(q), youtube_music: yt(q) };
+  return { spotify: sp(q), apple_music: am(q), tidal: td(q), soundcloud: sc(q), youtube_music: yt(q), boomplay: bp(q) };
 }
 
 const wiki = (path: string) =>
@@ -922,6 +924,7 @@ const CORE: Release[] = RELEASES.map((r, i) => ({
   tidal: r.tidal,
   soundcloud: r.soundcloud,
   youtube_music: r.youtube_music,
+  boomplay: r.boomplay,
   created_at: r.release_date + "T00:00:00Z",
   curator_note: r.curator_note ?? null,
 }));

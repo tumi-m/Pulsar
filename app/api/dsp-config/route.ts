@@ -26,14 +26,49 @@ function pick(...names: string[]): string {
   return "";
 }
 
+/**
+ * Per-service readiness, with the NAMES of whatever is missing (never values).
+ *
+ * Client ids alone over-reported what worked: YouTube also needs
+ * GOOGLE_CLIENT_SECRET for the server-side token exchange, and Apple needs the
+ * three signing values for its developer token. With only the id set, the
+ * export sheet offered the service, sent the user through a consent screen,
+ * and failed on the way back. Now the sheet knows before anyone taps, and can
+ * say exactly which setting is missing.
+ */
+function readiness() {
+  const has = (n: string) => Boolean(process.env[n]?.trim());
+  const spotify = pick("SPOTIFY_CLIENT_ID", "NEXT_PUBLIC_SPOTIFY_CLIENT_ID");
+  const google = pick("GOOGLE_CLIENT_ID", "NEXT_PUBLIC_GOOGLE_CLIENT_ID");
+  const tidal = pick("TIDAL_CLIENT_ID", "NEXT_PUBLIC_TIDAL_CLIENT_ID");
+  const appleFlag =
+    process.env.APPLE_MUSIC_ENABLED === "true" || process.env.NEXT_PUBLIC_APPLE_MUSIC_ENABLED === "true";
+  const missing = (pairs: [boolean, string][]) => pairs.filter(([ok]) => !ok).map(([, n]) => n);
+  return {
+    spotify: missing([[Boolean(spotify), "SPOTIFY_CLIENT_ID"]]),
+    youtube_music: missing([
+      [Boolean(google), "GOOGLE_CLIENT_ID"],
+      [has("GOOGLE_CLIENT_SECRET"), "GOOGLE_CLIENT_SECRET"],
+    ]),
+    tidal: missing([[Boolean(tidal), "TIDAL_CLIENT_ID"]]),
+    apple_music: missing([
+      [appleFlag, "APPLE_MUSIC_ENABLED=true"],
+      [has("APPLE_TEAM_ID"), "APPLE_TEAM_ID"],
+      [has("APPLE_KEY_ID"), "APPLE_KEY_ID"],
+      [has("APPLE_PRIVATE_KEY"), "APPLE_PRIVATE_KEY"],
+    ]),
+  };
+}
+
 export async function GET() {
+  const missing = readiness();
   return NextResponse.json(
     {
       spotifyClientId: pick("SPOTIFY_CLIENT_ID", "NEXT_PUBLIC_SPOTIFY_CLIENT_ID"),
       googleClientId: pick("GOOGLE_CLIENT_ID", "NEXT_PUBLIC_GOOGLE_CLIENT_ID"),
-      appleEnabled:
-        process.env.APPLE_MUSIC_ENABLED === "true" ||
-        process.env.NEXT_PUBLIC_APPLE_MUSIC_ENABLED === "true",
+      tidalClientId: pick("TIDAL_CLIENT_ID", "NEXT_PUBLIC_TIDAL_CLIENT_ID"),
+      appleEnabled: missing.apple_music.length === 0,
+      missing,
     },
     { headers: { "Cache-Control": "no-store" } }
   );

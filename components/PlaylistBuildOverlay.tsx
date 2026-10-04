@@ -14,6 +14,13 @@ interface Props {
   /** Recently matched releases, newest first — they stack up as it works. */
   recent?: Release[];
   Icon?: () => React.ReactElement;
+  /**
+   * Stop the build. There was no way out of this overlay: an Apple sign-in
+   * popup that never settled, or a slow crate, held the whole app behind it.
+   * Matching runs before anything is created, so cancelling while matching
+   * leaves nothing behind on the service.
+   */
+  onCancel?: () => void;
 }
 
 /**
@@ -33,17 +40,23 @@ export function PlaylistBuildOverlay({
   current,
   recent = [],
   Icon,
+  onCancel,
 }: Props) {
   const reduce = useReducedMotion();
   const pct = total ? Math.round((done / total) * 100) : 0;
+  // Every record has been looked up; the playlist is being created and filled.
+  const saving = total > 0 && done >= total;
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Building your ${label} playlist`}
       className="fixed inset-0 z-[70] flex items-center justify-center p-4"
-      style={{ background: "rgba(4,4,10,0.88)", backdropFilter: "blur(18px)" }}
+      style={{ background: "rgba(11,13,16,0.9)", backdropFilter: "blur(18px)" }}
     >
       {/* colour wash that breathes with the service's brand colour */}
       {!reduce && (
@@ -132,7 +145,7 @@ export function PlaylistBuildOverlay({
           {/* service badge riding the edge of the record */}
           <span
             className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full ring-2 ring-[#0b0b12]"
-            style={{ backgroundColor: color, color: "#04040a" }}
+            style={{ backgroundColor: color, color: "#0b0d10" }}
           >
             {Icon ? <Icon /> : null}
           </span>
@@ -164,9 +177,31 @@ export function PlaylistBuildOverlay({
           </div>
         )}
 
-        <p className="text-sm font-bold uppercase tracking-[0.22em] text-star-white">
+        <p className="text-sm font-bold uppercase tracking-[0.22em] text-ink">
           Building your playlist
         </p>
+
+        {/* the two phases, lit in turn: match every record, then write it */}
+        <div className="mt-2 flex items-center justify-center gap-2 text-[9px] font-bold uppercase tracking-[0.2em]">
+          {(["Matching", "Saving"] as const).map((step, i) => {
+            const on = i === 0 ? !saving : saving;
+            const past = i === 0 && saving;
+            return (
+              <span key={step} className="flex items-center gap-2">
+                {i > 0 && <span className="h-px w-5 bg-white/15" />}
+                <span className={`flex items-center gap-1.5 transition-colors duration-300 ${on ? "text-ink" : past ? "text-ink/50" : "text-ink/25"}`}>
+                  <motion.span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ backgroundColor: on || past ? color : "rgba(255,255,255,0.18)" }}
+                    animate={on && !reduce ? { opacity: [1, 0.35, 1] } : { opacity: 1 }}
+                    transition={on && !reduce ? { duration: 1.1, repeat: Infinity } : { duration: 0.2 }}
+                  />
+                  {step}
+                </span>
+              </span>
+            );
+          })}
+        </div>
 
         {/* now-matching line */}
         <div className="mt-1.5 h-4 overflow-hidden">
@@ -177,9 +212,13 @@ export function PlaylistBuildOverlay({
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: -12, opacity: 0 }}
               transition={{ duration: 0.25 }}
-              className="truncate text-[11px] text-star-white/55"
+              className="truncate text-[11px] text-ink/55"
             >
-              {current ? `${current.artist} — ${current.title}` : `Matching on ${label}…`}
+              {saving
+                ? `Saving to ${label}…`
+                : current
+                  ? `${current.artist} — ${current.title}`
+                  : `Matching on ${label}…`}
             </motion.p>
           </AnimatePresence>
         </div>
@@ -187,7 +226,7 @@ export function PlaylistBuildOverlay({
         {/* ── progress ───────────────────────────────── */}
         <div className="mt-5">
           <div className="mb-2 flex items-baseline justify-between px-0.5">
-            <span className="font-mono text-[11px] tabular-nums text-star-white/45">
+            <span className="font-mono text-[11px] tabular-nums text-ink/45" aria-live="polite">
               {done} / {total}
             </span>
             <motion.span
@@ -241,9 +280,17 @@ export function PlaylistBuildOverlay({
           </div>
         )}
 
-        <p className="mt-4 text-[10px] uppercase tracking-[0.2em] text-star-white/25">
+        <p className="mt-4 text-[10px] uppercase tracking-[0.2em] text-ink/30">
           Keep this tab open
         </p>
+        {onCancel && !saving && (
+          <button
+            onClick={onCancel}
+            className="mt-3 min-h-9 rounded-[10px] border border-chrome-700/70 bg-deck-600 px-5 text-[10px] font-bold uppercase tracking-[0.18em] text-ink-400 shadow-key transition-colors hover:text-ink active:translate-y-px active:shadow-keyed"
+          >
+            Cancel
+          </button>
+        )}
       </motion.div>
     </motion.div>
   );

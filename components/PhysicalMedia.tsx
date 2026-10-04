@@ -17,7 +17,7 @@ interface PhysicalMediaProps {
  * Renders the album art as a 3D physical object — NeXT/macOS-inspired
  * beveled hardware. Each format frames the same <Artwork> differently.
  */
-export function PhysicalMedia({ src, artist, title, format, hovered, big }: PhysicalMediaProps) {
+export function PhysicalMedia({ src, artist, title, format, hovered, big: _big }: PhysicalMediaProps) {
   const art = (className = "") => (
     <Artwork src={src} artist={artist} title={title} className={`object-cover ${className}`} />
   );
@@ -124,7 +124,7 @@ export function PhysicalMedia({ src, artist, title, format, hovered, big }: Phys
               rotate: { duration: 4, repeat: hovered ? Infinity : 0, ease: "linear" },
             }}
           >
-            <div className="absolute inset-[42%] rounded-full bg-void ring-2 ring-white/40" />
+            <div className="absolute inset-[42%] rounded-full bg-deck ring-2 ring-white/40" />
           </motion.div>
           <div
             className="relative aspect-square h-[90%] overflow-hidden rounded-[2px]"
@@ -182,7 +182,7 @@ export function PhysicalMedia({ src, artist, title, format, hovered, big }: Phys
           >
             {art()}
             {/* punch hole + string */}
-            <div className="absolute right-[8%] top-[8%] h-2 w-2 rounded-full bg-void ring-1 ring-white/40" />
+            <div className="absolute right-[8%] top-[8%] h-2 w-2 rounded-full bg-deck ring-1 ring-white/40" />
           </motion.div>
           {/* drive body */}
           <motion.div
@@ -194,7 +194,7 @@ export function PhysicalMedia({ src, artist, title, format, hovered, big }: Phys
             animate={{ y: hovered ? 2 : 0 }}
           >
             <div className="absolute left-[6%] top-1/2 h-[46%] w-[26%] -translate-y-1/2 rounded-[2px] bg-[#c8ccd4]" />
-            <div className="absolute right-[10%] top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-neon-green shadow-[0_0_6px_rgba(0,255,136,0.8)]" />
+            <div className="absolute right-[10%] top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-lcd shadow-[0_0_6px_rgba(126,217,174,0.8)]" />
           </motion.div>
         </div>
       );

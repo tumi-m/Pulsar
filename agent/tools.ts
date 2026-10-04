@@ -1,6 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
 import { saveRelease, releaseExists } from "../lib/supabase";
 import type { AgentRelease } from "../lib/types";
+import { checkFetchUrl } from "./fetch-guard";
 
 // ─────────────────────────────────────────────
 // Tool definitions (JSON Schema for Anthropic)
@@ -273,6 +275,8 @@ async function executeWebSearch(input: {
     }
 
     if (process.env.SERP_API_KEY) {
+      // SerpAPI requires the key as a query parameter (their only auth mode) —
+      // but never log this URL: it carries the secret.
       const res = await fetch(
         `https://serpapi.com/search.json?q=${encodeURIComponent(fullQuery)}&api_key=${process.env.SERP_API_KEY}&num=10`
       );
@@ -314,6 +318,16 @@ async function executeFetchPage(input: {
   url: string;
   extract?: string;
 }): Promise<string> {
+  // SSRF guard: the URL comes from the model, which is steered by the content
+  // it fetched. Restrict to the editorial/music hosts the curator needs.
+  const urlCheck = checkFetchUrl(input.url);
+  if (!urlCheck.ok) {
+    return JSON.stringify({
+      error: `Blocked: ${urlCheck.reason}`,
+      url: input.url,
+    });
+  }
+
   try {
     const res = await fetch(input.url, {
       headers: {
@@ -492,13 +506,64 @@ async function executeGetArtwork(input: {
   });
 }
 
+// ── save_release validation ─────────────────────────────────────
+// The model's output is persisted with the service-role key and later
+// rendered as links/artwork — validate shape, lengths and URL schemes
+// (never a javascript:/data: URI) before anything reaches the database.
+
+/** https:// URL — the only scheme we persist for links and artwork. */
+const httpsUrl = z
+  .string()
+  .max(2048)
+  .refine((s) => {
+    try {
+      const u = new URL(s);
+      return u.protocol === "https:";
+    } catch {
+      return false;
+    }
+  }, "must be an https:// URL");
+
+const releaseDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "release_date must be YYYY-MM-DD");
+
+const agentReleaseSchema = z.object({
+  artist: z.string().trim().min(1).max(200),
+  title: z.string().trim().min(1).max(300),
+  type: z.enum(["single", "album", "ep"]),
+  artwork_url: httpsUrl,
+  release_date: releaseDate,
+  genre: z.string().trim().max(80).optional(),
+  tags: z.array(z.string().trim().min(1).max(40)).max(12).optional(),
+  mood: z
+    .enum(["euphoric", "melancholic", "energetic", "ambient", "raw", "cinematic", "hypnotic", "tender"])
+    .optional(),
+  spotify: httpsUrl.nullable().optional(),
+  apple_music: httpsUrl.nullable().optional(),
+  tidal: httpsUrl.nullable().optional(),
+  soundcloud: httpsUrl.nullable().optional(),
+  youtube_music: httpsUrl.nullable().optional(),
+  curator_note: z.string().trim().max(600).optional(),
+});
+
 async function executeSaveRelease(input: AgentRelease): Promise<string> {
+  const parsed = agentReleaseSchema.safeParse(input);
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+      .map((i) => `${i.path.join(".") || "input"}: ${i.message}`)
+      .join("; ");
+    return JSON.stringify({
+      success: false,
+      error: `Rejected invalid release — ${issues}`,
+    });
+  }
   try {
-    const release = await saveRelease(input);
+    const release = await saveRelease(parsed.data as AgentRelease);
     return JSON.stringify({
       success: true,
       id: release.id,
-      message: `Saved: ${input.artist} — ${input.title}`,
+      message: `Saved: ${parsed.data.artist} — ${parsed.data.title}`,
     });
   } catch (err) {
     return JSON.stringify({

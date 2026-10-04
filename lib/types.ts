@@ -16,6 +16,7 @@ export interface PlatformLinks {
   tidal: string | null;
   soundcloud: string | null;
   youtube_music: string | null;
+  boomplay: string | null;
 }
 
 export interface Release {
@@ -34,6 +35,7 @@ export interface Release {
   tidal: string | null;
   soundcloud: string | null;
   youtube_music: string | null;
+  boomplay: string | null;
   created_at: string;
   curator_note: string | null;
   /** Cross-DSP chart strength (higher = more streamed right now).
@@ -41,6 +43,10 @@ export interface Release {
   popularity?: number | null;
   /** Record label (e.g. "Sub Pop", "Griselda"). Optional metadata. */
   label?: string | null;
+  /** Extracted credit list. Not persisted by the legacy ingest path. */
+  credits?: import("./credits").Credit[];
+  /** Title with credit fragments stripped — use for display and dedupe. */
+  clean_title?: string;
 }
 
 export interface AgentRelease {
@@ -57,6 +63,8 @@ export interface AgentRelease {
   tidal: string | null;
   soundcloud: string | null;
   youtube_music: string | null;
+  /** Optional: the agent pipeline predates Boomplay and doesn't resolve it. */
+  boomplay?: string | null;
   curator_note?: string;
 }
 

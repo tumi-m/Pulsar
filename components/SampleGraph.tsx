@@ -42,7 +42,9 @@ interface ChainResponse {
   edges: { from: string; to: string }[];
 }
 
-const ROLE_COLORS = ["#ff5fa2", "#9b5de5", "#00d4ff", "#45f0a0", "#ffb347", "#ff5b5b"];
+// Walkman palette, ordered so adjacent roles stay distinguishable:
+// transport orange, housing blue, sport yellow, LCD green, VU red, J-card cream.
+const ROLE_COLORS = ["#f2662c", "#4e86c7", "#ffce0a", "#7ed9ae", "#e23b2e", "#efe4cc"];
 
 export function SampleGraph({
   artist,
@@ -57,8 +59,18 @@ export function SampleGraph({
   const nodesRef = useRef<GraphNode[]>([]);
   const edgesRef = useRef<GraphEdge[]>([]);
   const rafRef = useRef<number>(0);
-  const [tick, setTick] = useState(0); // re-render trigger
+  // True while the simulation loop is scheduled. It used to run — and
+  // re-render the whole SVG — sixty times a second for as long as the panel
+  // was open, long after every node had stopped moving.
+  const runningRef = useRef(false);
+  const draggingRef = useRef(false);
+  const [, setTick] = useState(0); // re-render trigger (value never read)
   const [ready, setReady] = useState(false);
+  // The request failed, as opposed to succeeding with nothing to draw. Both
+  // used to show "No sample chain found … try a different track", which
+  // blamed the record for a network error and offered no way to retry.
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const widthRef = useRef(600);
@@ -137,13 +149,27 @@ export function SampleGraph({
     }
 
     setTick((t) => (t + 1) % 1000000);
+    // Sleep once the graph has come to rest; drag, expand and resize wake it.
+    let energy = 0;
+    for (const n of nodes) energy += n.vx * n.vx + n.vy * n.vy;
+    if (!draggingRef.current && nodes.length > 0 && energy / nodes.length < 0.002) {
+      runningRef.current = false;
+      return;
+    }
     rafRef.current = requestAnimationFrame(step);
   }, []);
+
+  const wake = useCallback(() => {
+    if (runningRef.current) return;
+    runningRef.current = true;
+    rafRef.current = requestAnimationFrame(step);
+  }, [step]);
 
   // ── load initial chain ───────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     setReady(false);
+    setFailed(false);
     (async () => {
       try {
         const res = await fetch(
@@ -177,17 +203,23 @@ export function SampleGraph({
         nodesRef.current = gnodes;
         edgesRef.current = gedges;
         setReady(true);
-        rafRef.current = requestAnimationFrame(step);
+        cancelAnimationFrame(rafRef.current);
+        runningRef.current = false;
+        wake();
       } catch {
-        if (!cancelled) setReady(true);
+        if (!cancelled) {
+          setFailed(true);
+          setReady(true);
+        }
       }
     })();
     return () => {
       cancelled = true;
       cancelAnimationFrame(rafRef.current);
+      runningRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [artist, title]);
+  }, [artist, title, attempt]);
 
   // Track the SVG size for responsive layout.
   useEffect(() => {
@@ -197,10 +229,11 @@ export function SampleGraph({
       const rect = svg.getBoundingClientRect();
       widthRef.current = rect.width;
       heightRef.current = rect.height;
+      if (nodesRef.current.length) wake();
     });
     ro.observe(svg);
     return () => ro.disconnect();
-  }, []);
+  }, [wake]);
 
   // ── expand a node: fetch its ancestors and graft them on ─
   const expandNode = async (node: GraphNode) => {
@@ -215,7 +248,6 @@ export function SampleGraph({
       const data: ChainResponse = await res.json();
       const existing = new Map(nodesRef.current.map((n) => [`${n.artist}::${n.title}`.toLowerCase(), n]));
       const idMap = new Map<string, GraphNode>();
-      let added = 0;
       for (const n of data.nodes) {
         if (n.level === 0) {
           idMap.set(n.id, node); // the root of this sub-chain IS the clicked node
@@ -236,7 +268,6 @@ export function SampleGraph({
         nodesRef.current.push(newNode);
         existing.set(key, newNode);
         idMap.set(n.id, newNode);
-        added++;
       }
       for (const e of data.edges) {
         const a = idMap.get(e.from);
@@ -254,6 +285,7 @@ export function SampleGraph({
     } finally {
       node.loading = false;
       setTick((t) => t + 1);
+      wake();
     }
   };
 
@@ -265,24 +297,32 @@ export function SampleGraph({
     const svg = svgRef.current;
     if (!svg) return;
     const start = { x: node.x, y: node.y };
+    draggingRef.current = true;
+    wake();
     const onMove = (e: PointerEvent) => {
       const rect = svg.getBoundingClientRect();
       node.fx = e.clientX - rect.left;
       node.fy = e.clientY - rect.top;
     };
     const onUp = () => {
+      draggingRef.current = false;
       node.fx = null;
       node.fy = null;
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    // A touch the browser takes over (a scroll, a system gesture) ends in
+    // pointercancel, not pointerup — which left the node stuck to a finger
+    // that had already gone.
+    window.addEventListener("pointercancel", onUp);
     void start;
   };
 
   return (
-    <div className="relative h-[420px] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a14]/60 md:h-[480px]">
+    <div className="relative h-[420px] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#12161a]/60 md:h-[480px]">
       <svg
         ref={svgRef}
         className="h-full w-full touch-none"
@@ -300,7 +340,7 @@ export function SampleGraph({
               y1={a.y}
               x2={b.x}
               y2={b.y}
-              stroke="rgba(155,93,229,0.35)"
+              stroke="rgba(242,102,44,0.35)"
               strokeWidth={1.5}
             />
           );
@@ -338,7 +378,7 @@ export function SampleGraph({
                   className="pointer-events-none select-none"
                   fontSize={9}
                   fontWeight={700}
-                  fill="rgba(232,232,244,0.9)"
+                  fill="rgba(237,241,244,0.9)"
                 >
                   {n.title.length > 22 ? n.title.slice(0, 21) + "…" : n.title}
                 </text>
@@ -361,9 +401,9 @@ export function SampleGraph({
 
       {/* loading state */}
       {!ready && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a14]/80">
-          <Loader2 size={22} className="animate-spin text-neon-violet" />
-          <span className="ml-3 text-[11px] font-bold uppercase tracking-[0.2em] text-star-white/50">
+        <div className="absolute inset-0 flex items-center justify-center bg-[#12161a]/80">
+          <Loader2 size={22} className="animate-spin text-sony" />
+          <span className="ml-3 text-[11px] font-bold uppercase tracking-[0.2em] text-ink/50">
             Tracing sample DNA…
           </span>
         </div>
@@ -376,13 +416,13 @@ export function SampleGraph({
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
-            className="absolute bottom-3 left-3 right-3 rounded-xl border border-white/[0.12] bg-[#0a0a14]/90 p-3 backdrop-blur-xl md:right-auto md:max-w-sm"
+            className="absolute bottom-3 left-3 right-3 rounded-xl border border-white/[0.12] bg-[#12161a]/90 p-3 backdrop-blur-xl md:right-auto md:max-w-sm"
           >
-            <p className="truncate text-[13px] font-bold text-star-white">{selNode.title}</p>
-            <p className="truncate text-[11px] text-star-white/55">{selNode.artist}</p>
+            <p className="truncate text-[13px] font-bold text-ink">{selNode.title}</p>
+            <p className="truncate text-[11px] text-ink/55">{selNode.artist}</p>
             <div className="mt-1.5 flex items-center gap-2">
               {selNode.year && (
-                <span className="font-mono text-[10px] text-star-white/40">{selNode.year}</span>
+                <span className="font-mono text-[10px] text-ink/40">{selNode.year}</span>
               )}
               <span
                 className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide"
@@ -397,19 +437,19 @@ export function SampleGraph({
             <div className="mt-2.5 flex gap-2">
               <button
                 onClick={() => onPlayNode(selNode.artist, selNode.title)}
-                className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-star-white transition-colors hover:bg-white/[0.12]"
+                className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-ink transition-colors hover:bg-white/[0.12]"
               >
                 <Play size={11} fill="currentColor" /> Play
               </button>
               <button
                 onClick={() => void expandNode(selNode)}
                 disabled={selNode.loading}
-                className="flex items-center gap-1.5 rounded-lg border border-neon-violet/40 bg-neon-violet/15 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-neon-violet transition-colors hover:bg-neon-violet/25 disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-lg border border-sony/40 bg-sony/15 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-sony transition-colors hover:bg-sony/25 disabled:opacity-50"
               >
                 {selNode.loading ? "Tracing…" : "Expand chain"}
               </button>
             </div>
-            <p className="mt-2 text-[9px] leading-relaxed text-star-white/35">
+            <p className="mt-2 text-[9px] leading-relaxed text-ink/35">
               Drag nodes to rearrange · click &ldquo;Expand chain&rdquo; to trace this song&rsquo;s
               own samples and grow the graph.
             </p>
@@ -417,9 +457,22 @@ export function SampleGraph({
         )}
       </AnimatePresence>
 
-      {ready && nodes.length <= 1 && (
+      {ready && failed && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+          <p className="text-[11px] leading-relaxed text-ink/50">
+            Couldn&rsquo;t reach the sample graph just now.
+          </p>
+          <button
+            onClick={() => setAttempt((n) => n + 1)}
+            className="min-h-9 rounded-[10px] border border-chrome-700/70 bg-deck-600 px-4 text-[11px] font-bold uppercase tracking-[0.16em] text-ink shadow-key active:translate-y-px active:shadow-keyed"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+      {ready && !failed && nodes.length <= 1 && (
         <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
-          <p className="text-[11px] leading-relaxed text-star-white/40">
+          <p className="text-[11px] leading-relaxed text-ink/40">
             No sample chain found for this track via MusicBrainz. Try a track from the curated
             set (e.g. Kanye West — Stronger) for a rich graph.
           </p>

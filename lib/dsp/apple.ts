@@ -9,7 +9,8 @@
  */
 
 import type { Release } from "../types";
-import { searchTerm, type BuildResult, type DspProvider, type ProgressFn } from "./shared";
+import { normaliseArtist } from "../match";
+import { searchTerm, sameTitle, catalogId, type BuildResult, type DspProvider, type ProgressFn } from "./shared";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
@@ -52,8 +53,40 @@ async function loadMusicKit(): Promise<any> {
     });
     return window.MusicKit.getInstance();
   })();
+  // A failed load used to stay cached for the life of the page, so every retry
+  // re-threw the same error without trying again. Forget it on failure.
+  musicKitReady.catch(() => {
+    musicKitReady = null;
+  });
   return musicKitReady;
 }
+
+/**
+ * Start loading MusicKit ahead of the click. Exported so the export sheet can
+ * call it when it opens: authorize() opens a popup, and browsers only allow a
+ * popup inside the user's click. Loading MusicKit (a token fetch plus a script)
+ * AFTER the click spent that activation, so Safari — and often Chrome — blocked
+ * the Apple sign-in window and the export failed before it began.
+ */
+export function prepareAppleMusic(): void {
+  if (!ENABLED || typeof window === "undefined") return;
+  loadMusicKit().catch(() => {
+    musicKitReady = null; // let a later attempt retry
+  });
+}
+
+class AppleFatalError extends Error {}
+
+/** authorize() can wait forever on a popup the user abandoned; don't let it. */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("timed out")), ms)),
+  ]);
+}
+
+/** The instance whose user token a 401/403 should invalidate. */
+let currentMusic: any = null;
 
 async function amApi(music: any, path: string, init?: RequestInit) {
   const res = await fetch(`https://api.music.apple.com${path}`, {
@@ -65,17 +98,75 @@ async function amApi(music: any, path: string, init?: RequestInit) {
       ...(init?.headers ?? {}),
     },
   });
+  if (res.status === 401 || res.status === 403) {
+    // MusicKit hands back a cached Music User Token from authorize(); if it was
+    // revoked, every later export reused it and failed identically. Drop it so
+    // the next attempt asks again.
+    try {
+      await currentMusic?.unauthorize?.();
+    } catch {
+      /* best effort */
+    }
+    throw new AppleFatalError(
+      res.status === 401
+        ? "Apple Music rejected the developer token. Check APPLE_TEAM_ID, APPLE_KEY_ID and APPLE_PRIVATE_KEY on the server."
+        : "Apple Music refused access. This account needs an active Apple Music subscription to create playlists."
+    );
+  }
   if (!res.ok) throw new Error(`Apple Music API ${res.status}`);
   return res.status === 204 ? null : res.json();
 }
 
-async function songIdFor(music: any, storefront: string, r: Release): Promise<string | null> {
+const norm = (x: string) => normaliseArtist(x.replace(/\(.*?\)|\[.*?\]/g, ""));
+const sameArtist = (want: string, got: string | undefined) => {
+  const w = norm(want);
+  const g = norm(got ?? "");
+  return g.length > 0 && (g.includes(w) || w.includes(g));
+};
+
+/**
+ * Song ids for one release. Albums and EPs expand to their full tracklist (as
+ * Spotify's provider does); singles resolve to one song. Every match is
+ * artist-checked: this took the first search hit whatever it was, so a common
+ * title could drop a stranger's song into the playlist.
+ */
+async function songIdsFor(music: any, storefront: string, r: Release): Promise<string[]> {
+  const term = encodeURIComponent(searchTerm(r));
+  // Chart records link straight to their Apple album: use it rather than
+  // re-searching. Falls back to search if it isn't in this storefront.
+  const direct = catalogId(r, "apple_music");
+  if (direct) {
+    try {
+      if (direct.kind === "track") return [direct.id];
+      const tracks = await amApi(music, `/v1/catalog/${storefront}/albums/${direct.id}/tracks?limit=100`);
+      const ids = (tracks?.data ?? []).filter((t: any) => t?.type === "songs" && t?.id).map((t: any) => String(t.id));
+      if (ids.length) return ids;
+    } catch (e) {
+      if (e instanceof AppleFatalError) throw e;
+    }
+  }
   try {
-    const term = encodeURIComponent(searchTerm(r));
-    const found = await amApi(music, `/v1/catalog/${storefront}/search?types=songs&limit=1&term=${term}`);
-    return found?.results?.songs?.data?.[0]?.id ?? null;
-  } catch {
-    return null;
+    if (r.type === "album" || r.type === "ep") {
+      const found = await amApi(music, `/v1/catalog/${storefront}/search?types=albums&limit=5&term=${term}`);
+      const album = (found?.results?.albums?.data ?? []).find(
+        (a: any) => sameArtist(r.artist, a?.attributes?.artistName) && sameTitle(r, a?.attributes?.name)
+      );
+      if (album?.id) {
+        const tracks = await amApi(music, `/v1/catalog/${storefront}/albums/${album.id}/tracks?limit=100`);
+        const ids = (tracks?.data ?? [])
+          .filter((t: any) => t?.type === "songs" && t?.id)
+          .map((t: any) => String(t.id));
+        if (ids.length) return ids;
+      }
+    }
+    const found = await amApi(music, `/v1/catalog/${storefront}/search?types=songs&limit=5&term=${term}`);
+    const song = (found?.results?.songs?.data ?? []).find(
+      (x: any) => sameArtist(r.artist, x?.attributes?.artistName) && sameTitle(r, x?.attributes?.name)
+    );
+    return song?.id ? [String(song.id)] : [];
+  } catch (e) {
+    if (e instanceof AppleFatalError) throw e;
+    return [];
   }
 }
 
@@ -84,29 +175,73 @@ export const appleProvider: DspProvider = {
   label: "Apple Music",
   configured: () => ENABLED,
 
+  async disconnect() {
+    try {
+      const music = currentMusic ?? (musicKitReady ? await musicKitReady : null);
+      await music?.unauthorize?.();
+    } catch {
+      /* nothing to forget */
+    }
+  },
+
   async createPlaylist(name, releases, onProgress?: ProgressFn): Promise<BuildResult | "redirecting"> {
     const music = await loadMusicKit();
-    await music.authorize(); // popup — sets music.musicUserToken
+    currentMusic = music;
+    try {
+      // A popup: it only opens inside the user's click, which is why the sheet
+      // preloads MusicKit (prepareAppleMusic) before anyone taps export.
+      await withTimeout(music.authorize(), 120_000); // sets music.musicUserToken
+    } catch {
+      throw new Error(
+        "Apple Music sign-in didn't open or was closed. Allow pop-ups for this site and try again."
+      );
+    }
+    if (!music.musicUserToken) {
+      throw new Error("Apple Music sign-in didn't complete, so no playlist was created.");
+    }
     const storefront = music.storefrontId || "us";
 
+    const seen = new Set<string>();
     const trackData: { id: string; type: "songs" }[] = [];
     let addedReleases = 0;
+    const unmatched: string[] = [];
     for (let i = 0; i < releases.length; i++) {
-      const id = await songIdFor(music, storefront, releases[i]);
-      if (id) {
+      const ids = await songIdsFor(music, storefront, releases[i]);
+      if (ids.length) addedReleases++;
+      else unmatched.push(`${releases[i].artist} — ${releases[i].title}`);
+      for (const id of ids) {
+        if (seen.has(id)) continue;
+        seen.add(id);
         trackData.push({ id, type: "songs" });
-        addedReleases++;
       }
       onProgress?.(i + 1, releases.length);
     }
+    // Nothing matched: say so rather than creating an empty playlist.
+    if (trackData.length === 0) {
+      throw new Error(
+        `None of the ${releases.length} record${releases.length === 1 ? "" : "s"} could be found on Apple Music, so no playlist was created.`
+      );
+    }
 
+    // Create with the first batch, append the rest: one request carrying an
+    // entire large crate risks the API's request limits and fails all-or-nothing.
+    const BATCH = 100;
     const created = await amApi(music, "/v1/me/library/playlists", {
       method: "POST",
       body: JSON.stringify({
         attributes: { name, description: "Made with Pulsar — music discovery." },
-        relationships: { tracks: { data: trackData } },
+        relationships: { tracks: { data: trackData.slice(0, BATCH) } },
       }),
     });
+    const newId = created?.data?.[0]?.id;
+    if (newId) {
+      for (let i = BATCH; i < trackData.length; i += BATCH) {
+        await amApi(music, `/v1/me/library/playlists/${newId}/tracks`, {
+          method: "POST",
+          body: JSON.stringify({ data: trackData.slice(i, i + BATCH) }),
+        });
+      }
+    }
     const id = created?.data?.[0]?.id;
     return {
       provider: "apple_music",
@@ -115,6 +250,7 @@ export const appleProvider: DspProvider = {
       addedReleases,
       totalReleases: releases.length,
       trackCount: trackData.length,
+      unmatched,
     };
   },
 };

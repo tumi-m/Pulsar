@@ -1,14 +1,107 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  /* Off-White / industrial: Helvetica Neue, bold, caps, quoted labels */
-  --font-display: 'Helvetica Neue', Helvetica, Arial, system-ui, sans-serif;
-  --font-body: 'Helvetica Neue', Helvetica, Arial, system-ui, sans-serif;
-  --font-mono: 'Space Mono', monospace;
+  /* Typefaces are provided by next/font in app/layout.tsx
+     (--font-display/body/mono). Fallbacks live in tailwind.config.ts. */
+
+  /* ── Palette: the Walkman ──────────────────────────────────
+     Pulsar used to be one violet accent over near-black, which read as
+     monotone: every surface, state and control borrowed the same hue, so
+     nothing could be distinguished by colour alone.
+
+     The palette now comes from the object the product is actually about —
+     the personal cassette player — and every value below is sampled from
+     real hardware rather than invented, which is what keeps the set
+     coherent instead of merely colourful. It also gives the interface the
+     one thing a single hue cannot: distinct meanings. Orange is the thing
+     you press. Yellow is new. Blue is information. Red is a peak or a
+     loss. Green is running. Cream is paper. Chrome is structure.
+
+     Tailwind tokens in tailwind.config.ts read these, so changing a value
+     here changes it everywhere. */
+
+  /* Every colour is declared twice: as hex, for inline styles, gradients and
+     canvas; and as bare RGB channels (the -rgb twin), which is the only form
+     Tailwind 3 can apply an opacity modifier to. A token defined as a plain
+     `var(--x)` makes `text-ink/60` emit NO CSS at all — it was 517 class
+     usages, silently dead: dimmed text at full strength, tints gone, borders
+     falling back to preflight's light grey. tailwind.config.ts reads the -rgb
+     form; test/palette-tokens.test.ts keeps it that way. */
+
+  /* Graphite housing — the body of the machine, and of the page. */
+  --deck-900: #0b0d10;
+  --deck-900-rgb: 11 13 16;
+  --deck-800: #12161a;
+  --deck-800-rgb: 18 22 26;
+  --deck-700: #1a2027;
+  --deck-700-rgb: 26 32 39;
+  --deck-600: #252d36; /* a raised panel, or the well a button sits in */
+  --deck-600-rgb: 37 45 54;
+
+  /* Brushed aluminium. Structure: bezels, hairlines, rules, quiet text. */
+  --chrome-100: #e7ebee;
+  --chrome-100-rgb: 231 235 238;
+  --chrome-300: #bac2c9;
+  --chrome-300-rgb: 186 194 201;
+  --chrome-500: #8b949d;
+  --chrome-500-rgb: 139 148 157;
+  --chrome-700: #59626b;
+  --chrome-700-rgb: 89 98 107;
+
+  /* TPS-L2 (1979): blue housing, silver trim, orange transport buttons. */
+  --sony-orange: #f2662c; /* the button you press — primary action */
+  --sony-orange-rgb: 242 102 44;
+  --tps-blue: #4e86c7; /* the housing — secondary, links, information */
+  --tps-blue-rgb: 78 134 199;
+
+  /* WM-F5 Sports (1983): the yellow one. Highlight, fresh, energy. */
+  --sport-yellow: #ffce0a;
+  --sport-yellow-rgb: 255 206 10;
+
+  /* The meter and the record button. */
+  --vu-red: #e23b2e;
+  --vu-red-rgb: 226 59 46;
+
+  /* The LCD readout on the later decks. Playing, connected, succeeded. */
+  --lcd-green: #7ed9ae;
+  --lcd-green-rgb: 126 217 174;
+
+  /* Consumables: J-card paper stock, and the tape seen through the window. */
+  --label-cream: #efe4cc;
+  --label-cream-rgb: 239 228 204;
+  --tape-brown: #3a2a20;
+  --tape-brown-rgb: 58 42 32;
+
+  /* ── Signature gradients ───────────────────────────────────
+     Both of these were copy-pasted as literals at ten call sites, so the
+     brand could never be changed in one place. They are the two surfaces
+     of the machine.
+
+     The faceplate is a TPS-L2 read left to right: polished bezel, brushed
+     aluminium, the yellow of the Sports model, the orange of the transport
+     buttons, and the blue of the housing.
+
+     The transport is the button itself — the warm orange-to-amber of the
+     play key under a light. */
+  --grad-faceplate: linear-gradient(
+    118deg,
+    #e7ebee 0%,
+    #bac2c9 16%,
+    #ffce0a 44%,
+    #f2662c 70%,
+    #4e86c7 100%
+  );
+  --grad-transport: linear-gradient(118deg, #f2662c 0%, #ff8c39 46%, #ffce0a 100%);
+
+  /* Type on a dark deck. */
+  --ink-100: #edf1f4;
+  --ink-100-rgb: 237 241 244;
+  --ink-400: #98a2ab;
+  --ink-400-rgb: 152 162 171;
+  --ink-600: #626b74;
+  --ink-600-rgb: 98 107 116;
 
   /* ── Design tokens: one radius / hairline / layering scale ──
      Components previously hard-coded rounded-lg/xl/2xl and z-[57]-style
@@ -30,12 +123,19 @@
   --z-modal: 70;      /* modals, export sheet */
   --z-toast: 80;      /* toasts */
   --z-noise: 1000;    /* film grain (non-interactive) */
+
+  /* Live height of the now-playing transport, set by NowPlayingBar from a
+     ResizeObserver; 0 when nothing is loaded. Anything that floats above the
+     bar offsets from this instead of hard-coding a guess — there were four
+     guesses (72, 76, 96, 200px), and when the status line showed they were
+     all wrong: the search strip sat 27px underneath the bar, half buried. */
+  --player-h: 0px;
 }
 
 /* ─── Focus visibility ─────────────────────────── */
 /* Keyboard users get a clear ring; pointer users don't (focus-visible). */
 :focus-visible {
-  outline: 2px solid rgba(155, 93, 229, 0.85);
+  outline: 2px solid rgba(242, 102, 44, 0.85);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
@@ -81,8 +181,8 @@ html {
 }
 
 body {
-  background-color: #04040a;
-  color: #e8e8f4;
+  background-color: #0b0d10;
+  color: #edf1f4;
   font-family: var(--font-body);
   min-height: 100vh;
   overflow-x: hidden;
@@ -125,8 +225,8 @@ body {
 
 /* ─── Selection ─────────────────────────────── */
 ::selection {
-  background: rgba(155, 93, 229, 0.3);
-  color: #e8e8f4;
+  background: rgba(242, 102, 44, 0.3);
+  color: #edf1f4;
 }
 
 /* ─── Text clamping ──────────────────────────── */
@@ -135,6 +235,23 @@ body {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+}
+
+/* ─── Eyebrow — the ONE small-label style ─────────
+   Replaces the 9/10/11px + tracking 0.18–0.4em sprawl. Use for section
+   labels, kickers, and meta rows. Sentence-case body text elsewhere. */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  line-height: 1.5;
+}
+
+/* ─── Balanced headlines ───────────────────────── */
+.text-balance {
+  text-wrap: balance;
 }
 
 /* ─── Antigravity noise texture overlay ───────── */
@@ -161,16 +278,16 @@ body {
 
 /* ─── Text gradient utility ─────────────────── */
 .text-gradient-cosmic {
-  background: linear-gradient(135deg, #e8e8f4 0%, #9b5de5 50%, #00d4ff 100%);
+  background: linear-gradient(135deg, #edf1f4 0%, #f2662c 50%, #4e86c7 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 /* ─── Glow utilities ─────────────────────────── */
-.glow-blue  { text-shadow: 0 0 20px rgba(0, 212, 255, 0.8); }
-.glow-pink  { text-shadow: 0 0 20px rgba(255, 0, 128, 0.8); }
-.glow-violet { text-shadow: 0 0 20px rgba(155, 93, 229, 0.8); }
+.glow-blue  { text-shadow: 0 0 20px rgba(78, 134, 199, 0.8); }
+.glow-pink  { text-shadow: 0 0 20px rgba(226, 59, 46, 0.8); }
+.glow-violet { text-shadow: 0 0 20px rgba(242, 102, 44, 0.8); }
 
 /* ─── Floating tiles (featured) ─────────────── */
 @keyframes tileFloat {
@@ -185,7 +302,12 @@ body {
   }
 }
 
-/* ─── Rainbow search outline (animated) ─────── */
+/* ─── Search field: light travelling across a metal face ─────
+   This was a six-stop rainbow, which belonged to no palette at all and read
+   as a novelty next to everything around it. It is now the same motion —
+   a band panning left to right — but the band is a highlight crossing
+   brushed aluminium, catching the yellow and orange of the keys on its way.
+   The class name is kept: it is referenced from the search markup. */
 @keyframes rainbowPan {
   0%   { background-position: 0% 50%; }
   100% { background-position: 300% 50%; }
@@ -193,7 +315,7 @@ body {
 .search-rainbow {
   background-image: linear-gradient(
     90deg,
-    #ff5fa2, #ffb347, #9b5de5, #00d4ff, #45f0a0, #ff5fa2
+    #8b949d, #e7ebee, #ffce0a, #f2662c, #4e86c7, #8b949d
   );
   background-size: 300% 100%;
   animation: rainbowPan 8s linear infinite;
@@ -260,6 +382,180 @@ body {
 }
 
 /* ─── Artwork loading sheen ──────────────────── */
+/* ─── J-card: the cover a record gets when it has no cover ─────────
+   Drawn as a cassette rather than as an error: a graphite shell, a J-card
+   label with the maker's colour stripe, and a tape window with two reels.
+   The record is real and playable; it simply shipped without artwork, the
+   way a home-dubbed tape does.
+
+   Sized entirely from its container (cqw/cqh), because the same component
+   renders at 36px in the build overlay, 44px in the transport and 460px in a
+   wide grid tile — and a wide tile turns sideways, label beside window.
+
+   `.jcard` is ONLY the container. Everything measured in cq units lives on
+   `.jcard-shell` inside it: an element cannot query its own size, so cq units
+   on the container itself silently fall back to the viewport — which is what
+   the first version did, padding a 180px tile by 7% of the screen height. */
+.jcard {
+  container-type: size;
+  position: absolute;
+  inset: 0;
+}
+.jcard-shell {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5cqh;
+  padding: 9cqh 8cqw;
+  background:
+    radial-gradient(circle at 5cqw 5cqh, rgba(255,255,255,0.16) 0 1.1cqw, transparent 1.5cqw),
+    radial-gradient(circle at 95cqw 5cqh, rgba(255,255,255,0.16) 0 1.1cqw, transparent 1.5cqw),
+    radial-gradient(circle at 5cqw 95cqh, rgba(255,255,255,0.16) 0 1.1cqw, transparent 1.5cqw),
+    radial-gradient(circle at 95cqw 95cqh, rgba(255,255,255,0.16) 0 1.1cqw, transparent 1.5cqw),
+    linear-gradient(160deg, #262e37 0%, #181d23 55%, #101317 100%);
+}
+.jcard-label {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  /* Written at the top, under the stripe, as on a real J-card — and clear of
+     the centre, where a playing tile's play/pause button sits. */
+  justify-content: flex-start;
+  padding: calc(16% + 3cqh) 6cqw 4cqh;
+  border-radius: 3cqw;
+  /* Faint blue rules, like the lines a J-card gives you to write the
+     tracklist on. They start below the stripe and give a large label a
+     reason to be large, instead of reading as an empty cream panel. */
+  background:
+    repeating-linear-gradient(
+      180deg,
+      transparent 0 calc(9cqh - 1px),
+      rgba(78, 134, 199, 0.2) calc(9cqh - 1px) 9cqh
+    ) 0 22% / 100% 100% no-repeat,
+    linear-gradient(180deg, #f2e9d3 0%, #e3d5b4 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1), 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+/* The maker's stripe across the top of the label — the bit of a TDK or
+   Maxell card everyone remembers. */
+.jcard-label::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 16%;
+  background: var(--jcard-accent, #f2662c);
+  box-shadow: 0 2px 0 rgba(18, 22, 26, 0.18);
+}
+.jcard-title {
+  color: #12161a;
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 1.02;
+  letter-spacing: 0.01em;
+  font-size: clamp(7px, 8.5cqw, 26px);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.jcard-artist {
+  margin-top: 1.5cqh;
+  color: rgba(18, 22, 26, 0.62);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: clamp(6px, 4.8cqw, 14px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.jcard-initial {
+  display: none;
+  color: #12161a;
+  font-weight: 900;
+  font-size: 30cqh;
+  line-height: 1;
+}
+.jcard-window {
+  position: relative;
+  flex: 0 0 22cqh;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #07090b, #111519);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+/* Two reels: a spindle hole, a cream hub with six teeth, then wound oxide.
+   The teeth are what make rotation visible — the first version was radially
+   symmetric, so spinning it would have looked like nothing at all. The left
+   reel carries more tape than the right, as a tape part-way through does. */
+.jcard-window::before,
+.jcard-window::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  height: 76%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  --tape-edge: 70%;
+  background:
+    radial-gradient(circle, #0b0d10 0 8%, transparent 9%),
+    radial-gradient(
+      circle,
+      transparent 0 25%,
+      #0b0d10 26% 31%,
+      #3a2a20 32% var(--tape-edge),
+      transparent calc(var(--tape-edge) + 1%)
+    ),
+    repeating-conic-gradient(#efe4cc 0deg 44deg, #7a6a55 44deg 60deg);
+  /* Clip the teeth to the hub: without this the conic layer shows through
+     beyond the tape as a ring of spikes. */
+  -webkit-mask-image: radial-gradient(circle, #000 0 25.5%, transparent 26%),
+    radial-gradient(circle, #000 0 calc(var(--tape-edge) + 0.5%), transparent calc(var(--tape-edge) + 1%));
+  mask-image: radial-gradient(circle, #000 0 25.5%, transparent 26%),
+    radial-gradient(circle, #000 0 calc(var(--tape-edge) + 0.5%), transparent calc(var(--tape-edge) + 1%));
+}
+.jcard-window::before { left: 28%; --tape-edge: 74%; }
+.jcard-window::after { left: 72%; --tape-edge: 46%; }
+
+/* The reels turn while that record is playing. Set by whoever knows playback
+   (a tile, the transport) with data-playing on any ancestor. Under reduced
+   motion the global rule below stops it, and a still reel says the same. */
+@keyframes reelTurn {
+  to { rotate: 360deg; }
+}
+[data-playing="true"] .jcard-window::before,
+[data-playing="true"] .jcard-window::after {
+  animation: reelTurn 2.6s linear infinite;
+}
+/* The take-up reel spins faster: less tape on it, same tape speed. */
+[data-playing="true"] .jcard-window::after {
+  animation-duration: 1.6s;
+}
+
+/* Wide tiles turn sideways: label on the left, window standing on the right. */
+@container (aspect-ratio >= 3 / 2) {
+  .jcard-shell { flex-direction: row; gap: 4cqw; padding: 10cqh 5cqw; }
+  .jcard-title { font-size: clamp(8px, 9cqh, 26px); }
+  .jcard-artist { font-size: clamp(6px, 5cqh, 14px); }
+  .jcard-window { flex: 0 0 22cqw; border-radius: 5cqh; }
+  .jcard-window::before, .jcard-window::after { height: auto; width: 70%; left: 50%; }
+  .jcard-window::before { top: 29%; }
+  .jcard-window::after { top: 71%; }
+}
+
+/* Thumbnails: no room for type, so the label carries the initial instead. */
+@container (max-width: 96px) {
+  .jcard-shell { padding: 10cqh 9cqw; gap: 7cqh; }
+  .jcard-title, .jcard-artist { display: none; }
+  .jcard-label { justify-content: center; align-items: center; padding: 16% 0 0; }
+  .jcard-initial { display: block; }
+  .jcard-window { flex-basis: 24cqh; }
+}
+
 @keyframes artSheen {
   0%   { transform: translateX(-120%); }
   100% { transform: translateX(220%); }
@@ -269,7 +565,7 @@ body {
     100deg,
     transparent 20%,
     rgba(255, 255, 255, 0.06) 45%,
-    rgba(155, 93, 229, 0.10) 55%,
+    rgba(242, 102, 44, 0.10) 55%,
     transparent 80%
   );
   animation: artSheen 1.8s ease-in-out infinite;
@@ -284,4 +580,28 @@ body {
 .aurora-blob {
   animation: auroraDrift 9s ease-in-out infinite;
   will-change: transform, opacity;
+}
+
+/* ─── Ready lamp ─────────────────────────────
+   A service that can build the playlist glows like a powered LED — a slow
+   breath, not a blink. */
+@keyframes lampBreath {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(126, 217, 174, 0.85); }
+  50% { opacity: 0.7; box-shadow: 0 0 3px rgba(126, 217, 174, 0.4); }
+}
+.lamp-live { animation: lampBreath 2.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .lamp-live { animation: none; }
+}
+
+/* ─── No zoom-on-focus ───────────────────────
+   iOS Safari zooms the whole page into any text field under 16px when it
+   takes focus, and doesn't zoom back out. Every search and name field here
+   was 14px. Raise them on touch screens only; desktop keeps its type scale. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
 }

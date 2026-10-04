@@ -25,6 +25,7 @@ const rel = (artist: string, title: string, date: string): Release =>
     tidal: null,
     soundcloud: null,
     youtube_music: null,
+  boomplay: null,
     created_at: `${date}T00:00:00Z`,
     curator_note: null,
   }) as Release;

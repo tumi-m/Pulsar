@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, X, Trash2, Sparkles, Shuffle, Play, Share2, Upload, Plus, Pencil, Copy } from "lucide-react";
+import { Heart, X, Trash2, Sparkles, Shuffle, Play, Share2, Upload, Plus, Pencil } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";
 import type { MediaFormat } from "@/lib/format";
@@ -21,18 +21,23 @@ import { PhysicalMedia } from "./PhysicalMedia";
 import { PLATFORMS } from "./platforms";
 import { usePlayer } from "./player/PlayerProvider";
 import { useScrollLock } from "@/lib/useScrollLock";
+import { useDialog } from "@/lib/useDialog";
 import { useBackClose } from "@/lib/useBackClose";
+import { useReducedMotion } from "@/lib/motion";
 import { Portal } from "./Portal";
 import { useIsTouch } from "@/lib/useIsTouch";
 import { PlaylistBuildOverlay } from "./PlaylistBuildOverlay";
+import { ExportSheet } from "./ExportSheet";
 import {
   exportCrate,
   handleDspRedirect,
   ensureDspConfig,
+  prepareAppleMusic,
   providerConfigured,
   disconnectProvider,
   type BuildResult,
 } from "@/lib/dsp";
+import { readPending } from "@/lib/dsp/shared";
 
 interface FloatingDockProps {
   format: MediaFormat;
@@ -45,11 +50,28 @@ type Panel = "favorites" | "playlist" | null;
  * Floating 3D dock (bottom-right): heart, playlist, share. Opens a
  * "crate" panel where the collection is displayed as physical media.
  */
+/** Where each service's own fixes live — linked from the export error card. */
+const DEV_CONSOLE: Record<string, { url: string; label: string } | undefined> = {
+  spotify: { url: "https://developer.spotify.com/dashboard", label: "Open Spotify dashboard" },
+  youtube_music: { url: "https://console.cloud.google.com/apis/credentials", label: "Open Google Cloud credentials" },
+  tidal: { url: "https://developer.tidal.com/dashboard", label: "Open TIDAL developer portal" },
+  apple_music: { url: "https://developer.apple.com/account/resources/authkeys/list", label: "Open Apple Developer keys" },
+};
+
+/** Thrown from the progress callback to stop a build the user cancelled. */
+class BuildCancelled extends Error {}
+
 export function FloatingDock({ format, onOpen }: FloatingDockProps) {
-  const { current, shuffle, toggleShuffle, play } = usePlayer();
+  const { shuffle, toggleShuffle, play } = usePlayer();
+  const reduceMotion = useReducedMotion();
+  // Each build gets an id; Cancel marks THAT build. A single boolean was reset
+  // by the next build, which un-cancelled a build still running.
+  const buildSeq = useRef(0);
+  const cancelledBuild = useRef(0);
   const [panel, setPanel] = useState<Panel>(null);
   // Lock background scroll while the crate sheet is open (mobile).
   useScrollLock(Boolean(panel));
+  const dialogRef = useDialog<HTMLDivElement>(Boolean(panel));
   useBackClose(Boolean(panel), () => setPanel(null));
   // Hover never fires on touch, so play / favourite / share / remove would be
   // permanently hidden on a phone — reveal them instead.
@@ -85,9 +107,21 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
     recent?: Release[];
   } | null>(null);
   const [built, setBuilt] = useState<BuildResult | null>(null);
-  const [buildError, setBuildError] = useState<
-    { label: string; color: string; message: string; key: string } | null
-  >(null);
+  const [buildError, setBuildError] = useState<{
+    label: string;
+    color: string;
+    message: string;
+    key: string;
+    /** The crate that failed — Try again / CSV act on THIS, not the open panel. */
+    releases: Release[];
+    name: string;
+  } | null>(null);
+  // The sheet and the result/error cards sit OVER the crate panel. Without
+  // their own entries, Escape and Back skipped them and closed the panel
+  // underneath while they stayed on screen.
+  useBackClose(exporting, () => setExporting(false));
+  useBackClose(Boolean(built), () => setBuilt(null));
+  useBackClose(Boolean(buildError), () => setBuildError(null));
   // Hide the floating dock while the album/tracklist panel is open so it never
   // covers the tracklist's text/icons (especially on mobile).
   const [detailOpen, setDetailOpen] = useState(false);
@@ -99,7 +133,12 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   useEffect(() => {
     if (!exporting) return;
     ensureDspConfig(true)
-      .then(() => setCfgTick((t) => t + 1))
+      .then(() => {
+        setCfgTick((t) => t + 1);
+        // Warm MusicKit now, so the Apple sign-in popup can open inside the
+        // tap that asks for it (see prepareAppleMusic).
+        prepareAppleMusic();
+      })
       .catch(() => {});
   }, [exporting]);
 
@@ -122,20 +161,64 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   // playlist build that was pending before we redirected.
   useEffect(() => {
     (async () => {
+      // Back from a sign-in with a crate waiting? Show the build overlay NOW,
+      // before the config fetch and token exchange — that window used to show
+      // nothing, and a second tap during it started a parallel export.
+      if (/[?&](code|error)=/.test(window.location.search)) {
+        const waiting = readPending();
+        if (waiting) {
+          const plat = PLATFORMS.find((p) => p.key === waiting.provider);
+          setBuilding({
+            done: 0,
+            total: waiting.releases.length,
+            label: plat?.label ?? "your service",
+            color: plat?.color ?? "#1DB954",
+            current: null,
+            recent: [],
+          });
+        }
+      }
       // Pull live DSP client config first so providerConfigured() (used all
       // over the export sheet) reflects the server's current env, not just the
       // build-time inlines.
       await ensureDspConfig().catch(() => {});
       setCfgTick((t) => t + 1);
-      const pending = await handleDspRedirect();
-      if (!pending) return;
+      const outcome = await handleDspRedirect();
+      if (!outcome || "connected" in outcome || "failed" in outcome) setBuilding(null);
+      if (!outcome) return;
+      if ("connected" in outcome) {
+        const plat = PLATFORMS.find((p) => p.key === outcome.connected);
+        flash(`Connected to ${plat?.label ?? "the service"} — export your crate again to build the playlist.`);
+        return;
+      }
+      // Failures on the way back from a sign-in get the same card as any other
+      // failure — Reconnect, Try again, CSV. They went to a 2.6-second toast,
+      // and the first export always takes this path.
+      if ("failed" in outcome) {
+        const plat = PLATFORMS.find((p) => p.key === outcome.failed);
+        setBuildError({
+          label: plat?.label ?? "Export",
+          color: plat?.color ?? "#1DB954",
+          message:
+            outcome.message ??
+            `${plat?.label ?? "The"} sign-in didn't complete, so the crate wasn't exported.`,
+          key: outcome.failed,
+          releases: outcome.releases,
+          name: outcome.name,
+        });
+        return;
+      }
+      const pending = outcome;
       const plat = PLATFORMS.find((p) => p.key === pending.provider);
       const label = plat?.label ?? "your DSP";
       const color = plat?.color ?? "#1DB954";
       const queued = pending.releases;
+      const myBuild = ++buildSeq.current;
+      const isCancelled = () => cancelledBuild.current === myBuild;
       setBuilding({ done: 0, total: queued.length, label, color, current: queued[0] ?? null, recent: [] });
       try {
-        const result = await exportCrate(pending.provider, pending.name, queued, (done, total) =>
+        const result = await exportCrate(pending.provider, pending.name, queued, (done, total) => {
+          if (isCancelled()) throw new BuildCancelled();
           setBuilding({
             done,
             total,
@@ -143,16 +226,24 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
             color,
             current: queued[done] ?? queued[done - 1] ?? null,
             recent: queued.slice(Math.max(0, done - 6), done).reverse(),
-          })
-        );
+          });
+        });
+        if (isCancelled()) return;
         setBuilding(null);
         if (result !== "redirecting") setBuilt(result);
       } catch (err) {
+        if (isCancelled() || err instanceof BuildCancelled) return;
         setBuilding(null);
-        flash(err instanceof Error ? err.message : `${label} export failed`);
+        setBuildError({
+          label,
+          color,
+          message: err instanceof Error ? err.message : `${label} export failed`,
+          key: pending.provider,
+          releases: queued,
+          name: pending.name,
+        });
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -176,10 +267,12 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
     };
   }, []);
 
-  // Crate/favorites only show entries that actually have artwork.
-  const items = (panel === "favorites" ? favs : activeCrate?.releases ?? []).filter(
-    (r) => r.artwork_url && r.artwork_url.trim().length > 0
-  );
+  // Everything in the crate is shown. Records without artwork used to be
+  // filtered out of the view — but not out of the crate, its tab count, or the
+  // export — so the panel could read "Empty crate" while exporting two records.
+  // A coverless record is drawn as a cassette J-card now (see <Artwork>).
+  const items = panel === "favorites" ? favs : activeCrate?.releases ?? [];
+  const favIds = new Set(favs.map((f) => f.id));
 
   async function shareRelease(r: Release) {
     const url = typeof window !== "undefined" ? window.location.href : "";
@@ -194,7 +287,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   // ── Crate export → a playlist on the DSP of choice ──────────────
   const crateName = () =>
     panel === "favorites" ? "PULSAR Favorites" : activeCrate?.name ?? "PULSAR Crate";
-  const asLines = () => items.map((r) => `${r.artist} — ${r.title}`).join("\n");
+  const asLines = (list: Release[] = items) => list.map((r) => `${r.artist} — ${r.title}`).join("\n");
 
   const download = (filename: string, text: string, type = "text/plain") => {
     const blob = new Blob([text], { type });
@@ -202,19 +295,23 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
     const a = document.createElement("a");
     a.href = url;
     a.download = filename;
+    // In the document, and the URL kept alive a moment: Safari and Firefox
+    // ignore a click on a detached anchor, and revoking the blob URL in the same
+    // tick could cancel the download before it started.
+    a.style.display = "none";
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 4000);
   };
 
-  const downloadCsv = () => {
+  const downloadCsv = (list: Release[] = items, name: string = crateName()) => {
+    const esc = (v: string) => `"${(v ?? "").replace(/"/g, '""')}"`;
     const rows = [
       "Title,Artist,Album",
-      ...items.map((r) => {
-        const esc = (s: string) => `"${(s ?? "").replace(/"/g, '""')}"`;
-        return [esc(r.title), esc(r.artist), esc(r.title)].join(",");
-      }),
+      ...list.map((r) => [esc(r.clean_title || r.title), esc(r.artist), esc(r.clean_title || r.title)].join(",")),
     ].join("\n");
-    download(`${crateName()}.csv`, rows, "text/csv");
+    download(`${name}.csv`, rows, "text/csv");
   };
 
   const copyList = async () => {
@@ -234,29 +331,40 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
     tidal: "https://tidal.com/my-collection/playlists",
     soundcloud: "https://soundcloud.com/you/library",
     youtube_music: "https://music.youtube.com/library/playlists",
+    // Boomplay had no entry, so its fallback opened Pulsar itself in a new tab.
+    boomplay: "https://www.boomplay.com/",
   };
 
   // Copy the tracklist + drop a CSV, then open the service's playlist area so
   // the list can be pasted / imported. Used for DSPs without an open write API,
   // or as a graceful fallback when real creation isn't possible.
-  const csvFallback = async (key: string, label: string) => {
-    downloadCsv();
-    try {
-      await navigator.clipboard.writeText(asLines());
-    } catch {
-      /* clipboard blocked — the CSV still downloaded */
-    }
-    window.open(DSP_HOME[key] ?? "https://pulsar.app", "_blank", "noopener,noreferrer");
+  const csvFallback = (key: string, label: string, list: Release[] = items, name: string = crateName()) => {
+    // Everything here starts synchronously inside the tap. window.open used to
+    // run after an `await` on the clipboard, by which point the click's user
+    // activation was spent and browsers blocked the new tab.
+    const copied = navigator.clipboard?.writeText(asLines(list)).then(
+      () => true,
+      () => false
+    );
+    downloadCsv(list, name);
+    if (DSP_HOME[key]) window.open(DSP_HOME[key], "_blank", "noopener,noreferrer");
     setExporting(false);
-    flash(`Crate copied + CSV ready for ${label}`);
+    void Promise.resolve(copied).then((ok) =>
+      flash(ok ? `Tracklist copied + CSV downloaded for ${label}` : `CSV downloaded for ${label}`)
+    );
   };
 
   // Create the real playlist on the chosen DSP (Spotify / YouTube / Apple).
   const buildDsp = async (key: string, label: string, color: string, releases: Release[], name: string) => {
     setExporting(false);
+    const myBuild = ++buildSeq.current;
+    const isCancelled = () => cancelledBuild.current === myBuild;
     setBuilding({ done: 0, total: releases.length, label, color, current: releases[0] ?? null, recent: [] });
     try {
-      const result = await exportCrate(key, name, releases, (done, total) =>
+      const result = await exportCrate(key, name, releases, (done, total) => {
+        // Cancel takes effect at the next record: the provider is still
+        // matching, nothing has been created yet, and throwing here stops it.
+        if (isCancelled()) throw new BuildCancelled();
         setBuilding({
           done,
           total,
@@ -267,12 +375,16 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
           current: releases[done] ?? releases[done - 1] ?? null,
           // Newest first — the overlay stacks them as they land.
           recent: releases.slice(Math.max(0, done - 6), done).reverse(),
-        })
-      );
+        });
+      });
+      if (isCancelled()) return; // the user already closed it
       setBuilding(null);
       if (result === "redirecting") return; // navigating to the DSP's consent screen
       setBuilt(result);
     } catch (err) {
+      // A cancelled build leaves without touching state: the overlay was
+      // closed on Cancel, and another build may own it by now.
+      if (isCancelled() || err instanceof BuildCancelled) return;
       setBuilding(null);
       // A 2.6s toast followed by a surprise CSV download reads as "export is
       // broken". Show a card that says what went wrong and let the user choose
@@ -282,11 +394,16 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
         color,
         message: err instanceof Error ? err.message : `Couldn't create the playlist on ${label}.`,
         key,
+        releases,
+        name,
       });
     }
   };
 
   const exportTo = async (key: string, label: string) => {
+    // One build at a time: a second would race the first for the same
+    // playlist name, or fire a second consent redirect that kills the first.
+    if (building) return;
     const plat = PLATFORMS.find((p) => p.key === key);
     // DSPs with an open API build the playlist right on the account.
     if (providerConfigured(key)) {
@@ -297,34 +414,6 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
     csvFallback(key, label);
   };
 
-  const dockBtn = (
-    key: string,
-    renderIcon: (active: boolean) => React.ReactNode,
-    label: string,
-    count: number | null,
-    onClick: () => void,
-    active: boolean
-  ) => (
-    <button
-      key={key}
-      onClick={onClick}
-      aria-label={label}
-      className="glass group relative flex h-14 w-14 items-center justify-center rounded-full ring-1 ring-white/45 transition-transform hover:scale-110 active:scale-95"
-      style={{
-        background: active ? "rgba(255,255,255,0.92)" : "rgba(24,24,34,0.78)",
-        boxShadow:
-          "0 8px 24px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 6px rgba(0,0,0,0.3)",
-      }}
-    >
-      {renderIcon(active)}
-      {count != null && count > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-neon-pink px-1 text-[9px] font-bold text-void">
-          {count}
-        </span>
-      )}
-    </button>
-  );
-
   return (
     <>
       {/* the dock — rides higher when the bottom search bar is showing, and
@@ -334,13 +423,8 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
         className={`fixed right-4 z-40 flex flex-col items-end gap-2 transition-all duration-300 ${
           detailOpen || panel ? "pointer-events-none translate-x-6 opacity-0" : "opacity-100"
         } ${
-          navHidden
-            ? current
-              ? "bottom-[200px]"
-              : "bottom-[128px]"
-            : current
-              ? "bottom-24"
-              : "bottom-5"
+          // Offsets from the transport's measured height, not a guess at it.
+          navHidden ? "bottom-[calc(var(--player-h,0px)_+_128px)]" : "bottom-[calc(var(--player-h,0px)_+_20px)]"
         }`}
       >
         {/* Curator flies in when the navbar hides. Shuffle also lives here on
@@ -360,11 +444,11 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                 aria-label="Curator"
                 className="flex h-14 w-14 items-center justify-center rounded-full"
                 style={{
-                  background: "linear-gradient(120deg, #9b5de5, #ff5fa2 60%, #ffb347)",
-                  boxShadow: "0 6px 18px rgba(155,93,229,0.5), inset 0 1px 0 rgba(255,255,255,0.3)",
+                  background: "var(--grad-transport)",
+                  boxShadow: "0 6px 18px rgba(242,102,44,0.5), inset 0 1px 0 rgba(255,255,255,0.3)",
                 }}
               >
-                <Sparkles size={22} className="text-white" />
+                <Sparkles size={22} className="text-deck" />
               </motion.button>
               )}
               <motion.button
@@ -392,24 +476,24 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
           )}
         </AnimatePresence>
 
-        {dockBtn(
-          "playlist",
-          (active) => (
-            <CrateIcon size={22} filled className={active ? "text-[#7a4a1f]" : "text-[#c08a4e]"} />
-          ),
-          "Your crate",
-          list.length,
-          () => setPanel(panel === "playlist" ? null : "playlist"),
-          panel === "playlist"
-        )}
-        {dockBtn(
-          "fav",
-          (active) => <Heart size={22} className={active ? "text-void" : "text-star-white/85"} />,
-          "Your favorites",
-          favs.length,
-          () => setPanel(panel === "favorites" ? null : "favorites"),
-          panel === "favorites"
-        )}
+        <DockButton
+          label="Your crate"
+          count={list.length}
+          active={panel === "playlist"}
+          reduce={reduceMotion}
+          onClick={() => setPanel(panel === "playlist" ? null : "playlist")}
+        >
+          {(active) => <CrateIcon size={22} filled className={active ? "text-[#7a4a1f]" : "text-[#c08a4e]"} />}
+        </DockButton>
+        <DockButton
+          label="Your favorites"
+          count={favs.length}
+          active={panel === "favorites"}
+          reduce={reduceMotion}
+          onClick={() => setPanel(panel === "favorites" ? null : "favorites")}
+        >
+          {(active) => <Heart size={22} className={active ? "text-deck" : "text-ink/85"} />}
+        </DockButton>
       </div>
 
       {/* crate panel — portalled to <body> so it escapes `main`'s z-10
@@ -423,23 +507,29 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setPanel(null)}
-              className="fixed inset-0 z-[54] bg-void/80 backdrop-blur-md"
+              className="fixed inset-0 z-[54] bg-deck/80 backdrop-blur-md"
             />
             <motion.div
+              ref={dialogRef}
+              role="dialog"
+              aria-label="Your crate"
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", stiffness: 340, damping: 36 }}
-              className="crate-weave fixed inset-x-0 bottom-0 z-[55] flex h-[55dvh] flex-col rounded-t-2xl border-t-2 border-[#5a3d24]/70 pb-[env(safe-area-inset-bottom)] lg:inset-x-auto lg:right-0 lg:top-0 lg:h-full lg:w-1/2 lg:rounded-none lg:border-l-2 lg:border-t-0 lg:pb-0"
+              // Grows while the export sheet is open: at 55% of a phone screen the
+              // sheet's four services, CSV keys and setup notes were a cramped
+              // scroll inside a scroll.
+              className={`crate-weave fixed inset-x-0 bottom-0 z-[55] flex transition-[height] duration-300 ease-settle ${exporting ? "h-[92dvh]" : "h-[55dvh]"} flex-col rounded-t-2xl border-t-2 border-[#5a3d24]/70 pb-[env(safe-area-inset-bottom)] lg:inset-x-auto lg:right-0 lg:top-0 lg:h-full lg:w-1/2 lg:rounded-none lg:border-l-2 lg:border-t-0 lg:pb-0`}
             >
               <div className="border-b border-white/10 px-5 py-4">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
-                    <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-star-white/40">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-ink/40">
                       {panel === "favorites" ? "Favorites" : "Crate"}
                     </p>
                     {panel === "favorites" ? (
-                      <h3 className="text-lg font-bold uppercase tracking-tight text-star-white">
+                      <h3 className="text-lg font-bold uppercase tracking-tight text-ink">
                         Loved · {items.length}
                       </h3>
                     ) : renaming ? (
@@ -452,15 +542,15 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                           refresh();
                         }}
                         onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-                        className="w-full rounded-md border border-white/20 bg-white/[0.06] px-2 py-1 text-lg font-bold uppercase tracking-tight text-star-white focus:outline-none"
+                        className="w-full rounded-md border border-white/20 bg-white/[0.06] px-2 py-1 text-lg font-bold uppercase tracking-tight text-ink focus:outline-none"
                       />
                     ) : (
                       <button
                         onClick={() => setRenaming(true)}
-                        className="flex items-center gap-2 text-left text-lg font-bold uppercase tracking-tight text-star-white"
+                        className="flex items-center gap-2 text-left text-lg font-bold uppercase tracking-tight text-ink"
                       >
                         <span className="truncate">{activeCrate?.name ?? "Crate"} · {items.length}</span>
-                        <Pencil size={12} className="flex-shrink-0 text-star-white/30" />
+                        <Pencil size={12} className="flex-shrink-0 text-ink/30" />
                       </button>
                     )}
                   </div>
@@ -469,7 +559,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                       <button
                         onClick={() => setExporting(true)}
                         aria-label={`Export ${items.length} to a playlist`}
-                        className="relative z-10 flex min-h-[44px] items-center gap-1.5 rounded-full border border-neon-green/50 bg-neon-green/15 px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-neon-green transition-colors hover:bg-neon-green/25 active:scale-95"
+                        className="relative z-10 flex min-h-[44px] items-center gap-1.5 rounded-full border border-lcd/50 bg-lcd/15 px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-lcd transition-colors hover:bg-lcd/25 active:scale-95"
                       >
                         <Upload size={15} />
                         Export
@@ -478,7 +568,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                     <button
                       onClick={() => setPanel(null)}
                       aria-label="Close"
-                      className="flex h-11 w-11 items-center justify-center rounded-full text-star-white/60 hover:bg-white/10 hover:text-star-white"
+                      className="flex h-11 w-11 items-center justify-center rounded-full text-ink/60 hover:bg-white/10 hover:text-ink"
                     >
                       <X size={18} />
                     </button>
@@ -492,14 +582,22 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                       <button
                         key={c.id}
                         onClick={() => setActiveCrateId(c.id)}
-                        className={`flex-shrink-0 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide transition-colors ${
+                        className={`relative flex-shrink-0 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide transition-colors ${
                           c.id === activeCrateId
-                            ? "border-[#c08a4e]/60 bg-[#c08a4e]/15 text-[#e0b070]"
-                            : "border-white/[0.12] text-star-white/50 hover:text-star-white"
+                            ? "border-[#c08a4e]/60 text-[#e0b070]"
+                            : "border-white/[0.12] text-ink/50 hover:text-ink"
                         }`}
                       >
-                        {c.name}
-                        <span className="ml-1.5 text-star-white/40">{c.releases.length}</span>
+                        {/* the lit tab slides between crates */}
+                        {c.id === activeCrateId && (
+                          <motion.span
+                            layoutId={reduceMotion ? undefined : "crate-tab"}
+                            className="absolute inset-0 rounded-full bg-[#c08a4e]/15"
+                            transition={{ type: "spring", stiffness: 480, damping: 38 }}
+                          />
+                        )}
+                        <span className="relative">{c.name}</span>
+                        <span className="relative ml-1.5 text-ink/40">{c.releases.length}</span>
                       </button>
                     ))}
                     <button
@@ -509,7 +607,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                         setActiveCrateId(c.id);
                       }}
                       aria-label="New crate"
-                      className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/15 text-star-white/60 hover:border-white/40 hover:text-star-white"
+                      className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/15 text-ink/60 hover:border-white/40 hover:text-ink"
                     >
                       <Plus size={14} />
                     </button>
@@ -520,7 +618,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                           refresh();
                         }}
                         aria-label="Delete this crate"
-                        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/15 text-star-white/50 hover:border-neon-pink/50 hover:text-neon-pink"
+                        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-white/15 text-ink/50 hover:border-vu/50 hover:text-vu"
                       >
                         <Trash2 size={13} />
                       </button>
@@ -538,133 +636,35 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       onClick={() => setExporting(false)}
-                      className="absolute inset-0 z-10 bg-void/70 backdrop-blur-sm"
+                      className="absolute inset-0 z-10 bg-deck/70 backdrop-blur-sm"
                     />
                     <motion.div
                       initial={{ opacity: 0, y: 16 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 16 }}
                       transition={{ type: "spring", stiffness: 460, damping: 34 }}
-                      className="absolute inset-x-3 bottom-3 top-16 z-20 overflow-y-auto overscroll-contain rounded-2xl border border-white/15 bg-[#0d0d16]/[0.97] p-4 backdrop-blur-2xl sm:inset-x-4 sm:bottom-auto sm:top-20"
+                      role="dialog"
+                      aria-label="Export this crate"
+                      className="absolute inset-x-3 bottom-3 top-16 z-20 overflow-y-auto overscroll-contain rounded-2xl border border-chrome-700/60 bg-[#151b21]/[0.98] p-4 backdrop-blur-2xl sm:inset-x-4 sm:bottom-auto sm:top-20 sm:max-h-[calc(100%-6rem)]"
                       style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 24px 60px rgba(0,0,0,0.6)" }}
                     >
-                      <p className="text-sm font-bold uppercase tracking-wide text-star-white">
-                        Export {items.length} to a playlist
-                      </p>
-                      <p className="mt-1 text-[11px] leading-relaxed text-star-white/45">
-                        {PLATFORMS.some((p) => providerConfigured(p.key)) ? (
-                          <>
-                            Services marked <span className="text-[#1DB954]">Creates playlist</span>{" "}
-                            build it right on your account. The rest copy the tracklist &amp; a CSV to
-                            import.
-                          </>
-                        ) : (
-                          <>
-                            Pick a service — Pulsar copies the tracklist &amp; downloads a CSV, then
-                            opens your playlists so you can paste or import it.
-                          </>
-                        )}
-                      </p>
-                      <div className="mt-3 grid grid-cols-1 gap-1.5" key={cfgTick}>
-                        {PLATFORMS.map((p) => {
-                          const live = providerConfigured(p.key);
-                          return (
-                            <button
-                              key={p.key}
-                              onClick={() => exportTo(p.key, p.label)}
-                              className={`flex min-h-[52px] items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors hover:bg-white/[0.06] active:scale-[0.99] ${
-                                live ? "border-[#1DB954]/40 bg-[#1DB954]/[0.06]" : "border-white/10"
-                              }`}
-                            >
-                              <span
-                                className="flex h-8 w-8 items-center justify-center rounded-lg"
-                                style={{ backgroundColor: `${p.color}26`, color: p.color }}
-                              >
-                                <p.Icon />
-                              </span>
-                              <span className="flex-1 text-sm font-medium text-star-white">
-                                {p.label}
-                              </span>
-                              {live ? (
-                                <span className="rounded-full bg-[#1DB954]/20 px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest text-[#1DB954]">
-                                  Creates playlist
-                                </span>
-                              ) : (
-                                <span className="text-star-white/30">→</span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          onClick={copyList}
-                          className="flex-1 rounded-lg border border-white/15 py-2 text-[10px] font-bold uppercase tracking-widest text-star-white/70 hover:text-star-white"
-                        >
-                          Copy list
-                        </button>
-                        <button
-                          onClick={() => {
-                            downloadCsv();
-                            flash("CSV downloaded");
-                          }}
-                          className="flex-1 rounded-lg border border-white/15 py-2 text-[10px] font-bold uppercase tracking-widest text-star-white/70 hover:text-star-white"
-                        >
-                          Download CSV
-                        </button>
-                      </div>
-
-                      {/* ── connection doctor ───────────────────────────
-                          When real playlist creation isn't live for Spotify,
-                          show the exact Redirect URI to register (with a copy
-                          button) — the two things the dashboard needs, right
-                          where the user is stuck. */}
-                      {!providerConfigured("spotify") && (
-                        <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-star-white/55">
-                            Turn on 1-tap Spotify playlists
-                          </p>
-                          <ol className="mt-1.5 list-decimal space-y-0.5 pl-4 text-[10px] leading-relaxed text-star-white/40">
-                            <li>
-                              Create an app at{" "}
-                              <a
-                                href="https://developer.spotify.com/dashboard"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[#1DB954] underline decoration-dotted underline-offset-2"
-                              >
-                                developer.spotify.com
-                              </a>{" "}
-                              and copy its Client ID into this deployment&apos;s{" "}
-                              <span className="font-mono text-star-white/60">SPOTIFY_CLIENT_ID</span>{" "}
-                              env var.
-                            </li>
-                            <li>
-                              Under the app&apos;s Settings, add this exact Redirect URI
-                              (trailing slash included):
-                            </li>
-                          </ol>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard
-                                ?.writeText(`${window.location.origin}/`)
-                                .then(() => flash("Redirect URI copied"))
-                                .catch(() => {});
-                            }}
-                            className="mt-2 flex w-full items-center gap-2 overflow-hidden rounded-lg border border-white/[0.12] bg-white/[0.04] px-2.5 py-2 text-left transition-colors hover:border-white/25"
-                          >
-                            <Copy size={11} className="flex-shrink-0 text-star-white/50" />
-                            <span className="truncate font-mono text-[10px] text-star-white/75">
-                              {typeof window !== "undefined" ? `${window.location.origin}/` : "/"}
-                            </span>
-                          </button>
-                          <p className="mt-2 text-[9px] leading-relaxed text-star-white/35">
-                            Env changes are picked up live — no redeploy needed. While the app is
-                            in Development mode, also add your Spotify account under Users &amp;
-                            Access.
-                          </p>
-                        </div>
-                      )}
+                      <ExportSheet
+                        count={items.length}
+                        crateName={crateName()}
+                        cfgTick={cfgTick}
+                        onPick={exportTo}
+                        onCopy={copyList}
+                        onCsv={() => {
+                          downloadCsv();
+                          flash("CSV downloaded");
+                        }}
+                        onCopyRedirect={() => {
+                          navigator.clipboard
+                            ?.writeText(`${window.location.origin}/`)
+                            .then(() => flash("Redirect URI copied"))
+                            .catch(() => {});
+                        }}
+                      />
                     </motion.div>
                   </>
                 )}
@@ -672,18 +672,42 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
 
               {items.length === 0 ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
-                  <p className="text-sm font-bold uppercase tracking-widest text-star-white/40">
+                  <p className="text-sm font-bold uppercase tracking-widest text-ink/40">
                     Empty {panel === "favorites" ? "loved" : "crate"}
                   </p>
-                  <p className="text-xs text-star-white/35">
-                    Hover any album and tap the {panel === "favorites" ? "♥ heart" : "＋ plus"} to
-                    add it here.
+                  {/* The instruction said "hover any album" — read almost
+                      always on a phone, where there is no hover and the
+                      controls are shown outright. It described a gesture the
+                      reader could not perform. */}
+                  <p className="max-w-[16rem] text-xs leading-relaxed text-ink/35">
+                    {isTouch ? "Tap the " : "Hover any album and tap the "}
+                    <span className="text-ink/60">
+                      {panel === "favorites" ? "♥ heart" : "＋ plus"}
+                    </span>
+                    {isTouch ? " on any album" : ""} to add it here.
                   </p>
                 </div>
               ) : (
-                <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto p-4 sm:grid-cols-3">
-                  {items.map((r) => (
-                    <div key={r.id} className="group relative">
+                <div className="grid flex-1 grid-cols-2 content-start gap-3 overflow-y-auto p-4 sm:grid-cols-3">
+                  <AnimatePresence mode="popLayout">
+                  {items.map((r, i) => (
+                    <motion.div
+                      key={`${panel}-${activeCrateId}-${r.id}`}
+                      layout={!reduceMotion}
+                      // Records deal in when the panel opens or the crate tab
+                      // changes; removing one shrinks it out and the rest close
+                      // the gap instead of jumping.
+                      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 14, scale: 0.94 }}
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                        scale: 1,
+                        transition: { type: "spring", stiffness: 420, damping: 34, delay: Math.min(i, 12) * 0.025 },
+                      }}
+                      exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.8, transition: { duration: 0.18 } }}
+                      transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                      className="group relative"
+                    >
                       <button
                         onClick={() => {
                           setPanel(null);
@@ -700,10 +724,10 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                             hovered={false}
                           />
                         </div>
-                        <p className="mt-1 truncate text-[10px] font-bold uppercase text-star-white">
+                        <p className="mt-1 truncate text-[10px] font-bold uppercase text-ink">
                           {r.title}
                         </p>
-                        <p className="truncate text-[9px] text-star-white/50">{r.artist}</p>
+                        <p className="truncate text-[9px] text-ink/50">{r.artist}</p>
                       </button>
 
                       {/* liquid-glass play triangle — like the home tiles */}
@@ -712,37 +736,35 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                           e.stopPropagation();
                           play(r);
                         }}
-                        aria-label="Play"
-                        className={`absolute left-1/2 top-[calc(50%-11px)] flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full ring-1 ring-white/45 transition-opacity ${reveal}`}
-                        style={{
-                          background: "rgba(12,12,20,0.5)",
-                          backdropFilter: "blur(10px) saturate(140%)",
-                          WebkitBackdropFilter: "blur(10px) saturate(140%)",
-                          boxShadow: "0 8px 24px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.4)",
-                        }}
+                        aria-label={`Play ${r.title}`}
+                        // A small transport key in the corner. Centred, it sat on
+                        // top of the cassette's label — on touch screens, where the
+                        // controls are always shown, every title was covered.
+                        className={`absolute bottom-[calc(2.4rem+6px)] right-1.5 flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#b84516] bg-transport text-deck shadow-key transition-opacity active:translate-y-px active:shadow-keyed ${reveal}`}
                       >
-                        <Play size={15} className="ml-0.5 text-white drop-shadow" fill="currentColor" />
+                        <Play size={14} className="ml-0.5" fill="currentColor" />
                       </button>
 
                       {/* home-style actions: heart · share · remove */}
-                      <div className={`absolute right-1 top-1 flex gap-1 transition-opacity ${reveal}`}>
+                      <div className={`absolute right-1.5 top-1.5 flex gap-1 transition-opacity ${reveal}`}>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleFavorite(r);
                           }}
-                          aria-label="Favorite"
-                          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-void/80 text-star-white/70 backdrop-blur hover:text-neon-pink"
+                          aria-label={favIds.has(r.id) ? `Remove ${r.title} from favourites` : `Favourite ${r.title}`}
+                          aria-pressed={favIds.has(r.id)}
+                          className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-chrome-700/70 bg-deck/85 text-ink/70 backdrop-blur hover:text-vu"
                         >
-                          <Heart size={13} />
+                          <Heart size={13} className={favIds.has(r.id) ? "fill-vu text-vu" : ""} />
                         </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             shareRelease(r);
                           }}
-                          aria-label="Share"
-                          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-void/80 text-star-white/70 backdrop-blur hover:text-star-white"
+                          aria-label={`Share ${r.title}`}
+                          className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-chrome-700/70 bg-deck/85 text-ink/70 backdrop-blur hover:text-ink"
                         >
                           <Share2 size={13} />
                         </button>
@@ -752,14 +774,15 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                             if (panel === "favorites") toggleFavorite(r);
                             else removeFromCrate(activeCrateId, r.id);
                           }}
-                          aria-label="Remove"
-                          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-void/80 text-star-white/60 backdrop-blur hover:text-neon-pink"
+                          aria-label={`Remove ${r.title} from ${panel === "favorites" ? "favourites" : "this crate"}`}
+                          className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-chrome-700/70 bg-deck/85 text-ink/60 backdrop-blur hover:text-vu"
                         >
                           <Trash2 size={13} />
                         </button>
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
+                  </AnimatePresence>
                 </div>
               )}
             </motion.div>
@@ -780,6 +803,12 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
             current={building.current}
             recent={building.recent}
             Icon={PLATFORMS.find((p) => p.label === building.label)?.Icon}
+            onCancel={() => {
+              cancelledBuild.current = buildSeq.current;
+              flash("Export cancelled — nothing was created");
+              // An Apple sign-in popup may never call back; free the screen now.
+              setBuilding(null);
+            }}
           />
         )}
       </AnimatePresence>
@@ -796,19 +825,19 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setBuilt(null)}
-              className="fixed inset-0 z-[70] flex items-center justify-center bg-void/85 backdrop-blur-md"
+              className="fixed inset-0 z-[70] flex items-center justify-center bg-deck/85 backdrop-blur-md"
             >
               <motion.div
                 initial={{ scale: 0.9, y: 10 }}
                 animate={{ scale: 1, y: 0 }}
                 exit={{ scale: 0.9, opacity: 0 }}
                 onClick={(e) => e.stopPropagation()}
-                className="w-[min(88vw,360px)] rounded-2xl border bg-[#0d0d16]/[0.97] p-6 text-center"
+                className="w-[min(88vw,360px)] rounded-2xl border bg-[#1a2027]/[0.97] p-6 text-center"
                 style={{ borderColor: `${color}66`, boxShadow: "0 24px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.15)" }}
               >
                 {/* celebratory burst behind the badge */}
                 <div className="relative mx-auto mb-3 h-12 w-12">
-                  {[...Array(10)].map((_, i) => {
+                  {!reduceMotion && [...Array(10)].map((_, i) => {
                     const a = (i / 10) * Math.PI * 2;
                     return (
                       <motion.span
@@ -830,36 +859,65 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                     initial={{ scale: 0, rotate: -140 }}
                     animate={{ scale: 1, rotate: 0 }}
                     transition={{ type: "spring", stiffness: 300, damping: 16, delay: 0.05 }}
-                    className="absolute inset-0 flex items-center justify-center rounded-full text-void"
+                    className="absolute inset-0 flex items-center justify-center rounded-full text-deck"
                     style={{ backgroundColor: color, boxShadow: `0 0 34px ${color}80` }}
                   >
                     {plat?.Icon?.() ?? null}
                   </motion.span>
                 </div>
-                <p className="text-base font-bold uppercase tracking-wide text-star-white">
-                  Playlist created 🎉
-                </p>
-                <p className="mt-1 text-[12px] leading-relaxed text-star-white/55">
+                <motion.p
+                  initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.22, duration: 0.3 }}
+                  className="text-base font-bold uppercase tracking-wide text-ink"
+                >
+                  Playlist created
+                </motion.p>
+                <motion.p
+                  initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3, duration: 0.3 }}
+                  className="mt-1 text-[12px] leading-relaxed text-ink/55"
+                >
                   “{built.name}” is now on your {label} with{" "}
-                  <span style={{ color }}>{built.trackCount} tracks</span>
-                  {built.addedReleases < built.totalReleases && (
-                    <> ({built.totalReleases - built.addedReleases} not found)</>
-                  )}
-                  .
-                </p>
+                  <span style={{ color }}>
+                    {built.trackCount} track{built.trackCount === 1 ? "" : "s"}
+                  </span>{" "}
+                  from {built.addedReleases} of {built.totalReleases} record
+                  {built.totalReleases === 1 ? "" : "s"}.
+                </motion.p>
+                {/* It stopped early but kept what it made (a quota ran out). */}
+                {built.note && (
+                  <p className="mt-2 rounded-lg border border-sport/30 bg-sport/10 px-3 py-2 text-left text-[11px] leading-relaxed text-sport">
+                    {built.note}
+                  </p>
+                )}
+                {/* "3 not found" told you there was a gap but not where. */}
+                {built.unmatched && built.unmatched.length > 0 && (
+                  <details className="mt-2 text-left">
+                    <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-widest text-ink-400 hover:text-ink">
+                      {built.unmatched.length} not found on {label}
+                    </summary>
+                    <ul className="mt-1.5 max-h-32 space-y-0.5 overflow-y-auto pl-1 text-[11px] text-ink-400">
+                      {built.unmatched.map((u) => (
+                        <li key={u} className="truncate">· {u}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
                 <div className="mt-4 flex gap-2">
                   <a
                     href={built.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 rounded-full py-2.5 text-[11px] font-bold uppercase tracking-widest text-void transition-transform hover:scale-105"
+                    className="flex-1 rounded-full py-2.5 text-[11px] font-bold uppercase tracking-widest text-deck transition-transform hover:scale-105"
                     style={{ backgroundColor: color }}
                   >
                     Open in {label}
                   </a>
                   <button
                     onClick={() => setBuilt(null)}
-                    className="rounded-full border border-white/15 px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-star-white/60 hover:text-star-white"
+                    className="rounded-full border border-white/15 px-4 py-2.5 text-[11px] font-bold uppercase tracking-widest text-ink/60 hover:text-ink"
                   >
                     Done
                   </button>
@@ -878,56 +936,62 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setBuildError(null)}
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-void/85 p-4 backdrop-blur-md"
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-deck/85 p-4 backdrop-blur-md"
           >
             <motion.div
               initial={{ scale: 0.92, y: 10 }}
-              animate={{ scale: 1, y: 0 }}
+              // A small head-shake: "no" without an alarm.
+              animate={reduceMotion ? { scale: 1, y: 0 } : { scale: 1, y: 0, x: [0, -7, 6, -4, 2, 0] }}
+              transition={{ x: { duration: 0.45, delay: 0.12 }, default: { type: "spring", stiffness: 420, damping: 30 } }}
               exit={{ scale: 0.92, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-[min(92vw,380px)] rounded-2xl border border-neon-pink/40 bg-[#0d0d16]/[0.97] p-6 text-center"
+              className="w-[min(92vw,380px)] rounded-2xl border border-vu/40 bg-[#1a2027]/[0.97] p-6 text-center"
               style={{ boxShadow: "0 24px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.15)" }}
             >
-              <p className="text-base font-bold uppercase tracking-wide text-star-white">
+              <p className="text-base font-bold uppercase tracking-wide text-ink">
                 {buildError.label} export failed
               </p>
-              <p className="mt-2 text-[12px] leading-relaxed text-star-white/60">
+              <p className="mt-2 text-[12px] leading-relaxed text-ink/60">
                 {buildError.message}
               </p>
               {/* A permission/session failure can't be retried with the same
                   token — reconnecting (possibly as a different account) is the
                   action that actually resolves it, so lead with that. */}
-              {/403|refused|expired|sign-in|session/i.test(buildError.message) && (
+              {/* The fix lives in THIS service's developer console. These were
+                  hard-coded to Spotify, so an Apple or YouTube failure sent the
+                  user to the wrong dashboard. */}
+              {/403|refused|expired|sign-in|session|token|configured|approved/i.test(buildError.message) &&
+                DEV_CONSOLE[buildError.key] && (
                 <a
-                  href="https://developer.spotify.com/dashboard"
+                  href={DEV_CONSOLE[buildError.key]!.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-3 inline-block text-[11px] font-bold uppercase tracking-widest underline decoration-dotted underline-offset-4"
                   style={{ color: buildError.color }}
                 >
-                  Open Spotify dashboard ↗
+                  {DEV_CONSOLE[buildError.key]!.label} ↗
                 </a>
               )}
               <div className="mt-5 flex flex-col gap-2">
-                {/403|refused|expired|sign-in|session/i.test(buildError.message) && (
+                {/403|refused|expired|sign-in|session|approved/i.test(buildError.message) && (
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       const e = buildError;
-                      disconnectProvider(e.key); // force a fresh consent screen
+                      await disconnectProvider(e.key); // force a fresh consent screen
                       setBuildError(null);
-                      buildDsp(e.key, e.label, e.color, items, crateName());
+                      buildDsp(e.key, e.label, e.color, e.releases, e.name);
                     }}
-                    className="min-h-[44px] rounded-full py-2.5 text-[11px] font-bold uppercase tracking-widest text-void transition-transform hover:scale-105"
+                    className="min-h-[44px] rounded-full py-2.5 text-[11px] font-bold uppercase tracking-widest text-deck transition-transform hover:scale-105"
                     style={{ backgroundColor: buildError.color }}
                   >
-                    Reconnect to Spotify
+                    Reconnect to {buildError.label}
                   </button>
                 )}
                 <button
                   onClick={() => {
                     const e = buildError;
                     setBuildError(null);
-                    buildDsp(e.key, e.label, e.color, items, crateName());
+                    buildDsp(e.key, e.label, e.color, e.releases, e.name);
                   }}
                   className="min-h-[44px] rounded-full border py-2.5 text-[11px] font-bold uppercase tracking-widest transition-colors hover:bg-white/[0.06]"
                   style={{ borderColor: `${buildError.color}66`, color: buildError.color }}
@@ -938,15 +1002,15 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                   onClick={() => {
                     const e = buildError;
                     setBuildError(null);
-                    csvFallback(e.key, e.label);
+                    csvFallback(e.key, e.label, e.releases, e.name);
                   }}
-                  className="min-h-[44px] rounded-full border border-white/15 py-2.5 text-[11px] font-bold uppercase tracking-widest text-star-white/70 hover:text-star-white"
+                  className="min-h-[44px] rounded-full border border-white/15 py-2.5 text-[11px] font-bold uppercase tracking-widest text-ink/70 hover:text-ink"
                 >
                   Download CSV instead
                 </button>
                 <button
                   onClick={() => setBuildError(null)}
-                  className="py-1 text-[10px] font-bold uppercase tracking-widest text-star-white/40 hover:text-star-white/70"
+                  className="py-1 text-[10px] font-bold uppercase tracking-widest text-ink/40 hover:text-ink/70"
                 >
                   Cancel
                 </button>
@@ -959,17 +1023,123 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       {/* export toast */}
       <AnimatePresence>
         {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-full border border-neon-green/40 bg-void/90 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-neon-green backdrop-blur"
-          >
-            {toast}
-          </motion.div>
+          // Centred by the flex wrapper, not by -translate-x-1/2 on the toast:
+          // framer-motion writes `transform` to animate y and that wiped the
+          // translate, so the toast sat with its left edge at mid-screen.
+          <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--player-h,0px)_+_1.5rem)] z-[80] flex justify-center px-4">
+            <motion.div
+              role="status"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="max-w-[min(92vw,26rem)] rounded-2xl border border-lcd/40 bg-deck/95 px-4 py-2 text-center text-[11px] font-bold tracking-wide text-lcd backdrop-blur"
+            >
+              {toast}
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
       </Portal>
     </>
+  );
+}
+
+/**
+ * A dock key. When its count goes up — a record dropped into the crate from
+ * anywhere in the app — the key hops and a "+1" floats off it, so adding
+ * something gives feedback where the thing actually went. The count itself
+ * rolls over rather than silently changing.
+ */
+function DockButton({
+  label,
+  count,
+  active,
+  reduce,
+  onClick,
+  children,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  reduce: boolean | null;
+  onClick: () => void;
+  children: (active: boolean) => React.ReactNode;
+}) {
+  const prev = useRef(count);
+  const mountedAt = useRef(0);
+  const [bump, setBump] = useState(0);
+  useEffect(() => {
+    mountedAt.current = Date.now();
+  }, []);
+  useEffect(() => {
+    // Only growth is news. The first read from storage also "grows" the count
+    // from 0 shortly after mount; that isn't the listener adding anything.
+    if (count > prev.current && Date.now() - mountedAt.current > 800) setBump((b) => b + 1);
+    prev.current = count;
+  }, [count]);
+
+  return (
+    <button
+      onClick={onClick}
+      aria-label={count > 0 ? `${label} (${count})` : label}
+      className="glass group relative flex h-14 w-14 items-center justify-center rounded-full ring-1 ring-white/45 transition-transform hover:scale-110 active:scale-95"
+      style={{
+        background: active ? "rgba(255,255,255,0.92)" : "rgba(24,24,34,0.78)",
+        boxShadow:
+          "0 8px 24px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 6px rgba(0,0,0,0.3)",
+      }}
+    >
+      <motion.span
+        key={bump}
+        className="flex"
+        initial={bump && !reduce ? { scale: 1, rotate: 0, y: 0 } : false}
+        animate={bump && !reduce ? { scale: [1, 1.32, 0.92, 1], rotate: [0, -12, 8, 0], y: [0, -5, 0, 0] } : undefined}
+        transition={{ duration: 0.55, ease: "easeOut" }}
+      >
+        {children(active)}
+      </motion.span>
+      {/* the ripple ring and the floating +1 */}
+      <AnimatePresence>
+        {bump > 0 && !reduce && (
+          <motion.span
+            key={`ring-${bump}`}
+            aria-hidden
+            className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-[#e0a45c]"
+            initial={{ scale: 1, opacity: 0.8 }}
+            animate={{ scale: 1.7, opacity: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {bump > 0 && !reduce && (
+          <motion.span
+            key={`plus-${bump}`}
+            aria-hidden
+            className="pointer-events-none absolute -top-2 left-1/2 -ml-3 w-6 text-center font-mono text-[11px] font-bold text-sport drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
+            initial={{ y: 0, opacity: 0 }}
+            animate={{ y: -22, opacity: [0, 1, 0] }}
+            transition={{ duration: 0.9, ease: "easeOut" }}
+          >
+            +1
+          </motion.span>
+        )}
+      </AnimatePresence>
+      {count > 0 && (
+        <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center overflow-hidden rounded-full bg-vu px-1 text-[9px] font-bold text-deck">
+          <AnimatePresence initial={false} mode="popLayout">
+            <motion.span
+              key={count}
+              initial={reduce ? { opacity: 0 } : { y: 9, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={reduce ? { opacity: 0 } : { y: -9, opacity: 0 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {count}
+            </motion.span>
+          </AnimatePresence>
+        </span>
+      )}
+    </button>
   );
 }

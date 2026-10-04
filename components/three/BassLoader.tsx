@@ -21,7 +21,7 @@ export function BassLoader({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-void"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-deck"
       role="status"
       aria-label="Loading the Observatory"
     >
@@ -36,7 +36,7 @@ export function BassLoader({
               duration: reduced ? 0.2 : 0.7,
               ease: [0.22, 1, 0.36, 1],
             }}
-            className="text-4xl font-bold uppercase tracking-[0.18em] text-star-white md:text-6xl"
+            className="text-4xl font-bold uppercase tracking-[0.18em] text-ink md:text-6xl"
           >
             {letter}
           </motion.span>
@@ -46,7 +46,7 @@ export function BassLoader({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.7, duration: reduced ? 0.2 : 0.6 }}
-        className="mt-5 font-mono text-[10px] uppercase tracking-[0.3em] text-star-white/40"
+        className="mt-5 font-mono text-[10px] uppercase tracking-[0.3em] text-ink/40"
       >
         {caption}
       </motion.p>

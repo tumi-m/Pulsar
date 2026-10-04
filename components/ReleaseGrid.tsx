@@ -21,8 +21,6 @@ import {
   computeCols,
   gridGrouping,
   buildDateSections,
-  GRID_MIN,
-  GRID_MAX,
 } from "@/lib/grid";
 import { loadFormat, saveFormat, type MediaFormat } from "@/lib/format";
 import {
@@ -59,11 +57,10 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   const [showRefine, setShowRefine] = useState(false);
   const [showGenres, setShowGenres] = useState(false);
   const [query, setQuery] = useState("");
-  // Server-side search results reach beyond the homepage's ~2000-release
+  // Server-side search results reach beyond the homepage's ~600-release
   // payload into the full Supabase archive (which grows daily). Only fetched
   // when the local query is too thin to be useful.
   const [serverResults, setServerResults] = useState<Release[]>([]);
-  const [serverSearching, setServerSearching] = useState(false);
 
   // ── iOS Photos-style pinch-to-zoom grid density ──────────────
   // Pinch OUT → fewer, bigger tiles; pinch IN → more tiles per row. `zoom` is a
@@ -96,18 +93,27 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     const q = query.trim();
     if (q.length < 2) {
       setServerResults([]);
-      setServerSearching(false);
       return;
     }
-    setServerSearching(true);
+    // The request is aborted when the query changes. Before, only the debounce
+    // timer was cleared: a slow response for "radio" could land after the one
+    // for "radiohead" and merge its results into the newer search.
+    const ctrl = new AbortController();
+    setServerResults([]); // never show the previous query's archive hits under this one
     const handle = setTimeout(() => {
-      fetch(`/api/search?q=${encodeURIComponent(q)}`)
+      fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: ctrl.signal })
         .then((r) => (r.ok ? r.json() : { releases: [] }))
-        .then((d) => setServerResults((d.releases ?? []) as Release[]))
-        .catch(() => setServerResults([]))
-        .finally(() => setServerSearching(false));
+        .then((d) => {
+          if (!ctrl.signal.aborted) setServerResults((d.releases ?? []) as Release[]);
+        })
+        .catch(() => {
+          if (!ctrl.signal.aborted) setServerResults([]);
+        });
     }, 350);
-    return () => clearTimeout(handle);
+    return () => {
+      clearTimeout(handle);
+      ctrl.abort();
+    };
   }, [query]);
 
   // Restore the saved density delta once.
@@ -234,15 +240,33 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     detailOpenRef.current = detailOpen;
   }, [detailOpen]);
 
+  // `/?play=<release id>` — the release page's "Play in PULSAR" CTA lands
+  // here. Find the release in the grid catalogue, open its detail sheet,
+  // and start the preview once. Runs once on mount.
+  const playedFromParamRef = useRef(false);
+  useEffect(() => {
+    if (playedFromParamRef.current) return;
+    const id = new URLSearchParams(window.location.search).get("play");
+    if (!id) return;
+    playedFromParamRef.current = true;
+    const target = releases.find((r) => r.id === id);
+    if (!target) return;
+    // Deferred to a microtask: this effect runs during hydration, and the
+    // synchronous setState inside it cascades renders on first paint.
+    setTimeout(() => {
+      setSelectedRelease(target);
+      player.play(target);
+    }, 0);
+    // Clean the URL so a refresh doesn't replay it.
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [releases, player]);
+
   // Tell the navbar when album mode is open so its header can go symmetrical.
   useEffect(() => {
     window.dispatchEvent(new CustomEvent("pulsar-detail-open", { detail: detailOpen }));
   }, [detailOpen]);
 
-  // Tell the navbar / visualizer whether we're in visualiser mode.
-  useEffect(() => {
-    window.dispatchEvent(new CustomEvent("pulsar-visualizing", { detail: Boolean(visualizing) }));
-  }, [visualizing]);
+  // (No pulsar-visualizing listener anywhere — channel retired.)
 
   // bumps whenever the user favorites/crates something → recompute recs
   const [collectionVersion, setCollectionVersion] = useState(0);
@@ -265,12 +289,8 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       setView("latest");
       setShowQuiz(true);
     };
-    const onSearch = (e: Event) => {
-      setQuery((e as CustomEvent<string>).detail);
-      setVisible(PAGE);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    };
-    const onCloseDetail = () => setSelectedRelease(null);
+    // (No onSearch/onCloseDetail — those event channels were dead: nothing
+    // dispatches pulsar-search or pulsar-close-detail anymore.)
     // The now-playing bar can send the user into the album sheet, or straight
     // into the artist's discography, for whatever is currently playing.
     const onOpenRelease = (e: Event) => setSelectedRelease((e as CustomEvent<Release>).detail);
@@ -282,8 +302,6 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     };
     window.addEventListener("pulsar-open-release", onOpenRelease);
     window.addEventListener("pulsar-open-discography", onOpenDiscography);
-    window.addEventListener("pulsar-close-detail", onCloseDetail);
-    window.addEventListener("pulsar-search", onSearch);
     window.addEventListener("pulsar-collection-change", onChange);
     window.addEventListener("pulsar-format-change", onFormat);
     window.addEventListener("pulsar-type-change", onType);
@@ -293,17 +311,26 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       window.removeEventListener("pulsar-format-change", onFormat);
       window.removeEventListener("pulsar-type-change", onType);
       window.removeEventListener("pulsar-retake-quiz", onRetake);
-      window.removeEventListener("pulsar-search", onSearch);
-      window.removeEventListener("pulsar-close-detail", onCloseDetail);
       window.removeEventListener("pulsar-open-release", onOpenRelease);
       window.removeEventListener("pulsar-open-discography", onOpenDiscography);
     };
   }, []);
 
   // The recommender profile: quiz taste + learned affinities from actions.
+  // `collectionVersion` is intentionally referenced (not read) so each
+  // favorites/crate change recomputes the profile — it's the refresh signal.
+  //
+  // Collections are read only after mount. They live in localStorage, which the
+  // server doesn't have, so reading them during the first render gave the
+  // client a taste profile the server never saw: different tile sizes, extra
+  // "For You" badges, and a hydration failure on which React threw away the
+  // server HTML and rebuilt the whole grid — for every visitor with a crate.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
   const recProfile = useMemo(
-    () => learnedProfile(profile, getFavorites(), getPlaylist()),
-    [profile, collectionVersion]
+    () => learnedProfile(profile, hydrated ? getFavorites() : [], hydrated ? getPlaylist() : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [profile, collectionVersion, hydrated]
   );
 
   // Releases ranked highest-for-you first — the pool shuffle draws from.
@@ -330,18 +357,24 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   // ranked track that hasn't played yet (no repeats until the pool is dry).
   useEffect(() => {
     player.setNextProvider((cur) => {
-      if (cur) playedRef.current.add(cur.id);
+      if (cur) {
+        // Track displays share the album's id prefix — count the ALBUM as
+        // played, not just the individual track, so shuffle doesn't pick
+        // another track off the same album right away.
+        playedRef.current.add(cur.id.split("#")[0]);
+      }
       const pool = rankedForYou.slice(0, Math.max(20, Math.min(120, rankedForYou.length)));
-      let fresh = pool.filter((r) => r.id !== cur?.id && !playedRef.current.has(r.id));
+      const baseOf = (r: Release) => r.id.split("#")[0];
+      let fresh = pool.filter((r) => !playedRef.current.has(baseOf(r)));
       if (!fresh.length) {
-        // Whole pool heard — start a new cycle (still skip the current track).
+        // Whole pool heard — start a new cycle (still skip the current album).
         playedRef.current.clear();
-        if (cur) playedRef.current.add(cur.id);
-        fresh = pool.filter((r) => r.id !== cur?.id);
+        if (cur) playedRef.current.add(baseOf(cur));
+        fresh = pool.filter((r) => baseOf(r) !== (cur ? baseOf(cur) : ""));
       }
       if (!fresh.length) return null;
       const next = fresh[Math.floor(Math.random() * fresh.length)];
-      playedRef.current.add(next.id);
+      playedRef.current.add(baseOf(next));
       // If the visualizer is open, follow the new track's art.
       if (visualizingRef.current) setVisualizing(next);
       return next;
@@ -408,7 +441,12 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     return list;
   }, [releases, activeGenre, activeType, activeLabel, view, recProfile, query, serverResults]);
 
-  const shown = filtered.slice(0, visible);
+  // `shown` identity: `filtered.slice` allocates a fresh array every render,
+  // which made every `useMemo` below recompute (tileSizes is an O(n log n)
+  // scoring pass over up to ~2000 items) on *any* grid re-render — scroll
+  // state, hover, anything. Derive sizes/sections from a count-stable memo
+  // instead: `shown` only changes when the filter set or page truly changes.
+  const shown = useMemo(() => filtered.slice(0, visible), [filtered, visible]);
   const searching = query.trim().length > 0;
   // In search mode, keep every tile the same size so results pack tightly with
   // no empty gaps; otherwise use the taste-driven dynamic sizing.
@@ -428,9 +466,20 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   // popularity or relevance would emit a header on nearly every row.
   const grouping = gridGrouping({ cols, view, searching, detailOpen });
 
+  // ── No render window ─────────────────────────────────────────
+  // This used to keep at most 240 tiles mounted, dropping the top of the list
+  // as you scrolled down and promising it would "re-mount on scroll up". Nothing
+  // ever moved the window back: after 240 tiles the start of the feed was gone
+  // for good, the page jumped as the dropped rows collapsed, and the flat grid
+  // read tile sizes by window position, so every tile's span and "For You"
+  // badge shifted each time it slid. Tiles already use content-visibility:
+  // auto, which skips paint and layout off-screen, so the list is rendered
+  // whole; it only grows as fast as infinite scroll pages it in.
+  const visibleShown = shown;
+
   const dateSections = useMemo(
-    () => (grouping === "none" ? null : buildDateSections(shown, grouping)),
-    [shown, grouping],
+    () => (grouping === "none" ? null : buildDateSections(visibleShown, grouping)),
+    [visibleShown, grouping],
   );
 
   const resetPage = () => setVisible(PAGE);
@@ -442,7 +491,9 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
     if (!el || !hasMore) return;
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) setVisible((v) => v + PAGE);
+        if (entries[0]?.isIntersecting) {
+          setVisible((v) => v + PAGE);
+        }
       },
       { rootMargin: "800px 0px" } // prefetch well before the bottom
     );
@@ -483,9 +534,9 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
       {/* everything that reflows when the detail sheet opens. Bottom padding
           (Fibonacci: 34 / 89px) keeps the last row clear of the player bar. */}
       <div
-        className={`transition-[padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        className={`transition-[padding] duration-500 ease-settle ${
           detailOpen ? "lg:pr-[50vw]" : ""
-        } ${player.current ? "pb-[178px]" : "pb-[110px]"}`}
+        } pb-[calc(var(--player-h,0px)_+_110px)]`}
       >
         {/* ── search block — rests below the letterhead at the top, and
             elegantly FOLLOWS the user to the bottom (above the player, no gap)
@@ -495,30 +546,31 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
           transition={{ type: "spring", stiffness: 220, damping: 32 }}
           className={`fixed left-0 right-0 z-40 flex flex-col-reverse items-center gap-2 px-4 ${
             detailOpen
-              ? `opacity-0 pointer-events-none lg:right-[50vw] lg:opacity-100 lg:pointer-events-auto ${
-                  player.current ? "bottom-[72px]" : "bottom-3"
-                }`
+              ? "opacity-0 pointer-events-none lg:right-[50vw] lg:opacity-100 lg:pointer-events-auto bottom-[calc(var(--player-h,0px)_+_12px)]"
               : atTop
                 ? "top-[178px] opacity-100 md:top-[248px]"
-                : `opacity-100 ${player.current ? "bottom-[72px]" : "bottom-3"}`
+                : "opacity-100 bottom-[calc(var(--player-h,0px)_+_12px)]"
           }`}
         >
           {/* ONE compact, immersive control row: menu · search · genre · refine.
               Only as wide as its contents → maximal screen real estate. */}
           <div
-            className="flex max-w-[94vw] items-center gap-2 rounded-full border border-white/[0.12] p-1.5"
+            className="flex max-w-[94vw] items-center gap-2 rounded-2xl border border-chrome-700/60 p-1.5"
+            // The deck's control strip: brushed metal under a polished lip,
+            // still translucent enough to feel like it floats over the grid.
             style={{
-              background: "rgba(10,10,18,0.6)",
-              backdropFilter: "blur(22px) saturate(170%)",
-              WebkitBackdropFilter: "blur(22px) saturate(170%)",
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.28), 0 12px 32px rgba(0,0,0,0.55)",
+              background:
+                "repeating-linear-gradient(90deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 3px)," +
+                "linear-gradient(180deg, rgba(40,48,57,0.82), rgba(20,25,30,0.86))",
+              backdropFilter: "blur(22px) saturate(140%)",
+              WebkitBackdropFilter: "blur(22px) saturate(140%)",
+              boxShadow: "inset 0 1px 0 rgba(231,235,238,0.2), 0 12px 32px rgba(0,0,0,0.55)",
             }}
           >
             <button
               onClick={() => window.dispatchEvent(new CustomEvent("pulsar-toggle-sidebar"))}
               aria-label="Open menu"
-              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ring-1 ring-white/20 text-star-white/90 transition-transform hover:scale-105 active:scale-95"
-              style={{ background: "rgba(255,255,255,0.1)" }}
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[10px] border border-chrome-700/70 bg-deck-600 text-ink-100 shadow-key transition-[box-shadow,transform] active:translate-y-px active:shadow-keyed"
             >
               <span className="flex flex-col gap-[3px]">
                 <span className="h-[2px] w-4 rounded-full bg-current" />
@@ -529,20 +581,23 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
 
             {/* search — flexes to fill, shrinking so genre/refine always fit */}
             <div
-              className={`search-rainbow min-w-0 flex-1 rounded-full p-[1.5px] transition-opacity duration-300 sm:w-[300px] sm:flex-none md:w-[380px] ${
+              className={`search-rainbow min-w-0 flex-1 rounded-[11px] p-[1.5px] transition-opacity duration-300 sm:w-[300px] sm:flex-none md:w-[380px] ${
                 atTop ? "opacity-100" : "opacity-[0.6]"
               }`}
             >
+              {/* The field was 10% white over the animated gradient, so the
+                  "ring" was the whole pill and the placeholder was white text
+                  on yellow — barely legible at any point in the cycle. It is
+                  now an opaque recessed window, and the gradient is what it was
+                  always meant to be: a thin lit bezel round the edge. */}
               <div
-                className="flex w-full items-center gap-2 rounded-full px-3 py-1.5"
+                className="flex w-full items-center gap-2 rounded-[10px] px-3 py-1.5"
                 style={{
-                  background: "rgba(255,255,255,0.1)",
-                  backdropFilter: "blur(18px) saturate(180%)",
-                  WebkitBackdropFilter: "blur(18px) saturate(180%)",
-                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.45)",
+                  background: "linear-gradient(180deg, #0e1216 0%, #161b21 100%)",
+                  boxShadow: "inset 0 1px 3px rgba(0,0,0,0.85), inset 0 -1px 0 rgba(231,235,238,0.05)",
                 }}
               >
-                <svg viewBox="0 0 20 20" className="h-4 w-4 flex-shrink-0 text-star-white/70" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg viewBox="0 0 20 20" className="h-4 w-4 flex-shrink-0 text-ink/70" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="9" cy="9" r="6" />
                   <path d="M14 14l4 4" strokeLinecap="round" />
                 </svg>
@@ -559,13 +614,13 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                     resetPage();
                   }}
                   placeholder="Search artists, albums…"
-                  className="w-full bg-transparent text-sm font-medium text-white placeholder:text-star-white/55 focus:outline-none"
+                  className="w-full bg-transparent text-sm font-medium text-ink placeholder:text-ink-400 focus:outline-none"
                 />
                 {query && (
                   <button
                     onClick={() => setQuery("")}
                     aria-label="Clear search"
-                    className="flex-shrink-0 text-star-white/40 hover:text-star-white"
+                    className="flex-shrink-0 text-ink/40 hover:text-ink"
                   >
                     ✕
                   </button>
@@ -576,10 +631,10 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
             <button
               onClick={() => setShowGenres((v) => !v)}
               aria-expanded={showGenres}
-              className={`flex flex-shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.1em] transition-colors sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.16em] ${
+              className={`flex min-h-9 flex-shrink-0 items-center gap-1 rounded-[10px] border px-3 py-1 text-[9px] font-bold uppercase tracking-[0.1em] shadow-key transition-[color,background-color,border-color,box-shadow,transform] active:translate-y-px active:shadow-keyed sm:min-h-0 sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.16em] ${
                 activeGenre
-                  ? "border-[#4aa3ff]/60 bg-[#4aa3ff]/15 text-[#a9d5ff]" // filter active → reminder
-                  : "border-star-white/15 text-star-white/60 hover:border-star-white/40 hover:text-star-white"
+                  ? "border-tps/60 bg-tps/20 text-[#bcd4f0]" // filter engaged → lit, like a held key
+                  : "border-chrome-700/60 bg-deck-600 text-ink-400 hover:text-ink"
               }`}
             >
               {activeGenre ?? "Genre"}
@@ -588,16 +643,17 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
             <button
               onClick={() => setShowRefine((v) => !v)}
               aria-expanded={showRefine}
-              className={`flex flex-shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.1em] transition-colors sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.2em] ${
+              className={`flex min-h-9 flex-shrink-0 items-center gap-1 rounded-[10px] border px-3 py-1 text-[9px] font-bold uppercase tracking-[0.1em] shadow-key transition-[color,background-color,border-color,box-shadow,transform] active:translate-y-px active:shadow-keyed sm:min-h-0 sm:gap-1.5 sm:px-3.5 sm:py-1.5 sm:text-[10px] sm:tracking-[0.2em] ${
                 refineActive
-                  ? "border-[#4aa3ff]/60 bg-[#4aa3ff]/15 text-[#a9d5ff]" // filter active → reminder
+                  ? "border-tps/60 bg-tps/20 text-[#bcd4f0]" // filter engaged → lit, like a held key
                   : showRefine
-                    ? "border-star-white/40 bg-star-white/[0.06] text-star-white"
-                    : "border-star-white/15 text-star-white/50 hover:border-star-white/40 hover:text-star-white"
+                    ? "border-chrome-500/60 bg-deck-700 text-ink shadow-keyed"
+                    : "border-chrome-700/60 bg-deck-600 text-ink-400 hover:text-ink"
               }`}
             >
               Refine
-              {refineActive && <span className="h-1 w-1 rounded-full bg-[#4aa3ff]" />}
+              {/* the engaged-filter lamp */}
+              {refineActive && <span className="h-1.5 w-1.5 rounded-full bg-lcd shadow-[0_0_6px_rgba(126,217,174,0.8)]" />}
               <span className={`transition-transform ${showRefine ? "rotate-180" : ""}`}>⌄</span>
             </button>
           </div>
@@ -669,6 +725,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                           return (
                             <button
                               key={v}
+                              aria-pressed={isActive}
                               onClick={() => {
                                 setView(v);
                                 resetPage();
@@ -680,13 +737,13 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                                   layoutId="view-active"
                                   className="absolute inset-0 rounded-md"
                                   style={{
-                                    background: "linear-gradient(160deg, #8cc6ff, #3f9bff)",
+                                    background: "linear-gradient(160deg, #9dc0e8, #4e86c7)",
                                     boxShadow: "0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.5)",
                                   }}
                                   transition={{ type: "spring", stiffness: 400, damping: 32 }}
                                 />
                               )}
-                              <span className={`relative ${isActive ? "text-void" : "text-[#a9d5ff]"}`}>
+                              <span className={`relative ${isActive ? "text-deck" : "text-[#bcd4f0]"}`}>
                                 {v === "latest" ? "Latest" : v === "streamed" ? "Most Streamed" : "For You"}
                               </span>
                             </button>
@@ -694,7 +751,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                         }
                       )}
                     </div>
-                    <span className="hidden h-4 w-px bg-star-white/15 sm:block" />
+                    <span className="hidden h-4 w-px bg-ink/15 sm:block" />
                     <FormatPicker
                       active={format}
                       onChange={(f) => {
@@ -710,7 +767,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                         setView("latest");
                         setShowQuiz(true);
                       }}
-                      className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#8cc6ff]/80 transition-colors hover:text-[#a9d5ff]"
+                      className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9dc0e8]/80 transition-colors hover:text-[#bcd4f0]"
                     >
                       {profile ? "Retake quiz →" : "Take quiz →"}
                     </button>
@@ -719,18 +776,19 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                   {/* labels */}
                   {labels.length > 0 && (
                     <div className="scrollbar-none flex items-center gap-1.5 overflow-x-auto">
-                      <span className="flex-shrink-0 pr-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#8cc6ff]/70">
+                      <span className="flex-shrink-0 pr-1 text-[10px] font-bold uppercase tracking-[0.24em] text-[#9dc0e8]/70">
                         Label
                       </span>
                       <button
+                        aria-pressed={activeLabel === null}
                         onClick={() => {
                           setActiveLabel(null);
                           resetPage();
                         }}
                         className={`flex-shrink-0 rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
                           activeLabel === null
-                            ? "bg-[#4aa3ff] text-void shadow-[0_1px_3px_rgba(0,0,0,0.5)]"
-                            : "bg-white/[0.06] text-[#a9d5ff] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-white/[0.1] hover:text-white"
+                            ? "bg-[#4e86c7] text-deck shadow-[0_1px_3px_rgba(0,0,0,0.5)]"
+                            : "bg-white/[0.06] text-[#bcd4f0] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-white/[0.1] hover:text-white"
                         }`}
                       >
                         All
@@ -738,14 +796,15 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                       {labels.map((l) => (
                         <button
                           key={l}
+                          aria-pressed={activeLabel === l}
                           onClick={() => {
                             setActiveLabel(activeLabel === l ? null : l);
                             resetPage();
                           }}
                           className={`flex-shrink-0 whitespace-nowrap rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
                             activeLabel === l
-                              ? "bg-[#4aa3ff] text-void shadow-[0_1px_3px_rgba(0,0,0,0.5)]"
-                              : "bg-white/[0.06] text-[#a9d5ff] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-white/[0.1] hover:text-white"
+                              ? "bg-[#4e86c7] text-deck shadow-[0_1px_3px_rgba(0,0,0,0.5)]"
+                              : "bg-white/[0.06] text-[#bcd4f0] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-white/[0.1] hover:text-white"
                           }`}
                         >
                           {l}
@@ -777,10 +836,54 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
           </AnimatePresence>
         </motion.div>
 
+        {/* Screen readers heard nothing when a search or filter changed the
+            grid — no live region existed anywhere in the app. This announces
+            the outcome, not every keystroke: it only speaks when the count
+            changes, and it's visually hidden. */}
+        <p className="sr-only" role="status" aria-live="polite">
+          {query.trim() || activeGenre || refineActive
+            ? filtered.length === 0
+              ? `No releases match${query.trim() ? ` “${query.trim()}”` : " these filters"}.`
+              : `${filtered.length} release${filtered.length === 1 ? "" : "s"} found.`
+            : ""}
+        </p>
+
         {/* grid */}
         {shown.length === 0 ? (
-          <div className="flex flex-col items-center justify-center px-6 py-32 text-center">
-            <p className="font-mono text-sm tracking-widest text-star-white/30">NOTHING HERE YET</p>
+          /* "NOTHING HERE YET" was all this said, whether you'd searched for a
+             typo, stacked three filters, or genuinely reached the end. It named
+             neither the cause nor a way out, so the only obvious move was to
+             reload. Say which it is, and offer the undo. */
+          <div className="flex flex-col items-center justify-center gap-3 px-6 py-24 text-center">
+            <p className="font-mono text-sm tracking-widest text-ink/45">
+              {query.trim() ? "NO MATCHES" : "NOTHING HERE YET"}
+            </p>
+            {query.trim() ? (
+              <p className="max-w-xs text-sm leading-relaxed text-ink/50">
+                Nothing matched{" "}
+                <span className="font-semibold text-ink/80">“{query.trim()}”</span>
+                {activeGenre || refineActive ? " with your filters applied." : "."}
+              </p>
+            ) : activeGenre || refineActive ? (
+              <p className="max-w-xs text-sm leading-relaxed text-ink/50">
+                No releases match these filters.
+              </p>
+            ) : null}
+            {(query.trim() || activeGenre || refineActive) && (
+              <button
+                onClick={() => {
+                  setQuery("");
+                  setActiveGenre(null);
+                  setActiveLabel(null);
+                  setView("latest");
+                  setFormat("vinyl");
+                  resetPage();
+                }}
+                className="min-h-9 rounded-full border border-ink/25 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-ink/80 transition-colors hover:border-ink/60 hover:text-ink"
+              >
+                Clear search &amp; filters
+              </button>
+            )}
           </div>
         ) : dateSections ? (
           /* Photos-style dated sections — pinched in far enough that a flat
@@ -791,17 +894,20 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 <div className="sticky top-14 z-[6] px-[13px] py-2 md:px-[21px]">
                   <motion.h2
                     layout
-                    className="inline-flex items-baseline gap-2 rounded-full border border-white/10 px-3 py-1"
+                    // A cassette spine label: J-card paper, a ruled edge, the
+                    // date in the heavy caps you'd write it in, and the count
+                    // where the tape length goes. The one light surface in the
+                    // grid, so the eye finds the sections while scrolling.
+                    className="inline-flex items-baseline gap-2.5 rounded-[5px] border-l-[3px] border-sony py-1 pl-2.5 pr-3"
                     style={{
-                      background: "rgba(10,10,18,0.72)",
-                      backdropFilter: "blur(14px) saturate(160%)",
-                      WebkitBackdropFilter: "blur(14px) saturate(160%)",
+                      background: "linear-gradient(180deg, rgba(239,228,204,0.96), rgba(226,213,184,0.96))",
+                      boxShadow: "0 1px 0 rgba(255,255,255,0.5) inset, 0 4px 14px rgba(0,0,0,0.45)",
                     }}
                   >
-                    <span className="text-[13px] font-bold tracking-tight text-star-white">
+                    <span className="text-[12px] font-black uppercase tracking-[0.08em] text-deck">
                       {section.label}
                     </span>
-                    <span className="text-[10px] font-mono text-star-white/40">
+                    <span className="font-mono text-[10px] font-bold tabular-nums text-tape/70">
                       {section.items.length}
                     </span>
                   </motion.h2>
@@ -811,7 +917,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                   style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
                 >
                   {section.items.map((release, j) => {
-                    const i = section.from + j; // global index → stable sizing
+                    const i = section.from + j; // absolute index → stable sizing
                     return (
                       <ReleaseCard
                         key={release.id}
@@ -843,7 +949,7 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                 : { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, touchAction: "pan-y" }
             }
           >
-            {shown.map((release, i) => (
+            {visibleShown.map((release, i) => (
               <ReleaseCard
                 key={release.id}
                 release={release}
@@ -883,16 +989,16 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
                   style={{ gridTemplateColumns: `repeat(${colHud}, 1fr)` }}
                 >
                   {Array.from({ length: colHud * 2 }).map((_, k) => (
-                    <span key={k} className="h-2.5 w-2.5 rounded-[3px] bg-star-white/85" />
+                    <span key={k} className="h-2.5 w-2.5 rounded-[3px] bg-ink/85" />
                   ))}
                 </div>
-                <span className="text-[11px] font-bold uppercase tracking-[0.24em] text-star-white/70">
+                <span className="text-[11px] font-bold uppercase tracking-[0.24em] text-ink/70">
                   {colHud} across
                 </span>
                 {/* mirror the Photos library: tell the user the grid is now
                     grouped, and by what */}
                 {grouping !== "none" && (
-                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-neon-blue/80">
+                  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-tps/80">
                     Grouped by {grouping}
                   </span>
                 )}
@@ -904,8 +1010,8 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
         {/* infinite-scroll sentinel + subtle loader */}
         {hasMore && (
           <div ref={sentinelRef} className="flex justify-center py-14">
-            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.25em] text-star-white/30">
-              <span className="h-1.5 w-1.5 animate-ping rounded-full bg-neon-violet" />
+            <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.25em] text-ink/30">
+              <span className="h-1.5 w-1.5 animate-ping rounded-full bg-sony" />
               Loading more
             </div>
           </div>
