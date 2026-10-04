@@ -593,3 +593,15 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .lamp-live { animation: none; }
 }
+
+/* ─── No zoom-on-focus ───────────────────────
+   iOS Safari zooms the whole page into any text field under 16px when it
+   takes focus, and doesn't zoom back out. Every search and name field here
+   was 14px. Raise them on touch screens only; desktop keeps its type scale. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}

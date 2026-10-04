@@ -578,24 +578,31 @@ export function AiChat({ releases }: AiChatProps) {
                           run();
                         }
                       }}
-                      placeholder={turns.length ? "Refine it — “slower”, “add sax”, “more 80s”…" : "Describe the vibe — mood, genre, era, anything…"}
+                      // Short on phones: a one-row textarea wraps a long
+                      // placeholder and clips its second line.
+                      placeholder={
+                        turns.length
+                          ? isMobile ? "Refine it — “slower”, “more 80s”…" : "Refine it — “slower”, “add sax”, “more 80s”…"
+                          : isMobile ? "Describe the vibe…" : "Describe the vibe — mood, genre, era, anything…"
+                      }
                       rows={1}
                       autoFocus
-                      className="max-h-28 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-ink placeholder:text-ink/35 focus:outline-none"
+                      // 16px on phones: iOS zooms the page into any field
+                      // smaller than that when it takes focus.
+                      className="max-h-28 flex-1 resize-none bg-transparent px-2 py-2 text-base text-ink placeholder:text-ink/35 focus:outline-none sm:text-sm"
                     />
-                    <motion.button
-                      whileTap={{ scale: 0.92 }}
+                    <button
                       onClick={() => run()}
                       disabled={thinking || !text.trim()}
                       aria-label="Send"
-                      className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-deck transition-opacity disabled:opacity-35"
+                      className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-deck transition-[opacity,transform] active:scale-90 disabled:opacity-35"
                       style={{
                         background: "var(--grad-transport)",
                         boxShadow: "0 4px 14px rgba(242,102,44,0.4)",
                       }}
                     >
                       <ArrowUp size={16} />
-                    </motion.button>
+                    </button>
                   </div>
                 </div>
               </>
