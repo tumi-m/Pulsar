@@ -1,3 +1,4 @@
+import { fold } from "./match";
 /**
  * Matching rules for resolving a 30-second preview to the right record.
  *
@@ -11,11 +12,10 @@
  */
 
 export const norm = (s: string): string =>
-  s
-    .toLowerCase()
+  fold(s)
     .replace(/\(.*?\)|\[.*?\]/g, "")
     .replace(/&/g, "and")
-    .replace(/[^a-z0-9]/g, "");
+    .replace(/[^\p{L}\p{N}]/gu, "");
 
 /**
  * Is this release credited to a compilation rather than a performer?

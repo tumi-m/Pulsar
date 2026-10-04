@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, X, Trash2, Sparkles, Shuffle, Play, Share2, Upload, Plus, Pencil, Copy } from "lucide-react";
+import { Heart, X, Trash2, Sparkles, Shuffle, Play, Share2, Upload, Plus, Pencil } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";
 import type { MediaFormat } from "@/lib/format";
@@ -27,16 +27,17 @@ import { useReducedMotion } from "@/lib/motion";
 import { Portal } from "./Portal";
 import { useIsTouch } from "@/lib/useIsTouch";
 import { PlaylistBuildOverlay } from "./PlaylistBuildOverlay";
+import { ExportSheet } from "./ExportSheet";
 import {
   exportCrate,
   handleDspRedirect,
   ensureDspConfig,
   prepareAppleMusic,
   providerConfigured,
-  providerMissing,
   disconnectProvider,
   type BuildResult,
 } from "@/lib/dsp";
+import { readPending } from "@/lib/dsp/shared";
 
 interface FloatingDockProps {
   format: MediaFormat;
@@ -63,7 +64,10 @@ class BuildCancelled extends Error {}
 export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   const { shuffle, toggleShuffle, play } = usePlayer();
   const reduceMotion = useReducedMotion();
-  const cancelBuild = useRef(false);
+  // Each build gets an id; Cancel marks THAT build. A single boolean was reset
+  // by the next build, which un-cancelled a build still running.
+  const buildSeq = useRef(0);
+  const cancelledBuild = useRef(0);
   const [panel, setPanel] = useState<Panel>(null);
   // Lock background scroll while the crate sheet is open (mobile).
   useScrollLock(Boolean(panel));
@@ -112,6 +116,12 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
     releases: Release[];
     name: string;
   } | null>(null);
+  // The sheet and the result/error cards sit OVER the crate panel. Without
+  // their own entries, Escape and Back skipped them and closed the panel
+  // underneath while they stayed on screen.
+  useBackClose(exporting, () => setExporting(false));
+  useBackClose(Boolean(built), () => setBuilt(null));
+  useBackClose(Boolean(buildError), () => setBuildError(null));
   // Hide the floating dock while the album/tracklist panel is open so it never
   // covers the tracklist's text/icons (especially on mobile).
   const [detailOpen, setDetailOpen] = useState(false);
@@ -151,13 +161,36 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   // playlist build that was pending before we redirected.
   useEffect(() => {
     (async () => {
+      // Back from a sign-in with a crate waiting? Show the build overlay NOW,
+      // before the config fetch and token exchange — that window used to show
+      // nothing, and a second tap during it started a parallel export.
+      if (/[?&](code|error)=/.test(window.location.search)) {
+        const waiting = readPending();
+        if (waiting) {
+          const plat = PLATFORMS.find((p) => p.key === waiting.provider);
+          setBuilding({
+            done: 0,
+            total: waiting.releases.length,
+            label: plat?.label ?? "your service",
+            color: plat?.color ?? "#1DB954",
+            current: null,
+            recent: [],
+          });
+        }
+      }
       // Pull live DSP client config first so providerConfigured() (used all
       // over the export sheet) reflects the server's current env, not just the
       // build-time inlines.
       await ensureDspConfig().catch(() => {});
       setCfgTick((t) => t + 1);
       const outcome = await handleDspRedirect();
+      if (!outcome || "connected" in outcome || "failed" in outcome) setBuilding(null);
       if (!outcome) return;
+      if ("connected" in outcome) {
+        const plat = PLATFORMS.find((p) => p.key === outcome.connected);
+        flash(`Connected to ${plat?.label ?? "the service"} — export your crate again to build the playlist.`);
+        return;
+      }
       // Failures on the way back from a sign-in get the same card as any other
       // failure — Reconnect, Try again, CSV. They went to a 2.6-second toast,
       // and the first export always takes this path.
@@ -180,11 +213,12 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       const label = plat?.label ?? "your DSP";
       const color = plat?.color ?? "#1DB954";
       const queued = pending.releases;
-      cancelBuild.current = false;
+      const myBuild = ++buildSeq.current;
+      const isCancelled = () => cancelledBuild.current === myBuild;
       setBuilding({ done: 0, total: queued.length, label, color, current: queued[0] ?? null, recent: [] });
       try {
         const result = await exportCrate(pending.provider, pending.name, queued, (done, total) => {
-          if (cancelBuild.current) throw new BuildCancelled();
+          if (isCancelled()) throw new BuildCancelled();
           setBuilding({
             done,
             total,
@@ -194,14 +228,12 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
             recent: queued.slice(Math.max(0, done - 6), done).reverse(),
           });
         });
+        if (isCancelled()) return;
         setBuilding(null);
         if (result !== "redirecting") setBuilt(result);
       } catch (err) {
+        if (isCancelled() || err instanceof BuildCancelled) return;
         setBuilding(null);
-        if (err instanceof BuildCancelled || cancelBuild.current) {
-          flash("Export cancelled — nothing was created");
-          return;
-        }
         setBuildError({
           label,
           color,
@@ -298,6 +330,8 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
     tidal: "https://tidal.com/my-collection/playlists",
     soundcloud: "https://soundcloud.com/you/library",
     youtube_music: "https://music.youtube.com/library/playlists",
+    // Boomplay had no entry, so its fallback opened Pulsar itself in a new tab.
+    boomplay: "https://www.boomplay.com/",
   };
 
   // Copy the tracklist + drop a CSV, then open the service's playlist area so
@@ -312,7 +346,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       () => false
     );
     downloadCsv(list, name);
-    window.open(DSP_HOME[key] ?? "https://pulsar-ten-sigma.vercel.app", "_blank", "noopener,noreferrer");
+    if (DSP_HOME[key]) window.open(DSP_HOME[key], "_blank", "noopener,noreferrer");
     setExporting(false);
     void Promise.resolve(copied).then((ok) =>
       flash(ok ? `Tracklist copied + CSV downloaded for ${label}` : `CSV downloaded for ${label}`)
@@ -322,13 +356,14 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   // Create the real playlist on the chosen DSP (Spotify / YouTube / Apple).
   const buildDsp = async (key: string, label: string, color: string, releases: Release[], name: string) => {
     setExporting(false);
-    cancelBuild.current = false;
+    const myBuild = ++buildSeq.current;
+    const isCancelled = () => cancelledBuild.current === myBuild;
     setBuilding({ done: 0, total: releases.length, label, color, current: releases[0] ?? null, recent: [] });
     try {
       const result = await exportCrate(key, name, releases, (done, total) => {
         // Cancel takes effect at the next record: the provider is still
         // matching, nothing has been created yet, and throwing here stops it.
-        if (cancelBuild.current) throw new BuildCancelled();
+        if (isCancelled()) throw new BuildCancelled();
         setBuilding({
           done,
           total,
@@ -341,15 +376,15 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
           recent: releases.slice(Math.max(0, done - 6), done).reverse(),
         });
       });
+      if (isCancelled()) return; // the user already closed it
       setBuilding(null);
       if (result === "redirecting") return; // navigating to the DSP's consent screen
       setBuilt(result);
     } catch (err) {
+      // A cancelled build leaves without touching state: the overlay was
+      // closed on Cancel, and another build may own it by now.
+      if (isCancelled() || err instanceof BuildCancelled) return;
       setBuilding(null);
-      if (err instanceof BuildCancelled || cancelBuild.current) {
-        flash("Export cancelled — nothing was created");
-        return;
-      }
       // A 2.6s toast followed by a surprise CSV download reads as "export is
       // broken". Show a card that says what went wrong and let the user choose
       // the CSV fallback deliberately.
@@ -365,6 +400,9 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   };
 
   const exportTo = async (key: string, label: string) => {
+    // One build at a time: a second would race the first for the same
+    // playlist name, or fire a second consent redirect that kills the first.
+    if (building) return;
     const plat = PLATFORMS.find((p) => p.key === key);
     // DSPs with an open API build the playlist right on the account.
     if (providerConfigured(key)) {
@@ -506,7 +544,10 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", stiffness: 340, damping: 36 }}
-              className="crate-weave fixed inset-x-0 bottom-0 z-[55] flex h-[55dvh] flex-col rounded-t-2xl border-t-2 border-[#5a3d24]/70 pb-[env(safe-area-inset-bottom)] lg:inset-x-auto lg:right-0 lg:top-0 lg:h-full lg:w-1/2 lg:rounded-none lg:border-l-2 lg:border-t-0 lg:pb-0"
+              // Grows while the export sheet is open: at 55% of a phone screen the
+              // sheet's four services, CSV keys and setup notes were a cramped
+              // scroll inside a scroll.
+              className={`crate-weave fixed inset-x-0 bottom-0 z-[55] flex transition-[height] duration-300 ease-settle ${exporting ? "h-[92dvh]" : "h-[55dvh]"} flex-col rounded-t-2xl border-t-2 border-[#5a3d24]/70 pb-[env(safe-area-inset-bottom)] lg:inset-x-auto lg:right-0 lg:top-0 lg:h-full lg:w-1/2 lg:rounded-none lg:border-l-2 lg:border-t-0 lg:pb-0`}
             >
               <div className="border-b border-white/10 px-5 py-4">
                 <div className="flex items-center justify-between">
@@ -621,127 +662,28 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 16 }}
                       transition={{ type: "spring", stiffness: 460, damping: 34 }}
-                      className="absolute inset-x-3 bottom-3 top-16 z-20 overflow-y-auto overscroll-contain rounded-2xl border border-white/15 bg-[#1a2027]/[0.97] p-4 backdrop-blur-2xl sm:inset-x-4 sm:bottom-auto sm:top-20"
+                      role="dialog"
+                      aria-label="Export this crate"
+                      className="absolute inset-x-3 bottom-3 top-16 z-20 overflow-y-auto overscroll-contain rounded-2xl border border-chrome-700/60 bg-[#151b21]/[0.98] p-4 backdrop-blur-2xl sm:inset-x-4 sm:bottom-auto sm:top-20 sm:max-h-[calc(100%-6rem)]"
                       style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 24px 60px rgba(0,0,0,0.6)" }}
                     >
-                      <p className="text-sm font-bold uppercase tracking-wide text-ink">
-                        Export {items.length} to a playlist
-                      </p>
-                      <p className="mt-1 text-[11px] leading-relaxed text-ink/45">
-                        {PLATFORMS.some((p) => providerConfigured(p.key)) ? (
-                          <>
-                            Services marked <span className="text-[#1DB954]">Creates playlist</span>{" "}
-                            build it right on your account. The rest copy the tracklist &amp; a CSV to
-                            import.
-                          </>
-                        ) : (
-                          <>
-                            Pick a service — Pulsar copies the tracklist &amp; downloads a CSV, then
-                            opens your playlists so you can paste or import it.
-                          </>
-                        )}
-                      </p>
-                      <div className="mt-3 grid grid-cols-1 gap-1.5" key={cfgTick}>
-                        {PLATFORMS.map((p) => {
-                          const live = providerConfigured(p.key);
-                          return (
-                            <button
-                              key={p.key}
-                              onClick={() => exportTo(p.key, p.label)}
-                              className={`flex min-h-[52px] items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors hover:bg-white/[0.06] active:scale-[0.99] ${
-                                live ? "border-[#1DB954]/40 bg-[#1DB954]/[0.06]" : "border-white/10"
-                              }`}
-                            >
-                              <span
-                                className="flex h-8 w-8 items-center justify-center rounded-lg"
-                                style={{ backgroundColor: `${p.color}26`, color: p.color }}
-                              >
-                                <p.Icon />
-                              </span>
-                              <span className="flex-1 text-sm font-medium text-ink">
-                                {p.label}
-                              </span>
-                              {live ? (
-                                <span className="rounded-full bg-[#1DB954]/20 px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest text-[#1DB954]">
-                                  Creates playlist
-                                </span>
-                              ) : (
-                                <span className="text-ink/30">→</span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          onClick={copyList}
-                          className="flex-1 rounded-lg border border-white/15 py-2 text-[10px] font-bold uppercase tracking-widest text-ink/70 hover:text-ink"
-                        >
-                          Copy list
-                        </button>
-                        <button
-                          onClick={() => {
-                            downloadCsv();
-                            flash("CSV downloaded");
-                          }}
-                          className="flex-1 rounded-lg border border-white/15 py-2 text-[10px] font-bold uppercase tracking-widest text-ink/70 hover:text-ink"
-                        >
-                          Download CSV
-                        </button>
-                      </div>
-
-                      {/* ── connection doctor ───────────────────────────
-                          When real playlist creation isn't live for Spotify,
-                          show the exact Redirect URI to register (with a copy
-                          button) — the two things the dashboard needs, right
-                          where the user is stuck. */}
-                      {!providerConfigured("spotify") && (
-                        <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-ink/55">
-                            Turn on 1-tap Spotify playlists
-                          </p>
-                          <ol className="mt-1.5 list-decimal space-y-0.5 pl-4 text-[10px] leading-relaxed text-ink/40">
-                            <li>
-                              Create an app at{" "}
-                              <a
-                                href="https://developer.spotify.com/dashboard"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[#1DB954] underline decoration-dotted underline-offset-2"
-                              >
-                                developer.spotify.com
-                              </a>{" "}
-                              and copy its Client ID into this deployment&apos;s{" "}
-                              <span className="font-mono text-ink/60">SPOTIFY_CLIENT_ID</span>{" "}
-                              env var.
-                            </li>
-                            <li>
-                              Under the app&apos;s Settings, add this exact Redirect URI
-                              (trailing slash included):
-                            </li>
-                          </ol>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard
-                                ?.writeText(`${window.location.origin}/`)
-                                .then(() => flash("Redirect URI copied"))
-                                .catch(() => {});
-                            }}
-                            className="mt-2 flex w-full items-center gap-2 overflow-hidden rounded-lg border border-white/[0.12] bg-white/[0.04] px-2.5 py-2 text-left transition-colors hover:border-white/25"
-                          >
-                            <Copy size={11} className="flex-shrink-0 text-ink/50" />
-                            <span className="truncate font-mono text-[10px] text-ink/75">
-                              {typeof window !== "undefined" ? `${window.location.origin}/` : "/"}
-                            </span>
-                          </button>
-                          <p className="mt-2 text-[9px] leading-relaxed text-ink/35">
-                            After setting an environment variable on Vercel, redeploy — Vercel only
-                            applies env changes to new deployments. While the app is in Development
-                            mode, also add your Spotify account under Users &amp; Access (Spotify
-                            allows up to 5).
-                          </p>
-                        </div>
-                      )}
+                      <ExportSheet
+                        count={items.length}
+                        crateName={crateName()}
+                        cfgTick={cfgTick}
+                        onPick={exportTo}
+                        onCopy={copyList}
+                        onCsv={() => {
+                          downloadCsv();
+                          flash("CSV downloaded");
+                        }}
+                        onCopyRedirect={() => {
+                          navigator.clipboard
+                            ?.writeText(`${window.location.origin}/`)
+                            .then(() => flash("Redirect URI copied"))
+                            .catch(() => {});
+                        }}
+                      />
                     </motion.div>
                   </>
                 )}
@@ -865,7 +807,8 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
             recent={building.recent}
             Icon={PLATFORMS.find((p) => p.label === building.label)?.Icon}
             onCancel={() => {
-              cancelBuild.current = true;
+              cancelledBuild.current = buildSeq.current;
+              flash("Export cancelled — nothing was created");
               // An Apple sign-in popup may never call back; free the screen now.
               setBuilding(null);
             }}
@@ -1008,7 +951,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               {/* The fix lives in THIS service's developer console. These were
                   hard-coded to Spotify, so an Apple or YouTube failure sent the
                   user to the wrong dashboard. */}
-              {/403|refused|expired|sign-in|session|token|configured/i.test(buildError.message) &&
+              {/403|refused|expired|sign-in|session|token|configured|approved/i.test(buildError.message) &&
                 DEV_CONSOLE[buildError.key] && (
                 <a
                   href={DEV_CONSOLE[buildError.key]!.url}
@@ -1021,7 +964,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                 </a>
               )}
               <div className="mt-5 flex flex-col gap-2">
-                {/403|refused|expired|sign-in|session/i.test(buildError.message) && (
+                {/403|refused|expired|sign-in|session|approved/i.test(buildError.message) && (
                   <button
                     onClick={async () => {
                       const e = buildError;
@@ -1071,14 +1014,20 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       {/* export toast */}
       <AnimatePresence>
         {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-full border border-lcd/40 bg-deck/90 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-lcd backdrop-blur"
-          >
-            {toast}
-          </motion.div>
+          // Centred by the flex wrapper, not by -translate-x-1/2 on the toast:
+          // framer-motion writes `transform` to animate y and that wiped the
+          // translate, so the toast sat with its left edge at mid-screen.
+          <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--player-h,0px)_+_1.5rem)] z-[80] flex justify-center px-4">
+            <motion.div
+              role="status"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="max-w-[min(92vw,26rem)] rounded-2xl border border-lcd/40 bg-deck/95 px-4 py-2 text-center text-[11px] font-bold tracking-wide text-lcd backdrop-blur"
+            >
+              {toast}
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
       </Portal>

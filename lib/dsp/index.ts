@@ -21,6 +21,8 @@ import {
   type Pending,
   type ProgressFn,
   takeAuthError,
+  hasOutstandingState,
+  dropState,
 } from "./shared";
 import { spotifyProvider, setSpotifyClientId } from "./spotify";
 import { tidalProvider, setTidalClientId } from "./tidal";
@@ -43,8 +45,7 @@ const PROVIDERS: Record<string, DspProvider> = {
  * changes only to new deployments, so a redeploy is needed either way).
  */
 export async function ensureDspConfig(force = false): Promise<void> {
-  const cfg = await loadDspConfig(force);
-  rememberDspConfig(cfg);
+  const cfg = rememberDspConfig(await loadDspConfig(force));
   setSpotifyClientId(cfg.spotifyClientId);
   setGoogleClientId(cfg.googleClientId);
   setTidalClientId(cfg.tidalClientId);
@@ -130,6 +131,25 @@ export interface RedirectFailure {
   releases: Release[];
 }
 
+/** Which OAuth state namespace each redirect-based provider uses. */
+const STATE_KEY: Partial<Record<Pending["provider"], string>> = {
+  spotify: "spotify",
+  tidal: "tidal",
+  youtube_music: "youtube",
+};
+
+/** What a sign-in that never came back usually means, per service. */
+const ABANDONED: Partial<Record<Pending["provider"], string>> = {
+  spotify:
+    "Spotify didn't send you back. If it showed “INVALID_CLIENT: Invalid redirect URI”, " +
+    "this site's address isn't registered in the Spotify app; otherwise the account may not be approved for this Pulsar.",
+  youtube_music:
+    "Google didn't send you back. If it said the app is blocked or unverified, the account " +
+    "needs adding as a test user — and Google refuses sign-in inside some in-app browsers; open Pulsar in your browser instead.",
+  tidal:
+    "TIDAL didn't send you back. Usually the redirect URI isn't registered for this client id, or the id isn't approved yet.",
+};
+
 /** Which auth-error key each export provider records its reason under. */
 const AUTH_ERROR_KEY: Partial<Record<Pending["provider"], string>> = {
   spotify: "spotify",
@@ -137,7 +157,12 @@ const AUTH_ERROR_KEY: Partial<Record<Pending["provider"], string>> = {
   youtube_music: "youtube",
 };
 
-export async function handleDspRedirect(): Promise<Pending | RedirectFailure | null> {
+/** Signed in successfully, but there was no crate waiting to resume. */
+export interface RedirectConnected {
+  connected: string;
+}
+
+export async function handleDspRedirect(): Promise<Pending | RedirectFailure | RedirectConnected | null> {
   if (typeof window === "undefined") return null;
   // `error=` counts too: a declined consent comes back with an error and no
   // code, and used to be ignored here — so no provider ever saw it, nothing
@@ -146,9 +171,27 @@ export async function handleDspRedirect(): Promise<Pending | RedirectFailure | n
     window.location.search.includes("code=") ||
     window.location.search.includes("error=") ||
     window.location.hash.includes("access_token=");
-  if (!hasResponse) return null;
-
   const pending = readPending();
+
+  if (!hasResponse) {
+    // An abandoned round-trip: a crate was queued and this browser sent the
+    // user to a sign-in that never came back. That's what a misregistered
+    // redirect URI, an unapproved account or an in-app browser Google refuses
+    // all look like — the service shows its own error page and never
+    // redirects, so pressing Back returned to Pulsar with no word of it.
+    const stateKey = pending ? STATE_KEY[pending.provider] : undefined;
+    if (pending && stateKey && hasOutstandingState(stateKey)) {
+      dropState(stateKey);
+      clearPending();
+      return {
+        failed: pending.provider,
+        message: ABANDONED[pending.provider] ?? null,
+        name: pending.name,
+        releases: pending.releases,
+      };
+    }
+    return null;
+  }
 
   // Complete the exchange even when the pending crate was lost (cleared
   // storage, a different tab, ITP). Otherwise the authorisation code would be
@@ -162,7 +205,9 @@ export async function handleDspRedirect(): Promise<Pending | RedirectFailure | n
     // Authorised. Resume the build only if this is the crate we queued.
     if (pending && pending.provider === provider.key) return pending;
     clearPending();
-    return null; // connected, but nothing to resume — the next click just works
+    // Connected, but the queued crate was lost (another tab, cleared storage).
+    // Say so — returning nothing left the user wondering if anything happened.
+    return { connected: provider.key };
   }
 
   // Nobody claimed it: consent denied, or the exchange failed. Drop the pending

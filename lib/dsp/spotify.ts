@@ -5,6 +5,7 @@
  */
 
 import type { Release } from "../types";
+import { normaliseArtist } from "../match";
 import {
   base64url,
   clearToken,
@@ -19,11 +20,14 @@ import {
   searchTerm,
   plainTitle,
   sameTitle,
+  catalogId,
   takeAuthError,
   type BuildResult,
   type DspProvider,
   type ProgressFn,
   newOAuthState,
+  rememberAuthClient,
+  authClient,
   checkOAuthState,
 } from "./shared";
 
@@ -125,6 +129,7 @@ async function beginAuth() {
   const verifier = randomString(48);
   const challenge = base64url(await sha256(verifier));
   setVerifier(verifier);
+  rememberAuthClient("spotify", CLIENT_ID);
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     response_type: "code",
@@ -240,7 +245,7 @@ async function api(
 }
 
 const normalise = (s: string) =>
-  s.toLowerCase().replace(/\(.*?\)|\[.*?\]/g, "").replace(/[^a-z0-9]/g, "");
+  normaliseArtist(s.replace(/\(.*?\)|\[.*?\]/g, ""));
 
 /** Does a Spotify result actually belong to the artist we asked for? */
 export function artistMatches(want: string, credits: { name?: string }[] | undefined): boolean {
@@ -264,7 +269,11 @@ export function artistMatches(want: string, credits: { name?: string }[] | undef
  * Searches with Spotify's field filters first (artist:/album:/track:), then
  * plain text. Auth errors propagate.
  */
-export async function urisForRelease(r: Release, token: string): Promise<string[]> {
+export async function urisForRelease(
+  r: Release,
+  token: string,
+  onError?: (e: Error) => void
+): Promise<string[]> {
   const title = plainTitle(r).replace(/["]/g, "");
   const artist = r.artist.replace(/["]/g, "");
   const wantAlbum = r.type === "album" || r.type === "ep";
@@ -272,6 +281,20 @@ export async function urisForRelease(r: Release, token: string): Promise<string[
     `${field}:"${title}" artist:"${artist}"`,
     searchTerm(r),
   ];
+
+  // The release already names its Spotify item: use it.
+  const direct = catalogId(r, "spotify");
+  if (direct?.kind === "track") return [`spotify:track:${direct.id}`];
+  if (direct?.kind === "album") {
+    try {
+      const page = await api(`/albums/${direct.id}/tracks?limit=50`, token);
+      const uris = ((page?.items as { uri?: string }[] | undefined) ?? []).map((t) => t.uri).filter(Boolean) as string[];
+      if (uris.length) return uris;
+    } catch (e) {
+      if (e instanceof SpotifyAuthError) throw e;
+      /* fall back to search */
+    }
+  }
 
   const search = async <T,>(q: string, type: "album" | "track"): Promise<T[]> => {
     // A 403 on search is the first sign of an account that isn't allow-listed.
@@ -314,6 +337,9 @@ export async function urisForRelease(r: Release, token: string): Promise<string[
     return [];
   } catch (e) {
     if (e instanceof SpotifyAuthError) throw e;
+    // A failed lookup isn't "not on Spotify". Report it, so a dropped network
+    // or exhausted rate limit can't masquerade as a list of missing records.
+    onError?.(e instanceof Error ? e : new Error(String(e)));
     return [];
   }
 }
@@ -324,7 +350,7 @@ export const spotifyProvider: DspProvider = {
   configured: () => CLIENT_ID.length > 0,
 
   async createPlaylist(name, releases, onProgress?: ProgressFn): Promise<BuildResult | "redirecting"> {
-    let token = readToken("spotify");
+    let token = readToken("spotify", 5 * 60_000); // enough to outlast a big crate
 
     // A token granted before the scope list changed can't do what we now need.
     // Discard it and re-consent silently rather than surfacing a 403 the user
@@ -364,8 +390,12 @@ export const spotifyProvider: DspProvider = {
     const allUris: string[] = [];
     let addedReleases = 0;
     const unmatched: string[] = [];
+    const lookup: { errors: number; last: Error | null } = { errors: 0, last: null };
     for (let i = 0; i < releases.length; i++) {
-      const uris = await urisForRelease(releases[i], token.access_token);
+      const uris = await urisForRelease(releases[i], token.access_token, (e) => {
+        lookup.errors++;
+        lookup.last = e;
+      });
       if (uris.length) addedReleases++;
       else unmatched.push(`${releases[i].artist} — ${releases[i].title}`);
       // De-duplicate so the same track never lands twice.
@@ -376,6 +406,9 @@ export const spotifyProvider: DspProvider = {
         }
       }
       onProgress?.(i + 1, releases.length);
+    }
+    if (allUris.length === 0 && lookup.errors > 0 && lookup.last) {
+      throw new Error(`Couldn't search Spotify — ${lookup.last.message}. Check your connection and try again.`);
     }
     if (allUris.length === 0) {
       throw new Error(
@@ -494,7 +527,7 @@ export const spotifyProvider: DspProvider = {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
-          client_id: CLIENT_ID,
+          client_id: authClient("spotify", CLIENT_ID),
           grant_type: "authorization_code",
           code,
           redirect_uri: redirectUri(),

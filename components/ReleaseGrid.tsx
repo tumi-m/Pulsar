@@ -319,10 +319,18 @@ export function ReleaseGrid({ releases }: ReleaseGridProps) {
   // The recommender profile: quiz taste + learned affinities from actions.
   // `collectionVersion` is intentionally referenced (not read) so each
   // favorites/crate change recomputes the profile — it's the refresh signal.
+  //
+  // Collections are read only after mount. They live in localStorage, which the
+  // server doesn't have, so reading them during the first render gave the
+  // client a taste profile the server never saw: different tile sizes, extra
+  // "For You" badges, and a hydration failure on which React threw away the
+  // server HTML and rebuilt the whole grid — for every visitor with a crate.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
   const recProfile = useMemo(
-    () => learnedProfile(profile, getFavorites(), getPlaylist()),
+    () => learnedProfile(profile, hydrated ? getFavorites() : [], hydrated ? getPlaylist() : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [profile, collectionVersion]
+    [profile, collectionVersion, hydrated]
   );
 
   // Releases ranked highest-for-you first — the pool shuffle draws from.

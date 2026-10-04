@@ -144,6 +144,25 @@ export function newOAuthState(provider: string): string {
  * "mismatch" — claims to be ours but we didn't start it (or storage was lost).
  * The stored nonce is consumed either way.
  */
+/** Did this browser start a sign-in with `provider` that never came back? */
+export function hasOutstandingState(provider: string): boolean {
+  try {
+    return Boolean(sessionStorage.getItem(STATE_PREFIX + provider) ?? localStorage.getItem(STATE_PREFIX + provider));
+  } catch {
+    return false;
+  }
+}
+
+/** Forget an outstanding sign-in nonce (an abandoned round-trip). */
+export function dropState(provider: string): void {
+  try {
+    sessionStorage.removeItem(STATE_PREFIX + provider);
+    localStorage.removeItem(STATE_PREFIX + provider);
+  } catch {
+    /* ignore */
+  }
+}
+
 export function checkOAuthState(provider: string, state: string | null): "other" | "ok" | "mismatch" {
   if (!state || (state !== provider && !state.startsWith(provider + "."))) return "other";
   let expected: string | null = null;
@@ -191,12 +210,17 @@ export function saveToken(provider: string, access_token: string, expiresInSec: 
   localStorage.setItem(`pulsar_dsp_token_${provider}`, JSON.stringify(token));
 }
 
-export function readToken(provider: string): StoredToken | null {
+/**
+ * @param minValidityMs how long the token must still be good for. Exports ask
+ *   for minutes, not the 30s default: a big crate takes longer than that to
+ *   build, and a token expiring halfway lost the run at the add step.
+ */
+export function readToken(provider: string, minValidityMs = 30_000): StoredToken | null {
   try {
     const raw = localStorage.getItem(`pulsar_dsp_token_${provider}`);
     if (!raw) return null;
     const t = JSON.parse(raw) as StoredToken;
-    if (!t.access_token || Date.now() > t.expires_at - 30_000) return null;
+    if (!t.access_token || Date.now() > t.expires_at - minValidityMs) return null;
     return t;
   } catch {
     return null;
@@ -224,7 +248,21 @@ export function savePending(p: Pending) {
     releases: p.releases.map(
       // clean_title survives the round-trip too: matching uses it, and dropping
       // it meant a resumed export searched for "Love - EP" instead of "Love".
-      (r) => ({ id: r.id, artist: r.artist, title: r.title, clean_title: r.clean_title, type: r.type }) as Release
+      // artwork_url too: the resumed build — which every first export goes
+      // through — showed its record animation with no covers at all.
+      (r) =>
+        ({
+          id: r.id,
+          artist: r.artist,
+          title: r.title,
+          clean_title: r.clean_title,
+          type: r.type,
+          artwork_url: r.artwork_url,
+          // Direct catalogue links, when the release has them (see catalogId).
+          spotify: r.spotify,
+          apple_music: r.apple_music,
+          tidal: r.tidal,
+        }) as Release
     ),
   };
   const raw = JSON.stringify(slim);
@@ -293,10 +331,82 @@ export function sameTitle(r: Release, got: string | undefined): boolean {
 
 /** The last loaded config, for synchronous readers (the export sheet). */
 let lastConfig: DspRuntimeConfig = BUILD_TIME_CONFIG;
-export function rememberDspConfig(c: DspRuntimeConfig) {
-  lastConfig = c;
+let haveServerConfig = false;
+/**
+ * A refetch that fails falls back to the build-time values, which know nothing
+ * about missing secrets. Applying that over a good server answer flipped
+ * YouTube to "ready" without its secret, and Apple off, mid-session. Keep the
+ * last server answer instead; use the fallback only if there never was one.
+ */
+export function rememberDspConfig(c: DspRuntimeConfig): DspRuntimeConfig {
+  const fromServer = c.missing !== null;
+  if (fromServer) {
+    lastConfig = c;
+    haveServerConfig = true;
+  } else if (!haveServerConfig) {
+    lastConfig = c;
+  }
+  return lastConfig;
 }
 /** Settings a provider still needs on the server, or [] when ready / unknown. */
 export function missingConfig(provider: string): string[] {
   return lastConfig.missing?.[provider] ?? [];
+}
+
+
+/**
+ * The client id a sign-in was STARTED with, kept beside the PKCE verifier.
+ *
+ * The token exchange on return used whatever CLIENT_ID the freshly loaded page
+ * had — which comes from /api/dsp-config on that load. If that request failed,
+ * the exchange posted client_id="" and the user was told their Client ID was
+ * wrong. The exchange must use the same id as the authorize request anyway.
+ */
+export function rememberAuthClient(provider: string, clientId: string): void {
+  try {
+    sessionStorage.setItem(`pulsar_${provider}_auth_client`, clientId);
+    localStorage.setItem(`pulsar_${provider}_auth_client`, clientId);
+  } catch {
+    /* storage unavailable */
+  }
+}
+export function authClient(provider: string, fallback: string): string {
+  try {
+    return (
+      sessionStorage.getItem(`pulsar_${provider}_auth_client`) ??
+      localStorage.getItem(`pulsar_${provider}_auth_client`) ??
+      fallback
+    );
+  } catch {
+    return fallback;
+  }
+}
+
+
+/**
+ * The exact catalogue item a release already links to, if any.
+ *
+ * Chart records carry a direct Apple Music album link, and records saved
+ * elsewhere can carry direct Spotify or TIDAL links — the export ignored them
+ * all and searched again, which can only ever be as good as the search. Search
+ * links (".../search?...") yield nothing here.
+ */
+export function catalogId(
+  r: Release,
+  provider: "spotify" | "apple_music" | "tidal"
+): { kind: "album" | "track"; id: string } | null {
+  const url = (r[provider] as string | null | undefined) ?? "";
+  if (!url || /\/search\b|[?&](q|term)=/.test(url)) return null;
+  if (provider === "spotify") {
+    const m = url.match(/open\.spotify\.com\/(?:intl-[a-z]+\/)?(album|track)\/([A-Za-z0-9]{10,})/);
+    return m ? { kind: m[1] as "album" | "track", id: m[2] } : null;
+  }
+  if (provider === "apple_music") {
+    const song = url.match(/[?&]i=(\d+)/);
+    if (song) return { kind: "track", id: song[1] };
+    const m = url.match(/\/(album|song)\/(?:[^/?#]+\/)?(\d+)/);
+    return m ? { kind: m[1] === "song" ? "track" : "album", id: m[2] } : null;
+  }
+  const m = url.match(/tidal\.com\/(?:browse\/)?(album|track)\/(\d+)/);
+  return m ? { kind: m[1] as "album" | "track", id: m[2] } : null;
 }

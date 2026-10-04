@@ -26,8 +26,13 @@ export async function POST(req: NextRequest) {
   const limited = guard(req, "youtube-token", { limit: 20, windowMs: 3_600_000 });
   if (limited) return limited;
 
-  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  // The same two names /api/dsp-config accepts. This read only the NEXT_PUBLIC_
+  // one, so a deployment configured with GOOGLE_CLIENT_ID — which readiness
+  // accepted and the setup guide names — passed every check and then failed
+  // every token exchange on the way back from Google.
+  const clientId =
+    process.env.GOOGLE_CLIENT_ID?.trim() || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim();
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
   if (!clientId || !clientSecret) {
     return NextResponse.json(
       { error: "YouTube export is not configured on the server." },
@@ -82,8 +87,15 @@ export async function POST(req: NextRequest) {
     if (!res.ok || !data.access_token) {
       // Google's error bodies are actually useful here (redirect_uri_mismatch,
       // invalid_client, …) so pass the reason through rather than a bare 500.
+      // Lead with the actionable code; Google's descriptions are often vague.
+      const hint: Record<string, string> = {
+        redirect_uri_mismatch: `the OAuth client's authorised redirect URIs must include ${self}/ exactly`,
+        invalid_client: "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET don't belong to the same OAuth client",
+        invalid_grant: "the sign-in code expired or was already used — try the export again",
+        unauthorized_client: "the OAuth client must be of type “Web application”",
+      };
       return NextResponse.json(
-        { error: data.error_description || data.error || "Token exchange failed." },
+        { error: hint[data.error] ?? data.error_description ?? data.error ?? "Token exchange failed." },
         { status: 400 }
       );
     }

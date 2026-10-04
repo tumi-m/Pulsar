@@ -9,7 +9,8 @@
  */
 
 import type { Release } from "../types";
-import { searchTerm, type BuildResult, type DspProvider, type ProgressFn } from "./shared";
+import { normaliseArtist } from "../match";
+import { searchTerm, sameTitle, catalogId, type BuildResult, type DspProvider, type ProgressFn } from "./shared";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
@@ -116,7 +117,7 @@ async function amApi(music: any, path: string, init?: RequestInit) {
   return res.status === 204 ? null : res.json();
 }
 
-const norm = (x: string) => x.toLowerCase().replace(/\(.*?\)|\[.*?\]/g, "").replace(/[^a-z0-9]/g, "");
+const norm = (x: string) => normaliseArtist(x.replace(/\(.*?\)|\[.*?\]/g, ""));
 const sameArtist = (want: string, got: string | undefined) => {
   const w = norm(want);
   const g = norm(got ?? "");
@@ -131,11 +132,24 @@ const sameArtist = (want: string, got: string | undefined) => {
  */
 async function songIdsFor(music: any, storefront: string, r: Release): Promise<string[]> {
   const term = encodeURIComponent(searchTerm(r));
+  // Chart records link straight to their Apple album: use it rather than
+  // re-searching. Falls back to search if it isn't in this storefront.
+  const direct = catalogId(r, "apple_music");
+  if (direct) {
+    try {
+      if (direct.kind === "track") return [direct.id];
+      const tracks = await amApi(music, `/v1/catalog/${storefront}/albums/${direct.id}/tracks?limit=100`);
+      const ids = (tracks?.data ?? []).filter((t: any) => t?.type === "songs" && t?.id).map((t: any) => String(t.id));
+      if (ids.length) return ids;
+    } catch (e) {
+      if (e instanceof AppleFatalError) throw e;
+    }
+  }
   try {
     if (r.type === "album" || r.type === "ep") {
       const found = await amApi(music, `/v1/catalog/${storefront}/search?types=albums&limit=5&term=${term}`);
-      const album = (found?.results?.albums?.data ?? []).find((a: any) =>
-        sameArtist(r.artist, a?.attributes?.artistName)
+      const album = (found?.results?.albums?.data ?? []).find(
+        (a: any) => sameArtist(r.artist, a?.attributes?.artistName) && sameTitle(r, a?.attributes?.name)
       );
       if (album?.id) {
         const tracks = await amApi(music, `/v1/catalog/${storefront}/albums/${album.id}/tracks?limit=100`);
@@ -146,8 +160,8 @@ async function songIdsFor(music: any, storefront: string, r: Release): Promise<s
       }
     }
     const found = await amApi(music, `/v1/catalog/${storefront}/search?types=songs&limit=5&term=${term}`);
-    const song = (found?.results?.songs?.data ?? []).find((x: any) =>
-      sameArtist(r.artist, x?.attributes?.artistName)
+    const song = (found?.results?.songs?.data ?? []).find(
+      (x: any) => sameArtist(r.artist, x?.attributes?.artistName) && sameTitle(r, x?.attributes?.name)
     );
     return song?.id ? [String(song.id)] : [];
   } catch (e) {

@@ -33,6 +33,7 @@
  */
 
 import type { Release } from "../types";
+import { normaliseArtist } from "../match";
 import {
   base64url,
   clearToken,
@@ -45,11 +46,14 @@ import {
   sha256,
   searchTerm,
   sameTitle,
+  catalogId,
   takeAuthError,
   type BuildResult,
   type DspProvider,
   type ProgressFn,
   newOAuthState,
+  rememberAuthClient,
+  authClient,
   checkOAuthState,
 } from "./shared";
 
@@ -146,6 +150,7 @@ async function beginAuth() {
   const verifier = randomString(48);
   const challenge = base64url(await sha256(verifier));
   setVerifier(verifier);
+  rememberAuthClient("tidal", CLIENT_ID);
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     response_type: "code",
@@ -228,7 +233,7 @@ async function api(
 }
 
 const normalise = (s: string) =>
-  s.toLowerCase().replace(/\(.*?\)|\[.*?\]/g, "").replace(/[^a-z0-9]/g, "");
+  normaliseArtist(s.replace(/\(.*?\)|\[.*?\]/g, ""));
 
 /** Does a TIDAL result actually belong to the artist we asked for? */
 export function tidalArtistMatches(want: string, got: string | undefined): boolean {
@@ -314,6 +319,27 @@ export async function trackIdsForRelease(
   onError?: (e: Error) => void
 ): Promise<string[]> {
   const term = searchTerm(r);
+  const direct = catalogId(r, "tidal");
+  if (direct?.kind === "track") return [direct.id];
+  const albumItems = async (albumId: string) => {
+    const ids: string[] = [];
+    let next: string | null = `/albums/${albumId}/relationships/items?countryCode=${countryCode()}`;
+    while (next && ids.length < 300) {
+      const page = await api(next, token);
+      for (const it of refs(page as { data?: Ref[] })) if (it.type === "tracks" && it.id) ids.push(String(it.id));
+      const link = (page?.links as { next?: string } | undefined)?.next;
+      next = link ? link.replace(API_BASE, "") : null;
+    }
+    return ids;
+  };
+  if (direct?.kind === "album") {
+    try {
+      const ids = await albumItems(direct.id);
+      if (ids.length) return ids;
+    } catch (e) {
+      if (e instanceof TidalAuthError) throw e;
+    }
+  }
   const pick = async (kind: "tracks" | "albums") => {
     const hits = (await search(term, kind, token)).filter((n) => sameTitle(r, n.attributes?.title));
     if (!hits.length) return null;
@@ -326,14 +352,7 @@ export async function trackIdsForRelease(
       try {
         const album = await pick("albums");
         if (album?.id) {
-          const ids: string[] = [];
-          let next: string | null = `/albums/${album.id}/relationships/items?countryCode=${countryCode()}`;
-          while (next && ids.length < 300) {
-            const page = await api(next, token);
-            for (const it of refs(page as { data?: Ref[] })) if (it.type === "tracks" && it.id) ids.push(String(it.id));
-            const link = (page?.links as { next?: string } | undefined)?.next;
-            next = link ? link.replace(API_BASE, "") : null;
-          }
+          const ids = await albumItems(String(album.id));
           if (ids.length) return ids;
         }
       } catch (e) {
@@ -358,7 +377,7 @@ export const tidalProvider: DspProvider = {
   configured: () => CLIENT_ID.length > 0,
 
   async createPlaylist(name, releases, onProgress?: ProgressFn): Promise<BuildResult | "redirecting"> {
-    let token = readToken("tidal");
+    let token = readToken("tidal", 5 * 60_000); // enough to outlast a big crate
 
     if (token && readScopes() !== SCOPES) {
       clearToken("tidal");
@@ -490,7 +509,7 @@ export const tidalProvider: DspProvider = {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
           grant_type: "authorization_code",
-          client_id: CLIENT_ID,
+          client_id: authClient("tidal", CLIENT_ID),
           code,
           redirect_uri: redirectUri(),
           code_verifier: verifier,
