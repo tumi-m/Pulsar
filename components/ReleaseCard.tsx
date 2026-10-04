@@ -138,14 +138,24 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
       onPointerUp={endPress}
       onPointerCancel={endPress}
       onPointerLeave={endPress}
-      whileTap={scrolling ? undefined : { scale: 0.95 }}
+      // No whileTap here. Framer's press gesture captures the pointer on touch,
+      // and a captured press delivers its `click` to this wrapper instead of the
+      // cover button inside it — so on phones, tapping a tile did nothing at all
+      // (mouse clicks were unaffected, which is why it went unnoticed). The press
+      // feedback is a CSS :active scale on the button instead.
       // Focus is tracked on the whole tile, like :focus-within. It used to sit
       // on the cover button alone, so tabbing from the cover to its own Play
       // button fired the cover's blur, which hid the overlay — the control
       // that had just received focus went invisible as it got it.
       // Capture-phase: framer-motion claims onFocus/onBlur on a motion
       // component for its own focus gesture, so the plain handlers never ran.
-      onFocusCapture={enter}
+      // KEYBOARD focus only (:focus-visible). A tap focuses the cover too, and
+      // revealing on that put the play triangle under the finger between press
+      // and release — the browser then sent the click to the wrapper, the two
+      // elements' common ancestor, and tapping a tile on a phone did nothing.
+      onFocusCapture={(e) => {
+        if ((e.target as HTMLElement).matches?.(":focus-visible")) enter();
+      }}
       onBlurCapture={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) leave();
       }}
@@ -173,7 +183,9 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
           onOpen(release);
         }}
         aria-label={`${release.artist} — ${release.title}. Open album`}
-        className="block w-full outline-none focus-visible:ring-2 focus-visible:ring-ink/40"
+        className={`block w-full outline-none transition-transform duration-150 focus-visible:ring-2 focus-visible:ring-ink/40 ${
+          scrolling ? "" : "active:scale-[0.96]"
+        }`}
       >
         <div
           className={`relative w-full overflow-hidden rounded-xl ring-1 ring-ink/[0.06] transition-[transform,box-shadow,ring-color] duration-300 ${
@@ -295,7 +307,11 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
         inert={compact && !isCurrent}
         className={`absolute left-1/2 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full ring-1 ring-white/40 transition-all duration-200 ${
           big ? "h-20 w-20" : "h-14 w-14"
-        } ${isCurrent || revealed ? "scale-100 opacity-100" : "scale-90 opacity-0"}`}
+        } ${
+          // pointer-events-none while hidden: an opacity-0 button still takes
+          // taps, so tapping a tile's centre played it instead of opening the album.
+          isCurrent || revealed ? "scale-100 opacity-100" : "pointer-events-none scale-90 opacity-0"
+        }`}
         style={{
           background: "rgba(12,12,20,0.72)",
           boxShadow:
@@ -314,7 +330,9 @@ function ReleaseCardBase({ release, index, size = 0, forYou = false, format, scr
       <div
         inert={compact}
         className={`absolute inset-x-2 top-2 z-20 flex items-stretch overflow-hidden rounded-full ring-1 ring-white/45 transition-all duration-200 ${
-          revealed ? "translate-y-0 opacity-100" : "-translate-y-1.5 opacity-0"
+          // Hidden means untouchable. Invisible, these took taps: on a phone,
+          // tapping near the top of any tile silently favourited it.
+          revealed ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-1.5 opacity-0"
         }`}
         style={{
           background: "rgba(12,12,20,0.72)",

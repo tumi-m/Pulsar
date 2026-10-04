@@ -1,5 +1,8 @@
 "use client";
 
+import { useBackClose } from "@/lib/useBackClose";
+import { useScrollLock } from "@/lib/useScrollLock";
+import { useDialog } from "@/lib/useDialog";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -44,6 +47,11 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 
 export function Sidebar() {
   const [open, setOpen] = useState(false);
+  // The menu was the one overlay outside the stack: Escape and Back did
+  // nothing to it, focus stayed behind it, and the page scrolled underneath.
+  useBackClose(open, () => setOpen(false));
+  useScrollLock(open);
+  const dialogRef = useDialog<HTMLElement>(open);
   const [format, setFormat] = useState<MediaFormat>("vinyl");
   const [themeId, setThemeId] = useState("tps-l2");
   const [aiMode, setAiMode] = useState<AiMode>("chat");
@@ -100,6 +108,10 @@ export function Sidebar() {
             className="fixed inset-0 z-[55] bg-deck/70 backdrop-blur-sm"
           />
           <motion.aside
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu"
             initial={{ x: "-100%" }}
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}

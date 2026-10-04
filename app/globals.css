@@ -422,8 +422,10 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-  padding: 0 6cqw 5cqh;
+  /* Written at the top, under the stripe, as on a real J-card — and clear of
+     the centre, where a playing tile's play/pause button sits. */
+  justify-content: flex-start;
+  padding: calc(16% + 3cqh) 6cqw 4cqh;
   border-radius: 3cqw;
   /* Faint blue rules, like the lines a J-card gives you to write the
      tracklist on. They start below the stripe and give a large label a

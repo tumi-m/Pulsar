@@ -272,6 +272,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   // export — so the panel could read "Empty crate" while exporting two records.
   // A coverless record is drawn as a cassette J-card now (see <Artwork>).
   const items = panel === "favorites" ? favs : activeCrate?.releases ?? [];
+  const favIds = new Set(favs.map((f) => f.id));
 
   async function shareRelease(r: Release) {
     const url = typeof window !== "undefined" ? window.location.href : "";
@@ -738,37 +739,35 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                           e.stopPropagation();
                           play(r);
                         }}
-                        aria-label="Play"
-                        className={`absolute left-1/2 top-[calc(50%-11px)] flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full ring-1 ring-white/45 transition-opacity ${reveal}`}
-                        style={{
-                          background: "rgba(12,12,20,0.5)",
-                          backdropFilter: "blur(10px) saturate(140%)",
-                          WebkitBackdropFilter: "blur(10px) saturate(140%)",
-                          boxShadow: "0 8px 24px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.4)",
-                        }}
+                        aria-label={`Play ${r.title}`}
+                        // A small transport key in the corner. Centred, it sat on
+                        // top of the cassette's label — on touch screens, where the
+                        // controls are always shown, every title was covered.
+                        className={`absolute bottom-[calc(2.4rem+6px)] right-1.5 flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#b84516] bg-transport text-deck shadow-key transition-opacity active:translate-y-px active:shadow-keyed ${reveal}`}
                       >
-                        <Play size={15} className="ml-0.5 text-white drop-shadow" fill="currentColor" />
+                        <Play size={14} className="ml-0.5" fill="currentColor" />
                       </button>
 
                       {/* home-style actions: heart · share · remove */}
-                      <div className={`absolute right-1 top-1 flex gap-1 transition-opacity ${reveal}`}>
+                      <div className={`absolute right-1.5 top-1.5 flex gap-1 transition-opacity ${reveal}`}>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleFavorite(r);
                           }}
-                          aria-label="Favorite"
-                          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-deck/80 text-ink/70 backdrop-blur hover:text-vu"
+                          aria-label={favIds.has(r.id) ? `Remove ${r.title} from favourites` : `Favourite ${r.title}`}
+                          aria-pressed={favIds.has(r.id)}
+                          className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-chrome-700/70 bg-deck/85 text-ink/70 backdrop-blur hover:text-vu"
                         >
-                          <Heart size={13} />
+                          <Heart size={13} className={favIds.has(r.id) ? "fill-vu text-vu" : ""} />
                         </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             shareRelease(r);
                           }}
-                          aria-label="Share"
-                          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-deck/80 text-ink/70 backdrop-blur hover:text-ink"
+                          aria-label={`Share ${r.title}`}
+                          className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-chrome-700/70 bg-deck/85 text-ink/70 backdrop-blur hover:text-ink"
                         >
                           <Share2 size={13} />
                         </button>
@@ -778,8 +777,8 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                             if (panel === "favorites") toggleFavorite(r);
                             else removeFromCrate(activeCrateId, r.id);
                           }}
-                          aria-label="Remove"
-                          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-deck/80 text-ink/60 backdrop-blur hover:text-vu"
+                          aria-label={`Remove ${r.title} from ${panel === "favorites" ? "favourites" : "this crate"}`}
+                          className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-chrome-700/70 bg-deck/85 text-ink/60 backdrop-blur hover:text-vu"
                         >
                           <Trash2 size={13} />
                         </button>
