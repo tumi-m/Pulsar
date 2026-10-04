@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Heart, X, Trash2, Sparkles, Shuffle, Play, Share2, Upload, Plus, Pencil, Copy } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
@@ -23,6 +23,7 @@ import { usePlayer } from "./player/PlayerProvider";
 import { useScrollLock } from "@/lib/useScrollLock";
 import { useDialog } from "@/lib/useDialog";
 import { useBackClose } from "@/lib/useBackClose";
+import { useReducedMotion } from "@/lib/motion";
 import { Portal } from "./Portal";
 import { useIsTouch } from "@/lib/useIsTouch";
 import { PlaylistBuildOverlay } from "./PlaylistBuildOverlay";
@@ -30,7 +31,9 @@ import {
   exportCrate,
   handleDspRedirect,
   ensureDspConfig,
+  prepareAppleMusic,
   providerConfigured,
+  providerMissing,
   disconnectProvider,
   type BuildResult,
 } from "@/lib/dsp";
@@ -46,8 +49,21 @@ type Panel = "favorites" | "playlist" | null;
  * Floating 3D dock (bottom-right): heart, playlist, share. Opens a
  * "crate" panel where the collection is displayed as physical media.
  */
+/** Where each service's own fixes live — linked from the export error card. */
+const DEV_CONSOLE: Record<string, { url: string; label: string } | undefined> = {
+  spotify: { url: "https://developer.spotify.com/dashboard", label: "Open Spotify dashboard" },
+  youtube_music: { url: "https://console.cloud.google.com/apis/credentials", label: "Open Google Cloud credentials" },
+  tidal: { url: "https://developer.tidal.com/dashboard", label: "Open TIDAL developer portal" },
+  apple_music: { url: "https://developer.apple.com/account/resources/authkeys/list", label: "Open Apple Developer keys" },
+};
+
+/** Thrown from the progress callback to stop a build the user cancelled. */
+class BuildCancelled extends Error {}
+
 export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   const { shuffle, toggleShuffle, play } = usePlayer();
+  const reduceMotion = useReducedMotion();
+  const cancelBuild = useRef(false);
   const [panel, setPanel] = useState<Panel>(null);
   // Lock background scroll while the crate sheet is open (mobile).
   useScrollLock(Boolean(panel));
@@ -87,9 +103,15 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
     recent?: Release[];
   } | null>(null);
   const [built, setBuilt] = useState<BuildResult | null>(null);
-  const [buildError, setBuildError] = useState<
-    { label: string; color: string; message: string; key: string } | null
-  >(null);
+  const [buildError, setBuildError] = useState<{
+    label: string;
+    color: string;
+    message: string;
+    key: string;
+    /** The crate that failed — Try again / CSV act on THIS, not the open panel. */
+    releases: Release[];
+    name: string;
+  } | null>(null);
   // Hide the floating dock while the album/tracklist panel is open so it never
   // covers the tracklist's text/icons (especially on mobile).
   const [detailOpen, setDetailOpen] = useState(false);
@@ -101,7 +123,12 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   useEffect(() => {
     if (!exporting) return;
     ensureDspConfig(true)
-      .then(() => setCfgTick((t) => t + 1))
+      .then(() => {
+        setCfgTick((t) => t + 1);
+        // Warm MusicKit now, so the Apple sign-in popup can open inside the
+        // tap that asks for it (see prepareAppleMusic).
+        prepareAppleMusic();
+      })
       .catch(() => {});
   }, [exporting]);
 
@@ -131,9 +158,21 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       setCfgTick((t) => t + 1);
       const outcome = await handleDspRedirect();
       if (!outcome) return;
+      // Failures on the way back from a sign-in get the same card as any other
+      // failure — Reconnect, Try again, CSV. They went to a 2.6-second toast,
+      // and the first export always takes this path.
       if ("failed" in outcome) {
         const plat = PLATFORMS.find((p) => p.key === outcome.failed);
-        flash(outcome.message ?? `${plat?.label ?? "The"} sign-in didn't complete, so the crate wasn't exported. Try again.`);
+        setBuildError({
+          label: plat?.label ?? "Export",
+          color: plat?.color ?? "#1DB954",
+          message:
+            outcome.message ??
+            `${plat?.label ?? "The"} sign-in didn't complete, so the crate wasn't exported.`,
+          key: outcome.failed,
+          releases: outcome.releases,
+          name: outcome.name,
+        });
         return;
       }
       const pending = outcome;
@@ -141,9 +180,11 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
       const label = plat?.label ?? "your DSP";
       const color = plat?.color ?? "#1DB954";
       const queued = pending.releases;
+      cancelBuild.current = false;
       setBuilding({ done: 0, total: queued.length, label, color, current: queued[0] ?? null, recent: [] });
       try {
-        const result = await exportCrate(pending.provider, pending.name, queued, (done, total) =>
+        const result = await exportCrate(pending.provider, pending.name, queued, (done, total) => {
+          if (cancelBuild.current) throw new BuildCancelled();
           setBuilding({
             done,
             total,
@@ -151,13 +192,24 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
             color,
             current: queued[done] ?? queued[done - 1] ?? null,
             recent: queued.slice(Math.max(0, done - 6), done).reverse(),
-          })
-        );
+          });
+        });
         setBuilding(null);
         if (result !== "redirecting") setBuilt(result);
       } catch (err) {
         setBuilding(null);
-        flash(err instanceof Error ? err.message : `${label} export failed`);
+        if (err instanceof BuildCancelled || cancelBuild.current) {
+          flash("Export cancelled — nothing was created");
+          return;
+        }
+        setBuildError({
+          label,
+          color,
+          message: err instanceof Error ? err.message : `${label} export failed`,
+          key: pending.provider,
+          releases: queued,
+          name: pending.name,
+        });
       }
     })();
   }, []);
@@ -183,10 +235,11 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
     };
   }, []);
 
-  // Crate/favorites only show entries that actually have artwork.
-  const items = (panel === "favorites" ? favs : activeCrate?.releases ?? []).filter(
-    (r) => r.artwork_url && r.artwork_url.trim().length > 0
-  );
+  // Everything in the crate is shown. Records without artwork used to be
+  // filtered out of the view — but not out of the crate, its tab count, or the
+  // export — so the panel could read "Empty crate" while exporting two records.
+  // A coverless record is drawn as a cassette J-card now (see <Artwork>).
+  const items = panel === "favorites" ? favs : activeCrate?.releases ?? [];
 
   async function shareRelease(r: Release) {
     const url = typeof window !== "undefined" ? window.location.href : "";
@@ -201,7 +254,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   // ── Crate export → a playlist on the DSP of choice ──────────────
   const crateName = () =>
     panel === "favorites" ? "PULSAR Favorites" : activeCrate?.name ?? "PULSAR Crate";
-  const asLines = () => items.map((r) => `${r.artist} — ${r.title}`).join("\n");
+  const asLines = (list: Release[] = items) => list.map((r) => `${r.artist} — ${r.title}`).join("\n");
 
   const download = (filename: string, text: string, type = "text/plain") => {
     const blob = new Blob([text], { type });
@@ -209,19 +262,23 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
     const a = document.createElement("a");
     a.href = url;
     a.download = filename;
+    // In the document, and the URL kept alive a moment: Safari and Firefox
+    // ignore a click on a detached anchor, and revoking the blob URL in the same
+    // tick could cancel the download before it started.
+    a.style.display = "none";
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 4000);
   };
 
-  const downloadCsv = () => {
+  const downloadCsv = (list: Release[] = items, name: string = crateName()) => {
+    const esc = (v: string) => `"${(v ?? "").replace(/"/g, '""')}"`;
     const rows = [
       "Title,Artist,Album",
-      ...items.map((r) => {
-        const esc = (s: string) => `"${(s ?? "").replace(/"/g, '""')}"`;
-        return [esc(r.title), esc(r.artist), esc(r.title)].join(",");
-      }),
+      ...list.map((r) => [esc(r.clean_title || r.title), esc(r.artist), esc(r.clean_title || r.title)].join(",")),
     ].join("\n");
-    download(`${crateName()}.csv`, rows, "text/csv");
+    download(`${name}.csv`, rows, "text/csv");
   };
 
   const copyList = async () => {
@@ -246,24 +303,32 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   // Copy the tracklist + drop a CSV, then open the service's playlist area so
   // the list can be pasted / imported. Used for DSPs without an open write API,
   // or as a graceful fallback when real creation isn't possible.
-  const csvFallback = async (key: string, label: string) => {
-    downloadCsv();
-    try {
-      await navigator.clipboard.writeText(asLines());
-    } catch {
-      /* clipboard blocked — the CSV still downloaded */
-    }
-    window.open(DSP_HOME[key] ?? "https://pulsar.app", "_blank", "noopener,noreferrer");
+  const csvFallback = (key: string, label: string, list: Release[] = items, name: string = crateName()) => {
+    // Everything here starts synchronously inside the tap. window.open used to
+    // run after an `await` on the clipboard, by which point the click's user
+    // activation was spent and browsers blocked the new tab.
+    const copied = navigator.clipboard?.writeText(asLines(list)).then(
+      () => true,
+      () => false
+    );
+    downloadCsv(list, name);
+    window.open(DSP_HOME[key] ?? "https://pulsar-ten-sigma.vercel.app", "_blank", "noopener,noreferrer");
     setExporting(false);
-    flash(`Crate copied + CSV ready for ${label}`);
+    void Promise.resolve(copied).then((ok) =>
+      flash(ok ? `Tracklist copied + CSV downloaded for ${label}` : `CSV downloaded for ${label}`)
+    );
   };
 
   // Create the real playlist on the chosen DSP (Spotify / YouTube / Apple).
   const buildDsp = async (key: string, label: string, color: string, releases: Release[], name: string) => {
     setExporting(false);
+    cancelBuild.current = false;
     setBuilding({ done: 0, total: releases.length, label, color, current: releases[0] ?? null, recent: [] });
     try {
-      const result = await exportCrate(key, name, releases, (done, total) =>
+      const result = await exportCrate(key, name, releases, (done, total) => {
+        // Cancel takes effect at the next record: the provider is still
+        // matching, nothing has been created yet, and throwing here stops it.
+        if (cancelBuild.current) throw new BuildCancelled();
         setBuilding({
           done,
           total,
@@ -274,13 +339,17 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
           current: releases[done] ?? releases[done - 1] ?? null,
           // Newest first — the overlay stacks them as they land.
           recent: releases.slice(Math.max(0, done - 6), done).reverse(),
-        })
-      );
+        });
+      });
       setBuilding(null);
       if (result === "redirecting") return; // navigating to the DSP's consent screen
       setBuilt(result);
     } catch (err) {
       setBuilding(null);
+      if (err instanceof BuildCancelled || cancelBuild.current) {
+        flash("Export cancelled — nothing was created");
+        return;
+      }
       // A 2.6s toast followed by a surprise CSV download reads as "export is
       // broken". Show a card that says what went wrong and let the user choose
       // the CSV fallback deliberately.
@@ -289,6 +358,8 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
         color,
         message: err instanceof Error ? err.message : `Couldn't create the playlist on ${label}.`,
         key,
+        releases,
+        name,
       });
     }
   };
@@ -664,9 +735,10 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                             </span>
                           </button>
                           <p className="mt-2 text-[9px] leading-relaxed text-ink/35">
-                            Env changes are picked up live — no redeploy needed. While the app is
-                            in Development mode, also add your Spotify account under Users &amp;
-                            Access.
+                            After setting an environment variable on Vercel, redeploy — Vercel only
+                            applies env changes to new deployments. While the app is in Development
+                            mode, also add your Spotify account under Users &amp; Access (Spotify
+                            allows up to 5).
                           </p>
                         </div>
                       )}
@@ -792,6 +864,11 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
             current={building.current}
             recent={building.recent}
             Icon={PLATFORMS.find((p) => p.label === building.label)?.Icon}
+            onCancel={() => {
+              cancelBuild.current = true;
+              // An Apple sign-in popup may never call back; free the screen now.
+              setBuilding(null);
+            }}
           />
         )}
       </AnimatePresence>
@@ -820,7 +897,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               >
                 {/* celebratory burst behind the badge */}
                 <div className="relative mx-auto mb-3 h-12 w-12">
-                  {[...Array(10)].map((_, i) => {
+                  {!reduceMotion && [...Array(10)].map((_, i) => {
                     const a = (i / 10) * Math.PI * 2;
                     return (
                       <motion.span
@@ -853,12 +930,31 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                 </p>
                 <p className="mt-1 text-[12px] leading-relaxed text-ink/55">
                   “{built.name}” is now on your {label} with{" "}
-                  <span style={{ color }}>{built.trackCount} tracks</span>
-                  {built.addedReleases < built.totalReleases && (
-                    <> ({built.totalReleases - built.addedReleases} not found)</>
-                  )}
-                  .
+                  <span style={{ color }}>
+                    {built.trackCount} track{built.trackCount === 1 ? "" : "s"}
+                  </span>{" "}
+                  from {built.addedReleases} of {built.totalReleases} record
+                  {built.totalReleases === 1 ? "" : "s"}.
                 </p>
+                {/* It stopped early but kept what it made (a quota ran out). */}
+                {built.note && (
+                  <p className="mt-2 rounded-lg border border-sport/30 bg-sport/10 px-3 py-2 text-left text-[11px] leading-relaxed text-sport">
+                    {built.note}
+                  </p>
+                )}
+                {/* "3 not found" told you there was a gap but not where. */}
+                {built.unmatched && built.unmatched.length > 0 && (
+                  <details className="mt-2 text-left">
+                    <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-widest text-ink-400 hover:text-ink">
+                      {built.unmatched.length} not found on {label}
+                    </summary>
+                    <ul className="mt-1.5 max-h-32 space-y-0.5 overflow-y-auto pl-1 text-[11px] text-ink-400">
+                      {built.unmatched.map((u) => (
+                        <li key={u} className="truncate">· {u}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
                 <div className="mt-4 flex gap-2">
                   <a
                     href={built.url}
@@ -909,37 +1005,41 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               {/* A permission/session failure can't be retried with the same
                   token — reconnecting (possibly as a different account) is the
                   action that actually resolves it, so lead with that. */}
-              {/403|refused|expired|sign-in|session/i.test(buildError.message) && (
+              {/* The fix lives in THIS service's developer console. These were
+                  hard-coded to Spotify, so an Apple or YouTube failure sent the
+                  user to the wrong dashboard. */}
+              {/403|refused|expired|sign-in|session|token|configured/i.test(buildError.message) &&
+                DEV_CONSOLE[buildError.key] && (
                 <a
-                  href="https://developer.spotify.com/dashboard"
+                  href={DEV_CONSOLE[buildError.key]!.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-3 inline-block text-[11px] font-bold uppercase tracking-widest underline decoration-dotted underline-offset-4"
                   style={{ color: buildError.color }}
                 >
-                  Open Spotify dashboard ↗
+                  {DEV_CONSOLE[buildError.key]!.label} ↗
                 </a>
               )}
               <div className="mt-5 flex flex-col gap-2">
                 {/403|refused|expired|sign-in|session/i.test(buildError.message) && (
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       const e = buildError;
-                      disconnectProvider(e.key); // force a fresh consent screen
+                      await disconnectProvider(e.key); // force a fresh consent screen
                       setBuildError(null);
-                      buildDsp(e.key, e.label, e.color, items, crateName());
+                      buildDsp(e.key, e.label, e.color, e.releases, e.name);
                     }}
                     className="min-h-[44px] rounded-full py-2.5 text-[11px] font-bold uppercase tracking-widest text-deck transition-transform hover:scale-105"
                     style={{ backgroundColor: buildError.color }}
                   >
-                    Reconnect to Spotify
+                    Reconnect to {buildError.label}
                   </button>
                 )}
                 <button
                   onClick={() => {
                     const e = buildError;
                     setBuildError(null);
-                    buildDsp(e.key, e.label, e.color, items, crateName());
+                    buildDsp(e.key, e.label, e.color, e.releases, e.name);
                   }}
                   className="min-h-[44px] rounded-full border py-2.5 text-[11px] font-bold uppercase tracking-widest transition-colors hover:bg-white/[0.06]"
                   style={{ borderColor: `${buildError.color}66`, color: buildError.color }}
@@ -950,7 +1050,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                   onClick={() => {
                     const e = buildError;
                     setBuildError(null);
-                    csvFallback(e.key, e.label);
+                    csvFallback(e.key, e.label, e.releases, e.name);
                   }}
                   className="min-h-[44px] rounded-full border border-white/15 py-2.5 text-[11px] font-bold uppercase tracking-widest text-ink/70 hover:text-ink"
                 >

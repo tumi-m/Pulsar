@@ -12,7 +12,9 @@ import {
   clearPending,
   clearToken,
   loadDspConfig,
+  missingConfig,
   readPending,
+  rememberDspConfig,
   savePending,
   type BuildResult,
   type DspProvider,
@@ -23,7 +25,8 @@ import {
 import { spotifyProvider, setSpotifyClientId } from "./spotify";
 import { tidalProvider, setTidalClientId } from "./tidal";
 import { youtubeProvider, setGoogleClientId } from "./youtube";
-import { appleProvider, setAppleEnabled } from "./apple";
+import { appleProvider, setAppleEnabled, prepareAppleMusic } from "./apple";
+export { prepareAppleMusic };
 
 const PROVIDERS: Record<string, DspProvider> = {
   [spotifyProvider.key]: spotifyProvider,
@@ -36,20 +39,32 @@ const PROVIDERS: Record<string, DspProvider> = {
  * Pull the live DSP client configuration from the server and overlay it on the
  * build-time NEXT_PUBLIC_* inlines. Call once on boot and whenever the export
  * sheet opens — this is what makes a client id set in the Vercel dashboard
- * take effect without redeploying.
+ * take effect without rebuilding the client bundle (Vercel still applies env
+ * changes only to new deployments, so a redeploy is needed either way).
  */
 export async function ensureDspConfig(force = false): Promise<void> {
   const cfg = await loadDspConfig(force);
+  rememberDspConfig(cfg);
   setSpotifyClientId(cfg.spotifyClientId);
   setGoogleClientId(cfg.googleClientId);
   setTidalClientId(cfg.tidalClientId);
   setAppleEnabled(cfg.appleEnabled);
 }
 
-/** Does this DSP support real, in-app playlist creation right now? */
+/**
+ * Does this DSP support real, in-app playlist creation right now? A client id
+ * isn't enough on its own — the server may still lack a secret or key the flow
+ * needs (see /api/dsp-config), and offering it then sends the user through a
+ * consent screen only to fail on the way back.
+ */
 export function providerConfigured(key: string): boolean {
   const p = PROVIDERS[key];
-  return !!p && p.configured();
+  return !!p && p.configured() && missingConfig(key).length === 0;
+}
+
+/** Which server settings a service still needs before it can create playlists. */
+export function providerMissing(key: string): string[] {
+  return missingConfig(key);
 }
 
 /**
@@ -58,8 +73,14 @@ export function providerConfigured(key: string): boolean {
  * allow-listed on the developer dashboard, so every call comes back 403 and
  * retrying with the same token can only ever fail the same way.
  */
-export function disconnectProvider(key: string) {
-  clearToken(key);
+export async function disconnectProvider(key: string) {
+  // Each provider clears its OWN sign-in. This called clearToken(key) with the
+  // provider key — but YouTube stores its token as "youtube", not
+  // "youtube_music", and Apple keeps no token at all — so "Reconnect" there
+  // cleared nothing and the next attempt reused the same failing session.
+  const p = PROVIDERS[key];
+  if (p?.disconnect) await p.disconnect();
+  else clearToken(key);
   clearPending();
 }
 
@@ -82,9 +103,16 @@ export async function exportCrate(
   if (!provider) throw new Error(`No playlist provider for ${key}`);
   // Remember what we're building so we can resume after an OAuth redirect.
   savePending({ provider: key, name, releases });
-  const result = await provider.createPlaylist(name, releases, onProgress);
-  if (result !== "redirecting") clearPending();
-  return result;
+  let result: BuildResult | "redirecting" | undefined;
+  try {
+    result = await provider.createPlaylist(name, releases, onProgress);
+    return result;
+  } finally {
+    // Only a redirect needs the crate kept for later. A failure used to leave
+    // it in storage, where a later, unrelated sign-in with the same service
+    // could resume an export the user had already seen fail.
+    if (result !== "redirecting") clearPending();
+  }
 }
 
 /**
@@ -97,6 +125,9 @@ export interface RedirectFailure {
   failed: Pending["provider"];
   /** The provider's own reason, when it recorded one. */
   message: string | null;
+  /** The crate that was waiting, so the UI can retry or fall back to CSV. */
+  name: string;
+  releases: Release[];
 }
 
 /** Which auth-error key each export provider records its reason under. */
@@ -141,7 +172,12 @@ export async function handleDspRedirect(): Promise<Pending | RedirectFailure | n
   if (pending) {
     clearPending();
     const key = AUTH_ERROR_KEY[pending.provider];
-    return { failed: pending.provider, message: key ? takeAuthError(key) : null };
+    return {
+      failed: pending.provider,
+      message: key ? takeAuthError(key) : null,
+      name: pending.name,
+      releases: pending.releases,
+    };
   }
   return null;
 }

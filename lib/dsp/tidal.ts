@@ -44,6 +44,7 @@ import {
   setAuthError,
   sha256,
   searchTerm,
+  sameTitle,
   takeAuthError,
   type BuildResult,
   type DspProvider,
@@ -62,7 +63,10 @@ const TOKEN_URL = "https://auth.tidal.com/v1/oauth2/token";
 const API_BASE = "https://openapi.tidal.com/v2";
 
 /** Only what an export needs: find tracks, make a playlist, put them in it. */
-const SCOPES = "playlists.write playlists.read collection.read user.read";
+// search.read: catalogue search with a user token may require it, and without
+// it every lookup would 403 in a way "reconnect" can never fix. Changing this
+// string forces a clean re-consent for existing tokens (see readScopes).
+const SCOPES = "playlists.write playlists.read collection.read user.read search.read";
 const SCOPE_KEY = "pulsar_tidal_scopes";
 const VERIFIER_KEY = "pulsar_tidal_verifier";
 const JUST_AUTHED = "pulsar_tidal_just_authed";
@@ -233,29 +237,115 @@ export function tidalArtistMatches(want: string, got: string | undefined): boole
   return g.length > 0 && (g.includes(w) || w.includes(g));
 }
 
+/** JSON:API resource identifier. */
+interface Ref {
+  id?: string;
+  type?: string;
+}
+interface TidalNode {
+  id?: string;
+  type?: string;
+  attributes?: { title?: string; name?: string };
+  relationships?: Record<string, { data?: Ref[] | Ref | null }>;
+}
+
+const refs = (rel: { data?: Ref[] | Ref | null } | undefined): Ref[] =>
+  Array.isArray(rel?.data) ? rel!.data : rel?.data ? [rel.data] : [];
+
+/**
+ * Search the catalogue. TIDAL moved search in mid-2026 from
+ * `/searchResults/{query}` to `/searchResults?filter[query]=…`: the old form
+ * "placed arbitrary search text in an ID path" and now answers 400
+ * INVALID_RESOURCE_ID, so every lookup this provider made failed. Returns the
+ * hits of `kind` in relevance order, with their attributes where included.
+ */
+async function search(term: string, kind: "tracks" | "albums", token: string): Promise<TidalNode[]> {
+  const q = term.replace(/[\\/]+/g, " ").replace(/\s+/g, " ").trim();
+  const found = await api(
+    `/searchResults?filter[query]=${encodeURIComponent(q)}&countryCode=${countryCode()}&include=${kind}`,
+    token
+  );
+  const data = found?.data as TidalNode[] | TidalNode | undefined;
+  const root = Array.isArray(data) ? data[0] : data;
+  const order = refs(root?.relationships?.[kind]).map((r) => r.id).filter(Boolean) as string[];
+  const included = ((found?.included as TidalNode[] | undefined) ?? []).filter((n) => n?.type === kind);
+  const byId = new Map(included.map((n) => [String(n.id), n]));
+  // Relevance order comes from the relationship; `included` order isn't guaranteed.
+  const ordered = order.map((id) => byId.get(id) ?? { id, type: kind });
+  return (ordered.length ? ordered : included).slice(0, 10);
+}
+
+/**
+ * Artist names for a set of tracks or albums, by id. TIDAL v2 doesn't put
+ * artist names on a track — they live behind `relationships.artists` — so the
+ * old check, which read `attributes.artists[].name` / `artistName` (the v1
+ * shape), never saw a name and rejected every candidate. Fetched in one call.
+ */
+async function artistNames(kind: "tracks" | "albums", ids: string[], token: string): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>();
+  if (!ids.length) return out;
+  const res = await api(
+    `/${kind}?filter[id]=${ids.map(encodeURIComponent).join(",")}&countryCode=${countryCode()}&include=artists`,
+    token
+  );
+  const nodes = ((Array.isArray(res?.data) ? res.data : [res?.data]) as TidalNode[]).filter(Boolean);
+  const names = new Map(
+    ((res?.included as TidalNode[] | undefined) ?? [])
+      .filter((n) => n?.type === "artists")
+      .map((n) => [String(n.id), n.attributes?.name ?? ""])
+  );
+  for (const n of nodes) {
+    out.set(String(n.id), refs(n.relationships?.artists).map((a) => names.get(String(a.id)) ?? "").filter(Boolean));
+  }
+  return out;
+}
+
 /**
  * Resolve one saved release to TIDAL track ids.
  *
- * Verified by artist, exactly like the Spotify provider: an export that quietly
- * fills with the wrong records is worse than one that comes up short.
+ * Both the artist and the title must match, as on the other providers. Albums
+ * and EPs expand to their tracklist; singles resolve to one track. A lookup
+ * that ERRORS (as opposed to finding nothing) is reported through `onError`,
+ * so a broken search shows up as a failure instead of "0 found".
  */
-export async function trackIdsForRelease(r: Release, token: string): Promise<string[]> {
+export async function trackIdsForRelease(
+  r: Release,
+  token: string,
+  onError?: (e: Error) => void
+): Promise<string[]> {
   const term = searchTerm(r);
+  const pick = async (kind: "tracks" | "albums") => {
+    const hits = (await search(term, kind, token)).filter((n) => sameTitle(r, n.attributes?.title));
+    if (!hits.length) return null;
+    const names = await artistNames(kind, hits.map((h) => String(h.id)), token);
+    return hits.find((h) => (names.get(String(h.id)) ?? []).some((a) => tidalArtistMatches(r.artist, a))) ?? null;
+  };
+
   try {
-    const found = await api(
-      `/searchResults/${encodeURIComponent(term)}?countryCode=${countryCode()}&include=tracks`,
-      token
-    );
-    // JSON:API: matches arrive in `included`, typed.
-    const included = ((found?.included as TidalResource[] | undefined) ?? []) as TidalResource[];
-    const tracks = included.filter((i) => i?.type === "tracks");
-    const hit = tracks.find((t) =>
-      tidalArtistMatches(r.artist, t?.attributes?.artists?.[0]?.name ?? t?.attributes?.artistName)
-    );
-    const id = hit?.id ?? null;
-    return id ? [String(id)] : [];
+    if (r.type === "album" || r.type === "ep") {
+      try {
+        const album = await pick("albums");
+        if (album?.id) {
+          const ids: string[] = [];
+          let next: string | null = `/albums/${album.id}/relationships/items?countryCode=${countryCode()}`;
+          while (next && ids.length < 300) {
+            const page = await api(next, token);
+            for (const it of refs(page as { data?: Ref[] })) if (it.type === "tracks" && it.id) ids.push(String(it.id));
+            const link = (page?.links as { next?: string } | undefined)?.next;
+            next = link ? link.replace(API_BASE, "") : null;
+          }
+          if (ids.length) return ids;
+        }
+      } catch (e) {
+        if (e instanceof TidalAuthError) throw e;
+        /* fall back to a single verified track */
+      }
+    }
+    const track = await pick("tracks");
+    return track?.id ? [String(track.id)] : [];
   } catch (e) {
     if (e instanceof TidalAuthError) throw e;
+    onError?.(e instanceof Error ? e : new Error(String(e)));
     return [];
   }
 }
@@ -290,6 +380,39 @@ export const tidalProvider: DspProvider = {
     }
     safeRemove(JUST_AUTHED);
 
+    const seen = new Set<string>();
+    const ids: string[] = [];
+    let addedReleases = 0;
+    const unmatched: string[] = [];
+    const lookup: { errors: number; last: Error | null } = { errors: 0, last: null };
+    for (let i = 0; i < releases.length; i++) {
+      const found = await trackIdsForRelease(releases[i], token.access_token, (e) => {
+        lookup.errors++;
+        lookup.last = e;
+      });
+      if (found.length) addedReleases++;
+      else unmatched.push(`${releases[i].artist} — ${releases[i].title}`);
+      for (const id of found) {
+        if (!seen.has(id)) {
+          seen.add(id);
+          ids.push(id);
+        }
+      }
+      onProgress?.(i + 1, releases.length);
+    }
+
+    // Every lookup failed outright: that's a broken search, not an empty
+    // catalogue — say what TIDAL said.
+    if (ids.length === 0 && lookup.errors > 0 && lookup.last) {
+      throw new Error(`TIDAL search failed — ${lookup.last.message}`);
+    }
+    // Match first, then create — see the Spotify provider for why.
+    if (ids.length === 0) {
+      throw new Error(
+        `None of the ${releases.length} record${releases.length === 1 ? "" : "s"} could be found on TIDAL, so no playlist was created.`
+      );
+    }
+
     const playlist = await api("/playlists", token.access_token, {
       method: "POST",
       body: JSON.stringify({
@@ -308,21 +431,6 @@ export const tidalProvider: DspProvider = {
     const playlistId = playlistData?.id;
     if (!playlistId) throw new Error("TIDAL didn't return a playlist id.");
 
-    const seen = new Set<string>();
-    const ids: string[] = [];
-    let addedReleases = 0;
-    for (let i = 0; i < releases.length; i++) {
-      const found = await trackIdsForRelease(releases[i], token.access_token);
-      if (found.length) addedReleases++;
-      for (const id of found) {
-        if (!seen.has(id)) {
-          seen.add(id);
-          ids.push(id);
-        }
-      }
-      onProgress?.(i + 1, releases.length);
-    }
-
     // Batched, like Spotify's 100-per-request limit.
     for (let i = 0; i < ids.length; i += 20) {
       await api(`/playlists/${playlistId}/relationships/items`, token.access_token, {
@@ -340,7 +448,13 @@ export const tidalProvider: DspProvider = {
       addedReleases,
       totalReleases: releases.length,
       trackCount: ids.length,
+      unmatched,
     };
+  },
+
+  disconnect() {
+    clearToken("tidal");
+    clearVerifier();
   },
 
   async completeRedirect(): Promise<boolean> {

@@ -137,7 +137,13 @@ async function api(path: string, token: string, init?: RequestInit) {
 async function videoIdFor(r: Release, token: string): Promise<string | null> {
   try {
     const q = encodeURIComponent(searchTerm(r));
-    const found = await api(`/search?part=snippet&type=video&maxResults=1&q=${q}`, token);
+    // videoCategoryId=10 is YouTube's Music category. Without it the top
+    // result for "artist title" was as often a reaction video, a lyric edit or
+    // a cover as the record itself. Same quota cost either way.
+    const found = await api(
+      `/search?part=snippet&type=video&videoCategoryId=10&maxResults=1&q=${q}`,
+      token
+    );
     return found?.items?.[0]?.id?.videoId ?? null;
   } catch (e) {
     // Quota/auth failures must abort the run — continuing would silently build a
@@ -162,6 +168,27 @@ export const youtubeProvider: DspProvider = {
       beginAuth();
       return "redirecting";
     }
+    // Find first, create second: creating up front left an empty playlist on
+    // the account whenever nothing matched or the quota ran out while searching.
+    const found: string[] = [];
+    let matchedReleases = 0;
+    const unmatched: string[] = [];
+    for (let i = 0; i < releases.length; i++) {
+      const videoId = await videoIdFor(releases[i], token.access_token);
+      if (videoId && !found.includes(videoId)) {
+        found.push(videoId);
+        matchedReleases++;
+      } else if (!videoId) {
+        unmatched.push(`${releases[i].artist} — ${releases[i].title}`);
+      }
+      onProgress?.(i + 1, releases.length);
+    }
+    if (found.length === 0) {
+      throw new Error(
+        `None of the ${releases.length} record${releases.length === 1 ? "" : "s"} could be found on YouTube, so no playlist was created.`
+      );
+    }
+
     const playlist = await api("/playlists?part=snippet,status", token.access_token, {
       method: "POST",
       body: JSON.stringify({
@@ -173,37 +200,43 @@ export const youtubeProvider: DspProvider = {
     // every insert fails with "playlistId required" — a silent empty playlist.
     if (!playlist?.id) throw new Error("YouTube didn't return a playlist.");
 
-    let addedReleases = 0;
     let trackCount = 0;
-    for (let i = 0; i < releases.length; i++) {
-      const videoId = await videoIdFor(releases[i], token.access_token);
-      if (videoId) {
-        try {
-          await api("/playlistItems?part=snippet", token.access_token, {
-            method: "POST",
-            body: JSON.stringify({
-              snippet: { playlistId: playlist.id, resourceId: { kind: "youtube#video", videoId } },
-            }),
-          });
-          addedReleases++;
-          trackCount++;
-        } catch (e) {
-          // A quota/auth failure will hit every remaining track too — stop
-          // rather than grinding through the rest for nothing.
-          if (e instanceof YouTubeFatalError) throw e;
-          /* otherwise skip just this one */
+    let note: string | undefined;
+    for (const videoId of found) {
+      try {
+        await api("/playlistItems?part=snippet", token.access_token, {
+          method: "POST",
+          body: JSON.stringify({
+            snippet: { playlistId: playlist.id, resourceId: { kind: "youtube#video", videoId } },
+          }),
+        });
+        trackCount++;
+      } catch (e) {
+        if (e instanceof YouTubeFatalError) {
+          // The playlist exists and holds what was added so far. Throwing here
+          // used to hide it: the user saw an error and never got the link.
+          if (trackCount === 0) throw e;
+          note = `Stopped after ${trackCount} of ${found.length}: ${e.message}`;
+          break;
         }
+        /* otherwise skip just this one */
       }
-      onProgress?.(i + 1, releases.length);
     }
     return {
       provider: "youtube_music",
       url: `https://music.youtube.com/playlist?list=${playlist.id}`,
       name,
-      addedReleases,
+      addedReleases: Math.min(matchedReleases, trackCount),
       totalReleases: releases.length,
       trackCount,
+      note,
+      unmatched,
     };
+  },
+
+  disconnect() {
+    clearToken("youtube");
+    clearVerifier();
   },
 
   async completeRedirect(): Promise<boolean> {

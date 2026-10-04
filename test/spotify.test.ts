@@ -80,7 +80,7 @@ describe("urisForRelease", () => {
     const fetchMock = vi.fn(async (url: string) => {
       const u = String(url);
       if (u.includes("type=track"))
-        return json({ tracks: { items: [{ uri: "spotify:track:s1", artists: [{ name: "Burna Boy" }] }] } });
+        return json({ tracks: { items: [{ uri: "spotify:track:s1", name: "Last Last", artists: [{ name: "Burna Boy" }] }] } });
       return json({}, { status: 404 });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -94,7 +94,7 @@ describe("urisForRelease", () => {
       const u = String(url);
       if (u.includes("type=album")) return json({ albums: { items: [] } });
       if (u.includes("type=track"))
-        return json({ tracks: { items: [{ uri: "spotify:track:f1", artists: [{ name: "Burna Boy" }] }] } });
+        return json({ tracks: { items: [{ uri: "spotify:track:f1", name: "Mystery", artists: [{ name: "Burna Boy" }] }] } });
       return json({}, { status: 404 });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -144,8 +144,19 @@ describe("urisForRelease", () => {
   it("propagates a 403 as a rejection", async () => {
     const fetchMock = vi.fn(async () => new Response(null, { status: 403 }));
     vi.stubGlobal("fetch", fetchMock);
+    // In Development Mode a 403 on search means the account isn't approved:
+    // it must stop the export with that explanation, not read as "not found".
     await expect(urisForRelease(release("Burna Boy", "Love, Damini", "album"), "tok")).rejects.toThrow(
-      /403/,
+      /approved/,
     );
+  });
+});
+
+describe("urisForRelease checks the title, not just the artist", () => {
+  it("rejects a different song by the same artist", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      json({ tracks: { items: [{ uri: "spotify:track:other", name: "Ye", artists: [{ name: "Burna Boy" }] }] } })
+    ));
+    expect(await urisForRelease(release("Burna Boy", "Last Last", "single"), "tok")).toEqual([]);
   });
 });

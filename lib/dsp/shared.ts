@@ -8,6 +8,7 @@
  */
 
 import type { Release } from "../types";
+import { titleMatches } from "../match";
 
 export interface BuildResult {
   provider: string; // provider key (matches PlatformDef.key)
@@ -16,6 +17,10 @@ export interface BuildResult {
   addedReleases: number; // releases that matched at least one track
   totalReleases: number;
   trackCount: number; // tracks actually added
+  /** Set when the build stopped early but kept what it made (e.g. a quota ran out). */
+  note?: string;
+  /** "Artist — Title" for each record the service had no match for. */
+  unmatched?: string[];
 }
 
 export interface Pending {
@@ -37,6 +42,8 @@ export interface DspProvider {
   /** For redirect-based providers: if the current URL carries this provider's
    *  OAuth response, finish the token exchange, clean the URL, return true. */
   completeRedirect?(): Promise<boolean>;
+  /** Forget this service's sign-in so the next export asks again. */
+  disconnect?(): void | Promise<void>;
 }
 
 // ── Runtime DSP configuration ────────────────────────────────────
@@ -50,6 +57,12 @@ export interface DspRuntimeConfig {
   googleClientId: string;
   tidalClientId: string;
   appleEnabled: boolean;
+  /**
+   * Server settings each service still lacks, by provider key (names only).
+   * null when unknown — the config request failed, or the build-time fallback
+   * is in use — in which case nothing is held back on its account.
+   */
+  missing: Record<string, string[]> | null;
 }
 
 const BUILD_TIME_CONFIG: DspRuntimeConfig = {
@@ -57,6 +70,7 @@ const BUILD_TIME_CONFIG: DspRuntimeConfig = {
   googleClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "",
   tidalClientId: process.env.NEXT_PUBLIC_TIDAL_CLIENT_ID ?? "",
   appleEnabled: process.env.NEXT_PUBLIC_APPLE_MUSIC_ENABLED === "true",
+  missing: null,
 };
 
 let configPromise: Promise<DspRuntimeConfig> | null = null;
@@ -72,6 +86,7 @@ export function loadDspConfig(force = false): Promise<DspRuntimeConfig> {
       googleClientId: c.googleClientId || BUILD_TIME_CONFIG.googleClientId,
       tidalClientId: c.tidalClientId || BUILD_TIME_CONFIG.tidalClientId,
       appleEnabled: c.appleEnabled ?? BUILD_TIME_CONFIG.appleEnabled,
+      missing: c.missing ?? null,
     }))
     .catch(() => BUILD_TIME_CONFIG);
   return configPromise;
@@ -207,7 +222,9 @@ export function savePending(p: Pending) {
     provider: p.provider,
     name: p.name,
     releases: p.releases.map(
-      (r) => ({ id: r.id, artist: r.artist, title: r.title, type: r.type }) as Release
+      // clean_title survives the round-trip too: matching uses it, and dropping
+      // it meant a resumed export searched for "Love - EP" instead of "Love".
+      (r) => ({ id: r.id, artist: r.artist, title: r.title, clean_title: r.clean_title, type: r.type }) as Release
     ),
   };
   const raw = JSON.stringify(slim);
@@ -250,7 +267,36 @@ export function cleanUrl() {
 }
 
 /** Normalise "artist — title" for a search query. */
+/**
+ * The title a streaming service will know the record by. Feed titles carry
+ * store suffixes and credits — "Love - EP", "Song (feat. X)" — that the
+ * services index without, and searching with them both lowers recall and
+ * defeats title checks.
+ */
+export function plainTitle(r: Release): string {
+  return (r.clean_title || r.title)
+    .replace(/\s*[-–—]\s*(single|ep)\s*$/i, "")
+    .replace(/\s*[([](feat\.?|ft\.?|featuring|with)\b[^)\]]*[)\]]/gi, "")
+    .trim();
+}
+
 export function searchTerm(r: Release): string {
   const clean = (s: string) => s.replace(/["']/g, "").trim();
-  return `${clean(r.artist)} ${clean(r.title)}`;
+  return `${clean(r.artist)} ${clean(plainTitle(r))}`;
+}
+
+/** Is `got` the same record as this release? See lib/match.ts titleMatches. */
+export function sameTitle(r: Release, got: string | undefined): boolean {
+  return Boolean(got) && titleMatches(plainTitle(r), got!);
+}
+
+
+/** The last loaded config, for synchronous readers (the export sheet). */
+let lastConfig: DspRuntimeConfig = BUILD_TIME_CONFIG;
+export function rememberDspConfig(c: DspRuntimeConfig) {
+  lastConfig = c;
+}
+/** Settings a provider still needs on the server, or [] when ready / unknown. */
+export function missingConfig(provider: string): string[] {
+  return lastConfig.missing?.[provider] ?? [];
 }
