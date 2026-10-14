@@ -13,11 +13,11 @@ interface Particle {
 }
 
 const PARTICLE_COLORS = [
-  "rgba(0, 212, 255,",   // neon-blue
-  "rgba(255, 0, 128,",   // neon-pink
-  "rgba(155, 93, 229,",  // neon-violet
-  "rgba(0, 255, 136,",   // neon-green
-  "rgba(232, 232, 244,", // star-white
+  "rgba(78, 134, 199,",   // neon-blue
+  "rgba(226, 59, 46,",   // neon-pink
+  "rgba(242, 102, 44,",  // neon-violet
+  "rgba(126, 217, 174,",   // neon-green
+  "rgba(237, 241, 244,", // star-white
 ];
 
 export function ParticleField() {
@@ -128,7 +128,7 @@ export function ParticleField() {
               ctx.beginPath();
               ctx.moveTo(particles[i].x, particles[i].y);
               ctx.lineTo(particles[j].x, particles[j].y);
-              ctx.strokeStyle = `rgba(155, 93, 229, ${alpha})`;
+              ctx.strokeStyle = `rgba(242, 102, 44, ${alpha})`;
               ctx.lineWidth = 0.5;
               ctx.stroke();
             }

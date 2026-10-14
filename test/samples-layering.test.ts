@@ -58,7 +58,7 @@ describe("samples panel layering", () => {
     // which was a dead end. Every card must offer a YouTube route out.
     expect(breakdown).toContain("youtubeSearchUrl");
     expect(
-      breakdown.includes('className="text-[10px] text-star-white/30">No video found'),
+      breakdown.includes('className="text-[10px] text-ink/30">No video found'),
       "the bare 'No video found' dead end should be gone"
     ).toBe(false);
   });

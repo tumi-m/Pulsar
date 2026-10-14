@@ -34,7 +34,17 @@ function release() {
   b.style.left = "";
   b.style.right = "";
   b.style.width = "";
+  // The app sets `scroll-behavior: smooth` globally, which this inherited:
+  // restoring the position became a ~500ms animation that anything else
+  // touching the scroller could cut short. Measured on the built app, closing
+  // a sheet from 840px left the feed at 209px — you lost your place every
+  // time. Restoring a saved offset is a correction, not a journey; it has to
+  // be instant.
+  const html = document.documentElement;
+  const previous = html.style.scrollBehavior;
+  html.style.scrollBehavior = "auto";
   window.scrollTo(0, savedY);
+  html.style.scrollBehavior = previous;
 }
 
 export function useScrollLock(active: boolean) {

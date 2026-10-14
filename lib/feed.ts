@@ -15,8 +15,24 @@
 
 import type { Release, ReleaseType, MoodTag } from "./types";
 import { artistMatches } from "./match";
+import { boomplaySearchUrl } from "./utils";
 import { GRAMMY_ARTISTS_UNIQUE } from "./grammy-artists";
 import { WORLD_ARTISTS_FLAT } from "./world-artists";
+import { CATALOG } from "./catalog";
+import {
+  registerAtomicArtists,
+  parseCredits,
+} from "./credits";
+
+// Seed the atomic-name index once per server boot with every artist name the
+// app already knows. Only separator-containing names ("Earth, Wind & Fire",
+// "Mellow & Sleazy") are retained — they are the only ones that could ever be
+// mis-split, so indexing the rest would just waste memory.
+registerAtomicArtists([
+  ...GRAMMY_ARTISTS_UNIQUE,
+  ...WORLD_ARTISTS_FLAT,
+  ...CATALOG.map((r) => r.artist),
+]);
 
 // ── platform deep links ──────────────────────
 const sp = (q: string) => `https://open.spotify.com/search/${encodeURIComponent(q)}`;
@@ -24,6 +40,7 @@ const am = (q: string) => `https://music.apple.com/search?term=${encodeURICompon
 const td = (q: string) => `https://tidal.com/search?q=${encodeURIComponent(q)}`;
 const sc = (q: string) => `https://soundcloud.com/search?q=${encodeURIComponent(q)}`;
 const yt = (q: string) => `https://music.youtube.com/search?q=${encodeURIComponent(q)}`;
+const bp = (q: string) => boomplaySearchUrl(q);
 
 // Map a genre string onto one of our mood accent colors.
 const GENRE_MOOD: Record<string, MoodTag> = {
@@ -89,6 +106,7 @@ function baseRelease(
   appleUrl: string | null
 ): Release {
   const q = `${artist} ${title}`;
+  const { credits, cleanTitle } = parseCredits(artist, title);
   return {
     id: stableId(artist, title),
     artist,
@@ -104,8 +122,11 @@ function baseRelease(
     tidal: td(q),
     soundcloud: sc(q),
     youtube_music: yt(q),
+    boomplay: bp(q),
     created_at: releaseDate + "T00:00:00Z",
     curator_note: null,
+    credits,
+    clean_title: cleanTitle,
   };
 }
 
@@ -115,7 +136,7 @@ async function fetchJSON(url: string): Promise<unknown | null> {
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(8000),
-      next: { revalidate: 1800 }, // refresh at most every 30 min
+      next: { revalidate: 300 }, // match the page ISR window — one truth for freshness
     });
     if (!res.ok) return null;
     return await res.json();
@@ -137,9 +158,23 @@ interface DeezerAlbum {
   release_date?: string;
   record_type?: string;
   artist?: { name?: string };
+  /** Present on list endpoints; resolved to a name via the /genre list. */
+  genre_id?: number;
 }
 
-export function mapDeezer(a: DeezerAlbum, popularity: number | null): FeedRelease | null {
+/**
+ * `genre` is the genre name when the caller knows it — the page it came from,
+ * or the album's genre_id resolved against Deezer's /genre list. Every Deezer
+ * release used to be mapped with genre null, so only the few undated chart
+ * albums that later got a detail fetch ever had one: the rest of the Deezer
+ * catalogue carried no genre, no tags, and mood "cinematic" by default, which
+ * starved genre filtering and the Selector's genre scoring.
+ */
+export function mapDeezer(
+  a: DeezerAlbum,
+  popularity: number | null,
+  genre: string | null = null
+): FeedRelease | null {
   const artist = a.artist?.name?.trim();
   const title = a.title?.trim();
   const art = a.cover_xl ?? a.cover_big;
@@ -151,7 +186,7 @@ export function mapDeezer(a: DeezerAlbum, popularity: number | null): FeedReleas
   // instead of pretending everything dropped today.
   const hasRealDate = Boolean(a.release_date && /^\d{4}-\d{2}-\d{2}$/.test(a.release_date));
   const date = hasRealDate ? a.release_date! : todayISO();
-  const r = baseRelease(artist, title, type, art, date, null, null) as FeedRelease;
+  const r = baseRelease(artist, title, type, art, date, genre, null) as FeedRelease;
   if (popularity != null) r.popularity = popularity;
   if (a.id) r._dz = a.id;
   if (!hasRealDate) r._noDate = true;
@@ -178,11 +213,18 @@ async function enrichRealDates(list: FeedRelease[]): Promise<void> {
   const CAP = 2500;
   const targets = need.slice(0, CAP);
   const CONC = 32;
+  // Wall-clock budget: without this, a cold render can spend minutes inside
+  // this stage alone (up to 2,500 fetches × 8s timeout at 32-way concurrency)
+  // and time out the whole serverless render. Missed albums stay undated and
+  // are picked up on the next revalidation, when their detail responses are
+  // already in the fetch cache.
+  const DEADLINE = Date.now() + 10_000;
   let idx = 0;
   let filled = 0;
 
   const worker = async () => {
     while (idx < targets.length) {
+      if (Date.now() > DEADLINE) return;
       const r = targets[idx++];
       const detail = (await fetchJSON(
         `https://api.deezer.com/album/${r._dz}`
@@ -208,18 +250,21 @@ async function enrichRealDates(list: FeedRelease[]): Promise<void> {
 }
 
 async function fromDeezer(): Promise<Release[]> {
-  const [releases, chart] = await Promise.all([
+  const [releases, chart, genres] = await Promise.all([
     fetchJSON("https://api.deezer.com/editorial/0/releases") as Promise<{ data?: DeezerAlbum[] } | null>,
     fetchJSON("https://api.deezer.com/chart/0/albums?limit=100") as Promise<{ data?: DeezerAlbum[] } | null>,
+    deezerGenres(),
   ]);
+  const nameOf = new Map(genres.map((g) => [g.id, g.name]));
+  const genreOf = (a: DeezerAlbum) => (a.genre_id ? nameOf.get(a.genre_id) ?? null : null);
   const out: Release[] = [];
   for (const a of releases?.data ?? []) {
-    const r = mapDeezer(a, null);
+    const r = mapDeezer(a, null, genreOf(a));
     if (r) out.push(r);
   }
   // Chart entries carry a popularity rank: position 1 => 200, 2 => 199...
   (chart?.data ?? []).forEach((a, i) => {
-    const r = mapDeezer(a, 200 - i);
+    const r = mapDeezer(a, 200 - i, genreOf(a));
     if (r) out.push(r);
   });
   return out;
@@ -227,16 +272,20 @@ async function fromDeezer(): Promise<Release[]> {
 
 // ── Source 1b: every genre's chart + editorial (thousands of albums) ──
 async function fromDeezerGenres(): Promise<Release[]> {
-  const genres = (await fetchJSON("https://api.deezer.com/genre")) as {
-    data?: { id: number; name: string }[];
-  } | null;
-  const ids = (genres?.data ?? []).map((g) => g.id).filter((id) => id > 0).slice(0, 29);
+  const genres = (await deezerGenres()).slice(0, 29);
+  const ids = genres.map((g) => g.id);
+  const nameOf = new Map(genres.map((g) => [g.id, g.name]));
   const out: Release[] = [];
   // Deezer caps a page at 100, so walk several pages per genre. This is what
-  // takes the catalogue from hundreds into the thousands.
+  // takes the catalogue from hundreds into the thousands. Bounded by a worker
+  // pool: 29 genres × 5 pages is 145 requests, and an unbounded Promise.all
+  // would spike 100+ simultaneous sockets.
   const PAGES = [0, 100, 200, 300];
-  await Promise.all(
-    ids.map(async (id) => {
+  const CONC = 20;
+  let idx = 0;
+  const worker = async () => {
+    while (idx < ids.length) {
+      const id = ids[idx++];
       const reqs: Promise<{ data?: DeezerAlbum[] } | null>[] = [
         fetchJSON(`https://api.deezer.com/chart/${id}/albums?limit=100`) as Promise<{ data?: DeezerAlbum[] } | null>,
       ];
@@ -250,23 +299,35 @@ async function fromDeezerGenres(): Promise<Release[]> {
       const pages = await Promise.all(reqs);
       for (const page of pages) {
         for (const a of page?.data ?? []) {
-          const r = mapDeezer(a, null);
+          // The page's own genre is the one we asked for.
+          const r = mapDeezer(a, null, nameOf.get(id) ?? null);
           if (r) out.push(r);
         }
       }
-    })
-  );
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(CONC, ids.length) }, worker));
   return out;
+}
+
+/** Deezer's genre list, minus id 0 ("All"). Cached by fetchJSON's revalidate. */
+async function deezerGenres(): Promise<{ id: number; name: string }[]> {
+  const genres = (await fetchJSON("https://api.deezer.com/genre")) as {
+    data?: { id: number; name: string }[];
+  } | null;
+  return (genres?.data ?? []).filter((g) => g.id > 0 && typeof g.name === "string");
+}
+
+/** Up to 29 usable genre ids. */
+async function deezerGenreIds(): Promise<number[]> {
+  return (await deezerGenres()).map((g) => g.id).slice(0, 29);
 }
 
 // ── Source 1e: top artists per genre → their catalogues ──────────────
 // Deezer exposes the leading artists in every genre; pulling each one's albums
 // adds thousands of real releases across the whole spectrum of music.
 async function fromGenreArtists(): Promise<Release[]> {
-  const genres = (await fetchJSON("https://api.deezer.com/genre")) as {
-    data?: { id: number; name: string }[];
-  } | null;
-  const ids = (genres?.data ?? []).map((g) => g.id).filter((id) => id > 0).slice(0, 29);
+  const ids = await deezerGenreIds();
 
   // Collect the top artists across every genre first.
   const artistIds = new Set<number>();
@@ -309,7 +370,7 @@ async function fromGenreArtists(): Promise<Release[]> {
 const AFRICA_ARTISTS = [
   // Afrobeats / Nigeria & West Africa
   "Burna Boy", "Wizkid", "Davido", "Tems", "Rema", "Asake", "Ayra Starr",
-  "Fireboy DML", "Omah Lay", "Tiwa Savage", "Yemi Alade", "Mr Eazi",
+  "Fireboy DML", "Omah Lay", "Tiwa Savage", "Yemi Alade",
   "Wande Coal", "Olamide", "Adekunle Gold", "Simi", "CKay", "Joeboy",
   "Ruger", "Kizz Daniel", "Patoranking", "Flavour", "Mr Eazi",
   // Amapiano / South Africa
@@ -327,21 +388,37 @@ const AFRICA_ARTISTS = [
   "Youssou N'Dour", "Salif Keita", "Diamond Platnumz", "Sauti Sol",
 ];
 
-async function fromAfrica(): Promise<Release[]> {
+/**
+ * Search a fixed artist list, bounded by a worker pool — an unbounded
+ * Promise.all over 100+ names opens 100+ sockets at once and invites 429s
+ * that fetchJSON silently converts to holes in the catalogue.
+ */
+async function searchArtistList(names: string[], transform?: (r: FeedRelease) => void): Promise<Release[]> {
   const out: Release[] = [];
-  await Promise.all(
-    AFRICA_ARTISTS.map(async (name) => {
+  const CONC = 20;
+  let idx = 0;
+  const worker = async () => {
+    while (idx < names.length) {
+      const name = names[idx++];
       const q = encodeURIComponent(`artist:"${name}"`);
       const data = (await fetchJSON(
         `https://api.deezer.com/search/album?q=${q}&limit=40&order=RANKING`
       )) as { data?: DeezerAlbum[] } | null;
       for (const a of data?.data ?? []) {
         const r = mapDeezer(a, null);
-        if (r) out.push(r);
+        if (r) {
+          transform?.(r);
+          out.push(r);
+        }
       }
-    })
-  );
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(CONC, names.length) }, worker));
   return out;
+}
+
+async function fromAfrica(): Promise<Release[]> {
+  return searchArtistList(AFRICA_ARTISTS);
 }
 
 // ── Source 1d: Gospel & worship (global + South African) ─────────────
@@ -364,37 +441,22 @@ const GOSPEL_ARTISTS = [
 ];
 
 async function fromGospel(): Promise<Release[]> {
-  const out: Release[] = [];
-  await Promise.all(
-    GOSPEL_ARTISTS.map(async (name) => {
-      const q = encodeURIComponent(`artist:"${name}"`);
-      const data = (await fetchJSON(
-        `https://api.deezer.com/search/album?q=${q}&limit=40&order=RANKING`
-      )) as { data?: DeezerAlbum[] } | null;
-      for (const a of data?.data ?? []) {
-        const r = mapDeezer(a, null);
-        if (!r) continue;
-        // Deezer's album search is FUZZY — `artist:"Zaza"` happily returns
-        // house compilations by nobody of the sort. This loop used to stamp
-        // every hit as gospel regardless, which is how "Club Ibiza, Vol. 2
-        // (Chillhouse Vibes)" and "The View (50 Deephouse Grooves)" ended up
-        // in the Gospel bucket. Require the album to actually be by the
-        // artist we asked for.
-        if (!artistMatches(name, r.artist)) continue;
-        r.genre = "Gospel";
-        r.tags = ["gospel"];
-        // Mood is deliberately NOT forced. Blanket-tagging the entire gospel
-        // sweep "euphoric" meant every one of these records scored a mood hit
-        // on any request mentioning joy, a party or celebration — which is
-        // exactly how a search for "euphoric house to dance to" came back
-        // full of mislabelled gospel compilations. Gospel spans jubilant
-        // praise and quiet worship; whatever mapDeezer inferred is closer to
-        // the truth than one blanket answer.
-        out.push(r);
-      }
-    })
+  return searchArtistList(GOSPEL_ARTISTS, (r) => {
+    r.genre = "Gospel";
+    r.tags = ["gospel"];
+    // Mood is deliberately NOT forced. Blanket-tagging the entire gospel
+    // sweep "euphoric" meant every one of these records scored a mood hit
+    // on any request mentioning joy, a party or celebration — which is
+    // exactly how a search for "euphoric house to dance to" came back
+    // full of mislabelled gospel compilations. Gospel spans jubilant
+    // praise and quiet worship; whatever mapDeezer inferred is closer to
+    // the truth than one blanket answer.
+  }).then((rows) =>
+    // Deezer's album search is FUZZY — `artist:"Zaza"` happily returns
+    // house compilations by nobody of the sort. Require the album to
+    // actually be by the artist we asked for.
+    rows.filter((r) => GOSPEL_ARTISTS.some((name) => artistMatches(name, r.artist)))
   );
-  return out;
 }
 
 // ── Source 1f: Grammy winners' complete discographies ────────────────
@@ -614,8 +676,14 @@ export async function getLiveFeed(): Promise<Release[]> {
 
   // Sort newest-first by REAL date; albums we still couldn't date are pushed
   // below the dated ones so they never sit at the top of "Latest".
+  // Return 0 on a tie. This returned -1 for equal dates, which makes the
+  // comparator inconsistent (compare(a,b) and compare(b,a) both said "first"),
+  // so same-day releases came out in an arbitrary order instead of the source
+  // priority they were assembled in. Array.prototype.sort is stable, so a real
+  // tie now preserves that order.
   all.sort((a, b) => {
     if (Boolean(a._noDate) !== Boolean(b._noDate)) return a._noDate ? 1 : -1;
+    if (a.release_date === b.release_date) return 0;
     return a.release_date < b.release_date ? 1 : -1;
   });
 

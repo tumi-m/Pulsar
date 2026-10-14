@@ -1,0 +1,9 @@
+{
+  "crateName": "Road Trip",
+  "withAudio": true,
+  "records": [
+    { "title": "GNX", "artist": "Kendrick Lamar", "artworkUrl": null, "year": "2024" },
+    { "title": "Brat", "artist": "Charli xcx", "artworkUrl": null, "year": "2024" },
+    { "title": "Blonde", "artist": "Frank Ocean", "artworkUrl": null, "year": "2016" }
+  ]
+}

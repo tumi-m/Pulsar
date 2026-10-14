@@ -18,12 +18,12 @@ describe("settings — AI mode", () => {
     saveAiMode("chat");
     expect(loadAiMode()).toBe("chat");
   });
-  it("dispatches pulsar-ai-mode-change on save", () => {
+  it("does not dispatch pulsar-ai-mode-change (channel retired)", () => {
     const h = vi.fn();
     window.addEventListener("pulsar-ai-mode-change", h);
     saveAiMode("survey");
     window.removeEventListener("pulsar-ai-mode-change", h);
-    expect(h).toHaveBeenCalled();
+    expect(h).not.toHaveBeenCalled();
   });
 });
 

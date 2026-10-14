@@ -1,24 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { loadTheme, themeById, THEMES, type Theme } from "@/lib/theme";
+import { useTheme } from "@/lib/useTheme";
 
 /**
  * Full-page themed nebula background. Reads the active theme and updates
  * live when it changes (from the sidebar or the onboarding quiz).
  */
 export function ThemedBackground() {
-  const [theme, setTheme] = useState<Theme>(THEMES[0]);
-
-  useEffect(() => {
-    setTheme(loadTheme());
-    const onChange = (e: Event) => {
-      const id = (e as CustomEvent<string>).detail;
-      setTheme(themeById(id));
-    };
-    window.addEventListener("pulsar-theme-change", onChange);
-    return () => window.removeEventListener("pulsar-theme-change", onChange);
-  }, []);
+  const theme = useTheme();
 
   return (
     <>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guard } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -20,8 +21,18 @@ export const runtime = "nodejs";
  */
 
 export async function POST(req: NextRequest) {
-  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  // Every call spends the app's client secret, so it gets the same per-IP
+  // ceiling as the other credentialed routes (apple-token, ask, agent).
+  const limited = guard(req, "youtube-token", { limit: 20, windowMs: 3_600_000 });
+  if (limited) return limited;
+
+  // The same two names /api/dsp-config accepts. This read only the NEXT_PUBLIC_
+  // one, so a deployment configured with GOOGLE_CLIENT_ID — which readiness
+  // accepted and the setup guide names — passed every check and then failed
+  // every token exchange on the way back from Google.
+  const clientId =
+    process.env.GOOGLE_CLIENT_ID?.trim() || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID?.trim();
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
   if (!clientId || !clientSecret) {
     return NextResponse.json(
       { error: "YouTube export is not configured on the server." },
@@ -44,6 +55,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // The redirect URI was taken from the request body and signed with our
+  // secret unexamined. The client only ever sends its own origin + "/" (see
+  // lib/dsp/shared.ts redirectUri()), so require exactly that, and require the
+  // browser's Origin — when it sends one — to be this same site. Google would
+  // reject an unregistered URI and PKCE binds the code to its verifier, so this
+  // is defence in depth; but there is no reason to let another site use this
+  // endpoint with our credentials at all.
+  const self = req.nextUrl.origin;
+  const origin = req.headers.get("origin");
+  if (redirectUri !== `${self}/` || (origin && origin !== self)) {
+    return NextResponse.json({ error: "Redirect URI does not match this site." }, { status: 400 });
+  }
+
   try {
     const res = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
@@ -63,8 +87,15 @@ export async function POST(req: NextRequest) {
     if (!res.ok || !data.access_token) {
       // Google's error bodies are actually useful here (redirect_uri_mismatch,
       // invalid_client, …) so pass the reason through rather than a bare 500.
+      // Lead with the actionable code; Google's descriptions are often vague.
+      const hint: Record<string, string> = {
+        redirect_uri_mismatch: `the OAuth client's authorised redirect URIs must include ${self}/ exactly`,
+        invalid_client: "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET don't belong to the same OAuth client",
+        invalid_grant: "the sign-in code expired or was already used — try the export again",
+        unauthorized_client: "the OAuth client must be of type “Web application”",
+      };
       return NextResponse.json(
-        { error: data.error_description || data.error || "Token exchange failed." },
+        { error: hint[data.error] ?? data.error_description ?? data.error ?? "Token exchange failed." },
         { status: 400 }
       );
     }

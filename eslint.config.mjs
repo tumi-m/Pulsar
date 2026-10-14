@@ -11,6 +11,12 @@ const eslintConfig = [
       "test-results/**",
       "coverage/**",
       "playwright/.cache/**",
+      // Vendored agent skills (third-party examples, linted upstream) and the
+      // Motion Canvas sub-project, which has its own package and toolchain.
+      ".claude/**",
+      "explainers/**",
+      "out/**",
+      "motion/out/**",
     ],
   },
   ...nextConfig,

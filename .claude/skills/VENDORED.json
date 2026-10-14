@@ -1,0 +1,136 @@
+{
+  "generatedBy": "scripts/motion/sync-agent-skills.mjs",
+  "sources": [
+    {
+      "repo": "remotion-dev/skills",
+      "commit": "7ba4dcf8ebe1626b00baa41e1f2478113719b60b",
+      "license": "See https://www.remotion.dev/license (no LICENSE file in the skills repo)"
+    },
+    {
+      "repo": "greensock/gsap-skills",
+      "commit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "license": "MIT"
+    },
+    {
+      "repo": "motiondivision/ai-kit",
+      "commit": "d1c5c26f424adfd47c112d894e9d424b57338c7e",
+      "license": "MIT"
+    }
+  ],
+  "skills": {
+    "remotion-best-practices": {
+      "repo": "remotion-dev/skills",
+      "commit": "7ba4dcf8ebe1626b00baa41e1f2478113719b60b",
+      "path": "skills/remotion-best-practices",
+      "sha256": "74387fd131f6bf315f91d4e60dccafc078956ef956629316a4407e78eed04859"
+    },
+    "remotion-create": {
+      "repo": "remotion-dev/skills",
+      "commit": "7ba4dcf8ebe1626b00baa41e1f2478113719b60b",
+      "path": "skills/remotion-create",
+      "sha256": "b4c7008d59acc97eb7ca61e29884548c3d570e1b10a93bef1a264d29165064cd"
+    },
+    "remotion-markup": {
+      "repo": "remotion-dev/skills",
+      "commit": "7ba4dcf8ebe1626b00baa41e1f2478113719b60b",
+      "path": "skills/remotion-markup",
+      "sha256": "5968247c3f628f36ac0b7faf0ed9d1df1bcf689bb1dc5db72cbdfda1e3b4525a"
+    },
+    "remotion-render": {
+      "repo": "remotion-dev/skills",
+      "commit": "7ba4dcf8ebe1626b00baa41e1f2478113719b60b",
+      "path": "skills/remotion-render",
+      "sha256": "75f520e1fb6b2b05c0ec3232d5423ac869c9929316612da7e79136ab6272266d"
+    },
+    "remotion-studio": {
+      "repo": "remotion-dev/skills",
+      "commit": "7ba4dcf8ebe1626b00baa41e1f2478113719b60b",
+      "path": "skills/remotion-studio",
+      "sha256": "aab3e04522deb92344a1d8432290da3d3f2539acc057518e093b92bd5ad0a863"
+    },
+    "remotion-multimedia": {
+      "repo": "remotion-dev/skills",
+      "commit": "7ba4dcf8ebe1626b00baa41e1f2478113719b60b",
+      "path": "skills/remotion-multimedia",
+      "sha256": "0300c3a7194e9301c8464a1f71116d9ec968a48d5e7fe8f74cc42323b68200ea"
+    },
+    "remotion-captions": {
+      "repo": "remotion-dev/skills",
+      "commit": "7ba4dcf8ebe1626b00baa41e1f2478113719b60b",
+      "path": "skills/remotion-captions",
+      "sha256": "14b7094ec0e58dde4321640d4bf18d7af56538acc3c64478f5aab979fd392654"
+    },
+    "remotion-interactivity": {
+      "repo": "remotion-dev/skills",
+      "commit": "7ba4dcf8ebe1626b00baa41e1f2478113719b60b",
+      "path": "skills/remotion-interactivity",
+      "sha256": "1ab5e4ba782be4ffb9454d5280e67cc843b9e3735674c5c74619decd6b340601"
+    },
+    "remotion-saas": {
+      "repo": "remotion-dev/skills",
+      "commit": "7ba4dcf8ebe1626b00baa41e1f2478113719b60b",
+      "path": "skills/remotion-saas",
+      "sha256": "260e2963b39c7823e7f9b7e47492357a243707315eaf33785e283e050f14eed3"
+    },
+    "remotion-docs": {
+      "repo": "remotion-dev/skills",
+      "commit": "7ba4dcf8ebe1626b00baa41e1f2478113719b60b",
+      "path": "skills/remotion-docs",
+      "sha256": "cc728017ead628a340866ddc398e7591c59bdb328e74ec38b88f6e4bed787f4a"
+    },
+    "remotion-upgrade": {
+      "repo": "remotion-dev/skills",
+      "commit": "7ba4dcf8ebe1626b00baa41e1f2478113719b60b",
+      "path": "skills/remotion-upgrade",
+      "sha256": "875d2cdb1927216c11af592d7a0f0ab74858b68bda7f4299d93a68d3fe47adf9"
+    },
+    "gsap-core": {
+      "repo": "greensock/gsap-skills",
+      "commit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "path": "skills/gsap-core",
+      "sha256": "54ea04b61bcdfe19bf09620f032a801c3ff11fdde2fd9270e7f7a5f484cdd8f5"
+    },
+    "gsap-timeline": {
+      "repo": "greensock/gsap-skills",
+      "commit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "path": "skills/gsap-timeline",
+      "sha256": "8f298b6e82151cf937ff7f94e2fb1a0cd505fc7f498f8dfbac3368f7cffef274"
+    },
+    "gsap-react": {
+      "repo": "greensock/gsap-skills",
+      "commit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "path": "skills/gsap-react",
+      "sha256": "462bf98687e2e404b99e6eb319c389427e91261b02887a2e99989d58c94dfe5f"
+    },
+    "gsap-plugins": {
+      "repo": "greensock/gsap-skills",
+      "commit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "path": "skills/gsap-plugins",
+      "sha256": "53f97dcc40f530b8127ea2052d2d86387598154f7b66ff3c571d983fcb4dda18"
+    },
+    "gsap-scrolltrigger": {
+      "repo": "greensock/gsap-skills",
+      "commit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "path": "skills/gsap-scrolltrigger",
+      "sha256": "b1997611820c8b7fdac73312492b1af00308649af0e5ca3426ef905f1903a98d"
+    },
+    "gsap-utils": {
+      "repo": "greensock/gsap-skills",
+      "commit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "path": "skills/gsap-utils",
+      "sha256": "c020319818c823ad19766a142c300d0b2ae644dd3fd685b09cf7a0d069edf67b"
+    },
+    "gsap-performance": {
+      "repo": "greensock/gsap-skills",
+      "commit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "path": "skills/gsap-performance",
+      "sha256": "ae9bfd168e3385ea47ed2c0a214272d1ac821580ea9dc996674dbbe0dfd0a93f"
+    },
+    "motion": {
+      "repo": "motiondivision/ai-kit",
+      "commit": "d1c5c26f424adfd47c112d894e9d424b57338c7e",
+      "path": "plugins/motion/skills/motion",
+      "sha256": "f1055c3531501633c24eb437881f002756682e8185680c8beb9a34521910ba6c"
+    }
+  }
+}

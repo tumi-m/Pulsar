@@ -87,3 +87,16 @@ describe("pickBestMatch", () => {
     expect(best!.title).toBe("Donda Deluxe");
   });
 });
+describe("matching works beyond a–z", () => {
+  it("matches non-Latin titles instead of normalising them to nothing", async () => {
+    const { titleMatches, normaliseTitle } = await import("@/lib/match");
+    expect(normaliseTitle("夜に駆ける")).not.toBe("");
+    expect(titleMatches("夜に駆ける", "夜に駆ける")).toBe(true);
+    expect(titleMatches("봄날", "Spring Day")).toBe(false);
+  });
+  it("folds accents rather than dropping the letter", async () => {
+    const { normaliseArtist, titleMatches } = await import("@/lib/match");
+    expect(normaliseArtist("Beyoncé")).toBe("beyonce");
+    expect(titleMatches("Café del Mar", "Cafe Del Mar")).toBe(true);
+  });
+});

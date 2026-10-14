@@ -41,9 +41,9 @@ function makePalette(
 
 /** Pulsar's own neon violet → cyan, used whenever the cover can't be read. */
 export const FALLBACK_PALETTE: Palette = makePalette(
-  [0.608, 0.365, 0.898], // #9b5de5
-  [0.0, 0.831, 1.0], // #00d4ff
-  [0.016, 0.016, 0.039], // #04040a
+  [0.608, 0.365, 0.898], // #f2662c
+  [0.0, 0.831, 1.0], // #4e86c7
+  [0.016, 0.016, 0.039], // #0b0d10
   true
 );
 
@@ -63,7 +63,7 @@ function vivify(r: number, g: number, b: number): [number, number, number] {
   const min = Math.min(r, g, b);
   const sat = max <= 0 ? 0 : (max - min) / max;
 
-  // Lift very dark swatches so they're visible against #04040a.
+  // Lift very dark swatches so they're visible against #0b0d10.
   let scale = 1;
   if (max < 0.35) scale = 0.35 / Math.max(max, 0.02);
 

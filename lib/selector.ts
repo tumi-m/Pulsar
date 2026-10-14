@@ -78,7 +78,17 @@ export const SCORE = {
   /** Mood supports a genre match; it does not substitute for one. */
   moodHit: 2,
   decadeHit: 2,
-  /** A query word appearing anywhere in the metadata. The weakest signal. */
+  /**
+   * A query word matching one of the record's descriptor tags.
+   *
+   * Tags are the only field that describes how a record actually sounds —
+   * "sparse", "late night", "driving", "warm analog synths" — and the scorer
+   * used to ignore them completely, matching only artist, title, genre and
+   * label. That is why "for a rainy day" or "to dance to" contributed nothing:
+   * the words could only ever hit a song title by coincidence.
+   */
+  tagHit: 3,
+  /** A query word appearing anywhere else in the metadata. The weakest signal. */
   wordHit: 1,
 } as const;
 
@@ -109,8 +119,15 @@ export function buildList(releases: Release[], p: Parsed, limit = 80): Release[]
     if (r.mood && p.moods.includes(r.mood)) s += SCORE.moodHit;
     if (p.decades.some((d) => r.release_date.startsWith(d))) s += SCORE.decadeHit;
 
+    // Descriptor tags are scored separately and higher: a tag is something
+    // somebody asserted about the record, whereas a word in a title is usually
+    // a coincidence ("Housework" is not house).
+    const tagHay = (r.tags ?? []).join(" ").toLowerCase();
     const hay = `${r.artist} ${r.title} ${r.genre ?? ""} ${r.label ?? ""}`.toLowerCase();
-    for (const w of words) if (hay.includes(w)) s += SCORE.wordHit;
+    for (const w of words) {
+      if (tagHay.includes(w)) s += SCORE.tagHit;
+      else if (hay.includes(w)) s += SCORE.wordHit;
+    }
 
     return { r, s };
   });
@@ -119,4 +136,49 @@ export function buildList(releases: Release[], p: Parsed, limit = 80): Release[]
     .sort((a, b) => b.s - a.s)
     .slice(0, limit)
     .map(({ r }) => r);
+}
+
+/**
+ * Map free-form genre names onto the buckets the scorer understands.
+ *
+ * /api/ask returns whatever the model thinks the genre is — "chillwave",
+ * "boom bap", "neo-soul", "shoegaze". Those were cast straight to GenreBucket
+ * and merged into the signal list, which broke scoring in both directions at
+ * once: nothing could match `p.genres.includes(bucket)`, so NO record earned
+ * the genre bonus, and the mismatch branch then penalised every record that
+ * had a genre at all. Records with no genre metadata sailed to the top on a
+ * coincidental title word — which is how "dreamy chillwave for a late-night
+ * drive" returned "Taxi Driver" and "Pop Drive".
+ *
+ * Anything that maps becomes a real bucket. Anything that doesn't is returned
+ * as leftover text rather than discarded, so a term like "shoegaze" can still
+ * match a record's descriptor tags instead of silently poisoning the genre
+ * filter.
+ */
+export function resolveGenres(freeform: string[]): {
+  buckets: GenreBucket[];
+  leftover: string[];
+} {
+  const buckets: GenreBucket[] = [];
+  const leftover: string[] = [];
+  const entries = Object.entries(GENRE_WORDS) as [GenreBucket, string[]][];
+
+  for (const raw of freeform) {
+    const g = raw.trim().toLowerCase();
+    if (!g) continue;
+    // Already a bucket name (the keyword parser emits these directly).
+    const exact = entries.find(([bucket]) => bucket.toLowerCase() === g);
+    if (exact) {
+      if (!buckets.includes(exact[0])) buckets.push(exact[0]);
+      continue;
+    }
+    // Otherwise look it up in each bucket's keyword vocabulary.
+    const viaKeyword = entries.find(([, kws]) => kws.some((k) => g.includes(k) || k.includes(g)));
+    if (viaKeyword) {
+      if (!buckets.includes(viaKeyword[0])) buckets.push(viaKeyword[0]);
+      continue;
+    }
+    leftover.push(g);
+  }
+  return { buckets, leftover };
 }

@@ -38,12 +38,27 @@ const SYSTEM_PROMPT = `You are Pulsar — a world-class music curator with the t
 For the release you are given, return STRICT JSON (no markdown, no prose) with exactly these fields:
 {
   "curator_note": "One vivid sentence. Specific and evocative. Never use clichés like 'boundary-pushing', 'genre-defying', 'sonic journey', or 'must-listen'. Make the reader feel the music before they press play.",
-  "mood": "one of: euphoric | melancholic | energetic | ambient | raw | cinematic | hypnotic | tender"
-}`;
+  "mood": "one of: euphoric | melancholic | energetic | ambient | raw | cinematic | hypnotic | tender",
+  "sonics": ["4-7 short lowercase phrases describing how this record ACTUALLY SOUNDS and where it fits"]
+}
+
+The "sonics" list is the important one — it is what people search against, so
+describe the listening experience, not the paperwork. Cover, where you can:
+  • pace — "slow", "mid-tempo", "frantic", "steady four-to-the-floor"
+  • texture — "warm analog synths", "distorted guitars", "sparse piano", "lush strings"
+  • energy — "understated", "explosive", "builds slowly", "relentless"
+  • setting — "late night", "rainy day", "driving", "the gym", "sunday morning"
+Use ordinary words a listener would actually type. Do NOT restate the genre or
+the artist name — those are already known. If you do not genuinely know how this
+record sounds, return fewer phrases rather than guessing: a wrong descriptor is
+worse than a missing one, because it will surface the record for the wrong
+request.`;
 
 interface Enrichment {
   curator_note: string;
-  mood: MoodTag;
+  /** null when the model didn't return a usable one — see parseEnrichment. */
+  mood: MoodTag | null;
+  sonics: string[];
 }
 
 /** True when Ollama is configured/reachable enough to attempt enrichment. */
@@ -90,7 +105,23 @@ function parseEnrichment(raw: string | null): Enrichment | null {
     const note = typeof obj.curator_note === "string" ? obj.curator_note.trim() : "";
     const mood = MOODS.includes(obj.mood) ? (obj.mood as MoodTag) : null;
     if (!note) return null;
-    return { curator_note: note, mood: mood ?? "cinematic" };
+    // Descriptors: short, lowercase, de-duplicated, and capped so one verbose
+    // answer can't dominate a record's tag set.
+    const rawSonics: unknown[] = Array.isArray(obj.sonics) ? obj.sonics : [];
+    const sonics: string[] = Array.from(
+      new Set(
+        rawSonics
+          .filter((t): t is string => typeof t === "string")
+          .map((t) => t.trim().toLowerCase())
+          .filter((t) => t.length > 1 && t.length <= 40)
+      )
+    ).slice(0, 8);
+    // Deliberately NOT defaulting to "cinematic". That default was applied
+    // whenever the model omitted or mangled the field, which quietly labelled
+    // a chunk of the catalogue with a mood nobody had asserted — and a wrong
+    // mood actively surfaces a record for the wrong request. Null leaves
+    // whatever the genre inferred, which is at least honest about its origin.
+    return { curator_note: note, mood, sonics };
   } catch {
     return null;
   }
@@ -105,7 +136,17 @@ Genre: ${r.genre ?? "unknown"}
 Write the curator_note and mood for this release.`;
   const enrichment = parseEnrichment(await chat(prompt));
   if (!enrichment) return r;
-  return { ...r, curator_note: enrichment.curator_note, mood: enrichment.mood };
+  // Sonic descriptors join the existing tags rather than replacing them: the
+  // genre tag is still worth keeping, and the Selector now scores query words
+  // against this field, so this is what makes "for a rainy day" or "late-night
+  // drive" match on something other than coincidence.
+  const tags = Array.from(new Set([...(r.tags ?? []), ...enrichment.sonics]));
+  return {
+    ...r,
+    curator_note: enrichment.curator_note,
+    mood: enrichment.mood ?? r.mood,
+    tags,
+  };
 }
 
 /** Run `fn` over `items` with a fixed concurrency pool. */
