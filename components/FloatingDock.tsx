@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "motion/react";
-import { Heart, X, Trash2, Sparkles, Shuffle, Play, Share2, Upload, Plus, Pencil } from "lucide-react";
+import { Heart, X, Trash2, Sparkles, Shuffle, Play, Share2, Upload, Plus, Pencil, Clapperboard } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";
 import type { MediaFormat } from "@/lib/format";
@@ -38,6 +39,12 @@ import {
   type BuildResult,
 } from "@/lib/dsp";
 import { readPending } from "@/lib/dsp/shared";
+import { playSfx } from "@/lib/sfx";
+
+// The recap video sheet carries Remotion's Player and the composition — far
+// too heavy for the home page's first load, and most visitors never open it.
+// Fetched the first time Video is pressed.
+const CrateVideoSheet = dynamic(() => import("./CrateVideoSheet").then((m) => m.CrateVideoSheet), { ssr: false });
 
 interface FloatingDockProps {
   format: MediaFormat;
@@ -93,6 +100,9 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   const [navHidden, setNavHidden] = useState(false);
   // Crate → playlist export sheet.
   const [exporting, setExporting] = useState(false);
+  // Crate → recap video sheet (it owns its own Back/Escape entry). Holds the
+  // crate it was opened on; see videoKey below for why.
+  const [videoFor, setVideoFor] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   // Bumped whenever the runtime DSP config is (re)fetched, so providerConfigured
   // re-evaluates and the export sheet's "Creates playlist" badges update.
@@ -122,6 +132,15 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   useBackClose(exporting, () => setExporting(false));
   useBackClose(Boolean(built), () => setBuilt(null));
   useBackClose(Boolean(buildError), () => setBuildError(null));
+  // The tape-deck chime for a playlist that landed, the buzz for one that
+  // didn't — keyed on the cards themselves, so every path that shows one
+  // (a direct build, a resumed sign-in, Try again) sounds the same.
+  useEffect(() => {
+    if (built) playSfx("success");
+  }, [built]);
+  useEffect(() => {
+    if (buildError) playSfx("error");
+  }, [buildError]);
   // Hide the floating dock while the album/tracklist panel is open so it never
   // covers the tracklist's text/icons (especially on mobile).
   const [detailOpen, setDetailOpen] = useState(false);
@@ -273,6 +292,14 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   // A coverless record is drawn as a cassette J-card now (see <Artwork>).
   const items = panel === "favorites" ? favs : activeCrate?.releases ?? [];
   const favIds = new Set(favs.map((f) => f.id));
+  // The video sheet is about the crate it was opened on. Closing the panel,
+  // switching crate or to Favorites, or emptying the crate closes it for good;
+  // a bare flag outlived all of those and reopened the sheet by itself the
+  // next time records showed. Adjusted during render, React's pattern for
+  // state that follows other state.
+  const videoKey = panel ? `${panel}:${panel === "favorites" ? "" : activeCrate?.id ?? ""}` : null;
+  if (videoFor !== null && (videoFor !== videoKey || items.length === 0)) setVideoFor(null);
+  const videoOpen = videoFor !== null;
 
   async function shareRelease(r: Release) {
     const url = typeof window !== "undefined" ? window.location.href : "";
@@ -517,10 +544,10 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", stiffness: 340, damping: 36 }}
-              // Grows while the export sheet is open: at 55% of a phone screen the
-              // sheet's four services, CSV keys and setup notes were a cramped
-              // scroll inside a scroll.
-              className={`crate-weave fixed inset-x-0 bottom-0 z-[55] flex transition-[height] duration-300 ease-settle ${exporting ? "h-[92dvh]" : "h-[55dvh]"} flex-col rounded-t-2xl border-t-2 border-[#5a3d24]/70 pb-[env(safe-area-inset-bottom)] lg:inset-x-auto lg:right-0 lg:top-0 lg:h-full lg:w-1/2 lg:rounded-none lg:border-l-2 lg:border-t-0 lg:pb-0`}
+              // Grows while the export or video sheet is open: at 55% of a phone
+              // screen the sheet's four services, CSV keys and setup notes were a
+              // cramped scroll inside a scroll, and the preview a postage stamp.
+              className={`crate-weave fixed inset-x-0 bottom-0 z-[55] flex transition-[height] duration-300 ease-settle ${exporting || videoOpen ? "h-[92dvh]" : "h-[55dvh]"} flex-col rounded-t-2xl border-t-2 border-[#5a3d24]/70 pb-[env(safe-area-inset-bottom)] lg:inset-x-auto lg:right-0 lg:top-0 lg:h-full lg:w-1/2 lg:rounded-none lg:border-l-2 lg:border-t-0 lg:pb-0`}
             >
               <div className="border-b border-white/10 px-5 py-4">
                 <div className="flex items-center justify-between">
@@ -547,7 +574,9 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                     ) : (
                       <button
                         onClick={() => setRenaming(true)}
-                        className="flex items-center gap-2 text-left text-lg font-bold uppercase tracking-tight text-ink"
+                        // max-w-full: a button sizes to its content, so without it the
+                        // name ran under the header's buttons instead of truncating.
+                        className="flex max-w-full items-center gap-2 text-left text-lg font-bold uppercase tracking-tight text-ink"
                       >
                         <span className="truncate">{activeCrate?.name ?? "Crate"} · {items.length}</span>
                         <Pencil size={12} className="flex-shrink-0 text-ink/30" />
@@ -555,6 +584,18 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                     )}
                   </div>
                   <div className="flex flex-shrink-0 items-center gap-2">
+                    {items.length > 0 && (
+                      <button
+                        onClick={() => setVideoFor(videoKey)}
+                        aria-label={`Make a recap video of ${items.length} record${items.length === 1 ? "" : "s"}`}
+                        // Icon-only on a phone: with Export and Close beside it there
+                        // is no room left for the crate's name otherwise.
+                        className="relative z-10 flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-full border border-sony/50 bg-sony/15 px-3 py-2.5 text-[11px] font-bold uppercase tracking-widest text-sony transition-colors hover:bg-sony/25 active:scale-95 sm:px-3.5"
+                      >
+                        <Clapperboard size={15} />
+                        <span className="hidden sm:inline">Video</span>
+                      </button>
+                    )}
                     {items.length > 0 && (
                       <button
                         onClick={() => setExporting(true)}
@@ -651,6 +692,10 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                       <ExportSheet
                         count={items.length}
                         crateName={crateName()}
+                        // The share card draws exactly these. Without them it
+                        // had to find the crate in storage by name and count,
+                        // and "Crate 3" can exist twice after a delete.
+                        records={items}
                         cfgTick={cfgTick}
                         onPick={exportTo}
                         onCopy={copyList}
@@ -667,6 +712,18 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                       />
                     </motion.div>
                   </>
+                )}
+              </AnimatePresence>
+
+              {/* crate → recap video sheet */}
+              <AnimatePresence>
+                {videoOpen && items.length > 0 && (
+                  <CrateVideoSheet
+                    key="video"
+                    crateName={crateName()}
+                    releases={items}
+                    onClose={() => setVideoFor(null)}
+                  />
                 )}
               </AnimatePresence>
 

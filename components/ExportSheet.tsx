@@ -1,9 +1,11 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
-import { Copy, Download, ChevronDown } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { motion, useIsPresent, useReducedMotion } from "motion/react";
+import { Copy, Download, ChevronDown, Share2, Loader2 } from "lucide-react";
 import { PLATFORMS } from "./platforms";
 import { providerConfigured, providerMissing } from "@/lib/dsp";
+import type { CardSourceRecord } from "@/lib/cards/client";
 
 /**
  * The "export this crate" sheet.
@@ -28,6 +30,12 @@ interface Props {
   onCopy: () => void;
   onCsv: () => void;
   onCopyRedirect: () => void;
+  /**
+   * The crate's records, for the share card. Without them the card reads the
+   * crate back from storage by name and count (crateRecordsFromStorage), and
+   * refuses when two same-named crates would make different cards.
+   */
+  records?: readonly CardSourceRecord[];
 }
 
 /** What each service needs before Pulsar can create playlists on it. */
@@ -69,10 +77,54 @@ const SETUP: Record<string, { console: string; consoleLabel: string; steps: stri
   },
 };
 
-export function ExportSheet({ count, crateName, cfgTick, onPick, onCopy, onCsv, onCopyRedirect }: Props) {
+export function ExportSheet({ count, crateName, cfgTick, onPick, onCopy, onCsv, onCopyRedirect, records }: Props) {
   const reduce = useReducedMotion();
   const anyLive = PLATFORMS.some((p) => providerConfigured(p.key));
   const origin = typeof window !== "undefined" ? `${window.location.origin}/` : "/";
+  const [card, setCard] = useState<{ state: "idle" | "busy" | "done" | "error"; msg: string }>({
+    state: "idle",
+    msg: "",
+  });
+  const drawing = card.state === "busy";
+
+  // Closing the sheet cancels a card still drawing: otherwise the PNG lands,
+  // or the share sheet pops up, a second after the listener dismissed it.
+  // isPresent turns false as the exit animation starts, before the unmount.
+  const draw = useRef<AbortController | null>(null);
+  const present = useIsPresent();
+  useEffect(() => {
+    if (!present) draw.current?.abort();
+  }, [present]);
+  useEffect(() => () => draw.current?.abort(), []);
+
+  // The card is drawn by /api/card and rasterised here; all of that loads on
+  // the tap, so the sheet itself carries none of it.
+  const shareCard = async () => {
+    if (drawing) return;
+    const ctl = new AbortController();
+    draw.current = ctl;
+    setCard({ state: "busy", msg: "Drawing your card…" });
+    try {
+      const cards = await import("@/lib/cards/client");
+      const list = records ?? cards.crateRecordsFromStorage(crateName, count);
+      if (!list?.length) throw new cards.CardError("This crate has no records to put on a card.");
+      const outcome = await cards.shareCrateCard(crateName, list, ctl.signal);
+      setCard(
+        outcome === "cancelled"
+          ? { state: "idle", msg: "" }
+          : { state: "done", msg: outcome === "shared" ? "Card shared." : "Card saved as a PNG." },
+      );
+    } catch (err) {
+      if (ctl.signal.aborted) return;
+      setCard({
+        state: "error",
+        msg:
+          err instanceof Error && err.name === "CardError"
+            ? err.message
+            : "Couldn't make the card — check your connection and try again.",
+      });
+    }
+  };
 
   return (
     // No key={cfgTick}: remounting on every config refresh snapped the owner
@@ -132,6 +184,24 @@ export function ExportSheet({ count, crateName, cfgTick, onPick, onCopy, onCsv, 
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
+        {/* Full width above the pair: three keys across don't fit their labels
+            at phone width, and this keeps the CSV note under the CSV key. */}
+        {/* aria-disabled, not disabled: disabling the focused key drops focus
+            to <body>, throwing keyboard and screen-reader users out of the
+            dialog. shareCard ignores presses while it draws. */}
+        <button
+          onClick={shareCard}
+          aria-disabled={drawing}
+          aria-busy={drawing}
+          className="col-span-2 flex min-h-10 items-center justify-center gap-1.5 rounded-[10px] border border-chrome-700/70 bg-deck-600 text-[10px] font-bold uppercase tracking-widest text-ink shadow-key active:translate-y-px active:shadow-keyed aria-disabled:cursor-wait aria-disabled:opacity-70 aria-disabled:active:translate-y-0 aria-disabled:active:shadow-key"
+        >
+          {drawing ? (
+            <Loader2 size={12} className="animate-spin motion-reduce:animate-none" />
+          ) : (
+            <Share2 size={12} className="text-sony" />
+          )}
+          {drawing ? "Drawing card…" : "Share card"}
+        </button>
         <button
           onClick={onCopy}
           className="flex min-h-10 items-center justify-center gap-1.5 rounded-[10px] border border-chrome-700/70 bg-deck-600 text-[10px] font-bold uppercase tracking-widest text-ink shadow-key active:translate-y-px active:shadow-keyed"
@@ -145,6 +215,20 @@ export function ExportSheet({ count, crateName, cfgTick, onPick, onCopy, onCsv, 
           <Download size={12} /> Download CSV
         </button>
       </div>
+      {/* Always mounted, so screen readers announce the text when it changes.
+          While drawing, the key's own label says so; this line is for them. */}
+      <p
+        role="status"
+        className={
+          drawing
+            ? "sr-only"
+            : card.msg
+              ? `mt-2 text-[10.5px] leading-relaxed ${card.state === "error" ? "text-vu" : "text-lcd"}`
+              : undefined
+        }
+      >
+        {card.msg}
+      </p>
       {/* Honest about what a CSV is for: the old copy implied each service
           would take it directly, and none of them does. */}
       <p className="mt-2 text-[10px] leading-relaxed text-ink-600">

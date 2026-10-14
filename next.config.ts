@@ -1,6 +1,16 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // /api/card reads its fonts from disk by a computed path (lib/cards/fonts.ts),
+  // which file tracing can't follow — without this the function deploys
+  // without them and every card is a 500.
+  outputFileTracingIncludes: {
+    "/api/card": [
+      "./node_modules/@fontsource/inter/files/inter-*-700-normal.woff",
+      "./node_modules/@fontsource/inter/files/inter-*-900-normal.woff",
+      "./node_modules/@fontsource/space-mono/files/space-mono-*-normal.woff",
+    ],
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 86400,

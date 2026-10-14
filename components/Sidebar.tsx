@@ -12,6 +12,7 @@ import { CrateIcon } from "./CrateIcon";
 import { FORMATS, loadFormat, saveFormat, type MediaFormat } from "@/lib/format";
 import { THEMES, loadTheme, saveTheme } from "@/lib/theme";
 import { getFavorites, getPlaylist } from "@/lib/collection";
+import { useSfxEnabled } from "@/lib/sfx";
 import { currentUserId, onAuthChange, signInWithEmail, signOut, syncConfigured } from "@/lib/sync";
 import {
   loadAiMode,
@@ -60,6 +61,7 @@ export function Sidebar() {
   const [syncUser, setSyncUser] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [emailState, setEmailState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [sounds, setSounds] = useSfxEnabled();
 
   const refresh = () => setCounts({ fav: getFavorites().length, crate: getPlaylist().length });
 
@@ -250,6 +252,48 @@ export function Sidebar() {
                   </button>
                 ))}
               </div>
+              {/* Opt-in: a music app that clicks at you uninvited is worse than
+                  silent. Turning it on plays the key click itself (lib/sfx.ts),
+                  so the confirmation is the sound working. The copy names only
+                  what really sounds: the player's transport keys, a record
+                  landing in a crate, an export finishing. Keep onClick
+                  synchronous: lib/sfx opens its AudioContext inside this click,
+                  the only place WebKit will start one. Press feedback is CSS
+                  :active, not whileTap, which misroutes taps here. */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={sounds}
+                onClick={() => setSounds(!sounds)}
+                className={`mt-3 flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors active:bg-ink/[0.09] ${
+                  sounds ? "border-lcd/40 bg-lcd/[0.06]" : "border-ink/10 hover:border-ink/25"
+                }`}
+              >
+                <span className="min-w-0">
+                  <span className="block text-[12px] font-bold uppercase tracking-wide text-ink">
+                    Interface sounds
+                  </span>
+                  <span className="block text-[10px] text-ink/40">
+                    Tape-deck sounds for keys, crates &amp; exports
+                  </span>
+                </span>
+                <span
+                  aria-hidden="true"
+                  className={`flex h-5 w-9 flex-shrink-0 items-center rounded-full border px-0.5 transition-colors ${
+                    sounds ? "border-lcd/60 bg-lcd/20" : "border-ink/20 bg-deck/60"
+                  }`}
+                >
+                  {/* The lit LED slides across. Plain CSS, so translate-x is
+                      safe here, and it snaps under reduced motion. */}
+                  <span
+                    className={`h-3.5 w-3.5 rounded-full transition-transform duration-200 ease-settle motion-reduce:transition-none ${
+                      sounds
+                        ? "translate-x-4 bg-lcd shadow-[0_0_6px_rgba(126,217,174,0.8)]"
+                        : "translate-x-0 bg-ink/40"
+                    }`}
+                  />
+                </span>
+              </button>
             </Section>
 
             {/* Theme */}

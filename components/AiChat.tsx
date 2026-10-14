@@ -17,6 +17,7 @@ import { useBackClose } from "@/lib/useBackClose";
 import { Portal } from "./Portal";
 import { PLATFORMS } from "./platforms";
 import { MiniPlayer } from "./player/MiniPlayer";
+import { TapeLoader } from "./TapeLoader";
 
 interface AiChatProps {
   releases: Release[];
@@ -534,17 +535,11 @@ export function AiChat({ releases }: AiChatProps) {
                       >
                         <Sparkles size={14} className="text-deck" />
                       </span>
-                      <div className="flex items-end gap-1" aria-label="Thinking">
-                        {[0, 1, 2, 3].map((i) => (
-                          <motion.span
-                            key={i}
-                            className="w-1 rounded-full bg-sony"
-                            initial={{ height: 6 }}
-                            // Reduced motion: a static dot still says "working".
-                            animate={reduce ? undefined : { height: [6, 18, 6] }}
-                            transition={reduce ? undefined : { duration: 0.9, repeat: Infinity, delay: i * 0.12, ease: "easeInOut" }}
-                          />
-                        ))}
+                      <div className="flex" aria-label="Thinking">
+                        {/* A tape playing while the model listens. Under
+                            reduced motion it holds still; the words beside it
+                            carry the meaning either way. */}
+                        <TapeLoader className="h-10 w-20" />
                       </div>
                       <span className="text-[11px] text-ink/50">Reading the room…</span>
                     </div>

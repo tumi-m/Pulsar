@@ -1,6 +1,7 @@
 "use client";
 
 import { EASE, ms } from "./motion";
+import { playSfx } from "./sfx";
 
 /**
  * Fly a record's artwork into the crate button.
@@ -39,16 +40,20 @@ function prefersReducedMotion(): boolean {
  */
 export function flyToCrate(source: Element | null, imageUrl?: string): void {
   if (typeof window === "undefined") return;
+  // The record is in the crate whether or not anything flies, so every path
+  // that skips the flight still lands with the sound. Reduced motion asks for
+  // less movement, not less feedback. (A no-op unless sounds are switched on.)
+  const land = () => playSfx("drop");
   // Motion for its own sake is exactly what this preference is about.
-  if (prefersReducedMotion()) return;
-  if (!source) return;
+  if (prefersReducedMotion()) return land();
+  if (!source) return land();
 
   const target = document.querySelector(crateTargetSelector);
-  if (!target) return; // crate not on screen — nothing to fly to
+  if (!target) return land(); // crate not on screen — nothing to fly to
 
   const from = source.getBoundingClientRect();
   const to = target.getBoundingClientRect();
-  if (from.width === 0 || to.width === 0) return;
+  if (from.width === 0 || to.width === 0) return land();
 
   const img = imageUrl ?? source.querySelector("img")?.getAttribute("src") ?? null;
 
@@ -81,6 +86,7 @@ export function flyToCrate(source: Element | null, imageUrl?: string): void {
   // object rather than a linear tween.
   const lift = Math.min(120, Math.abs(dy) * 0.35 + 40);
 
+  const flight = ms(0.62);
   const anim = ghost.animate(
     [
       { transform: "translate(0,0) scale(1)", opacity: 1, offset: 0 },
@@ -92,11 +98,23 @@ export function flyToCrate(source: Element | null, imageUrl?: string): void {
       { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0.1, offset: 1 },
     ],
     {
-      duration: ms(0.62),
+      duration: flight,
       easing: `cubic-bezier(${EASE.inOut.join(",")})`,
       fill: "forwards",
     }
   );
+
+  // In flight, the thunk waits for the arrival, where the crate's recoil
+  // (below) also lands. Waiting is safe: lib/sfx resumed its AudioContext on
+  // the click that started this flight. A finish that comes seconds later —
+  // the tab was hidden mid-flight — is stale, and a late thunk would be about
+  // nothing.
+  // The second of grace is for a busy main thread: the add re-renders the
+  // grid, which can hold the finish event back a few frames on a slow phone.
+  const landsAt = performance.now() + flight;
+  anim.addEventListener("finish", () => {
+    if (performance.now() - landsAt < 1000) land();
+  });
 
   const cleanup = () => ghost.remove();
   anim.addEventListener("finish", cleanup);
