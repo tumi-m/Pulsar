@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "Motion": {
+      "type": "http",
+      "url": "https://mcp.motion.dev"
+    },
+    "Motion+": {
+      "type": "http",
+      "url": "https://mcp.motion.dev/plus"
+    }
+  }
+}
