@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { QUIZ, buildProfile, saveProfile, type TasteProfile } from "@/lib/taste";
 import { saveTheme } from "@/lib/theme";
 import { Portal } from "./Portal";

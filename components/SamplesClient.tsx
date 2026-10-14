@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "motion/react";
 import { Search, Loader2, AudioLines, Trophy, Sparkles, ArrowDownRight, Link2, BarChart3, Users, ExternalLink, Mic2 } from "lucide-react";
 import Link from "next/link";
 import { SamplePage, type SampleRef, type SampleSubject } from "./SamplePage";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { motion, AnimatePresence, useDragControls } from "framer-motion";
+import { motion, AnimatePresence, useDragControls } from "motion/react";
 import { X, Play, Pause, ChevronLeft, ChevronRight, Move } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { usePlayer } from "./player/PlayerProvider";

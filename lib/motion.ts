@@ -1,7 +1,7 @@
 "use client";
 
-import type { Variants } from "framer-motion";
-import { useReducedMotion } from "framer-motion";
+import type { Variants } from "motion/react";
+import { useReducedMotion } from "motion/react";
 
 /**
  * Re-exported so there is ONE reduced-motion hook in the codebase. Several

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { X, Mic2 } from "lucide-react";
 import { useScrollLock } from "@/lib/useScrollLock";
 import { useDialog } from "@/lib/useDialog";

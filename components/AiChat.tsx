@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence, useDragControls, useReducedMotion } from "framer-motion";
+import { motion, AnimatePresence, useDragControls, useReducedMotion } from "motion/react";
 import { Sparkles, X, Play, Pause, Loader2, LayoutGrid, MessagesSquare, ArrowUp, RotateCcw } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";

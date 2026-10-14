@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence, useDragControls } from "framer-motion";
+import { motion, AnimatePresence, useDragControls } from "motion/react";
 import dynamic from "next/dynamic";
 import { useScrollLock } from "@/lib/useScrollLock";
 import { useDialog } from "@/lib/useDialog";

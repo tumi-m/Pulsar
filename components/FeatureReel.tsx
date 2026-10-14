@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { Mic2, AudioLines, Library, ListMusic, Youtube, Sparkles } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 

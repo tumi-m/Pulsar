@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { X, Plus } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { getCrates, createCrate, toggleInCrate, inCrate, type Crate } from "@/lib/collection";

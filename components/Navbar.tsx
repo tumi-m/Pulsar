@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useScroll, useMotionValueEvent } from "framer-motion";
+import { motion, useScroll, useMotionValueEvent } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Shuffle, Sparkles, AudioLines } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";

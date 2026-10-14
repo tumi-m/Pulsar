@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "motion/react";
 import { Copy, Download, ChevronDown } from "lucide-react";
 import { PLATFORMS } from "./platforms";
 import { providerConfigured, providerMissing } from "@/lib/dsp";

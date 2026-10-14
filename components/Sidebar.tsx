@@ -5,7 +5,7 @@ import { useScrollLock } from "@/lib/useScrollLock";
 import { useDialog } from "@/lib/useDialog";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { X, Heart, Sparkles, CloudUpload, Check } from "lucide-react";
 import { CalabiYau } from "./CalabiYau";
 import { CrateIcon } from "./CrateIcon";

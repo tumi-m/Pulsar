@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 
 /**
  * Calabi–Yau manifold mark — a stylized cross-section of the 6-fold

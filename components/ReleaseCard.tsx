@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, memo } from "react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { Heart, Play, Pause, Share2, Sparkles } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 import type { Release } from "@/lib/types";

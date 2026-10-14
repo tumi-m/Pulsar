@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { X, Search, AudioLines, Clock, Loader2, Trophy, Sparkles, ExternalLink, ArrowRight } from "lucide-react";
 import { Portal } from "./Portal";
 import { useScrollLock } from "@/lib/useScrollLock";

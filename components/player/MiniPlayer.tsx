@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 import { Play, Pause, Loader2, X, Maximize2 } from "lucide-react";
 import { Artwork } from "../Artwork";
 import { usePlayer, useTransport } from "./PlayerProvider";

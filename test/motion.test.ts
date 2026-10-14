@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { TargetAndTransition, Variant } from "framer-motion";
+import type { TargetAndTransition, Variant } from "motion/react";
 import { EASE, DUR, SPRING, fadeUp, pop, staggerParent, sheet, ms } from "@/lib/motion";
 
 /**

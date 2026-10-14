@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { motion, AnimatePresence, useAnimationControls } from "framer-motion";
+import { motion, AnimatePresence, useAnimationControls } from "motion/react";
 import type { Release } from "@/lib/types";
 import { ReleaseCard } from "./ReleaseCard";
 import { ReleaseDetail } from "./ReleaseDetail";
