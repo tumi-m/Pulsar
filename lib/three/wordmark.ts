@@ -244,3 +244,10 @@ export function buildConstellation(
 
   return { count, start, target, delay, flightSeconds };
 }
+
+/** Widest |x| of the assembled wordmark — what has to fit across the frame. */
+export function constellationHalfWidth({ target, count }: Constellation): number {
+  let half = 0;
+  for (let i = 0; i < count; i++) half = Math.max(half, Math.abs(target[i * 3]));
+  return half;
+}

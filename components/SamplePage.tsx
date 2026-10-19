@@ -18,10 +18,11 @@ import {
   Dna,
   Pause,
   Loader2,
-  ArrowDown,
 } from "lucide-react";
 import Link from "next/link";
 import { Artwork } from "./Artwork";
+import { useCablePath, usePairFlip } from "./samples/usePairFlip";
+import { DUR, EASE, SPRING, useReducedMotion } from "@/lib/motion";
 import { useScrollLock } from "@/lib/useScrollLock";
 import { useDialog } from "@/lib/useDialog";
 import { useBackClose } from "@/lib/useBackClose";
@@ -133,8 +134,10 @@ function previewRelease(artist: string, title: string, artwork: string, year: st
   };
 }
 
-/** One record in the pair: cover, title, artist · year, its timing mark, and a play key. */
-function PairRow({
+/** One record in the pair: cover, title, artist · year, its timing mark, and a play key.
+ *  Exported for test/gsap-pairrow.test.ts, which scrambles its mark like the flip timeline does. */
+export function PairRow({
+  slot,
   release,
   year,
   isSubject,
@@ -142,6 +145,8 @@ function PairRow({
   mark,
   onMarkJump,
 }: {
+  /** Which end of the cable this row is — the flip (takes) or the source (is taken from). */
+  slot: "flip" | "source";
   release: Release;
   year: string | null;
   isSubject: boolean;
@@ -152,9 +157,14 @@ function PairRow({
   const isThis = player.current?.id === release.id;
   const playingThis = isThis && player.playing;
   const loadingThis = isThis && player.loading;
+  const markText = mark != null ? fromSeconds(mark) : null;
   return (
-    <div className="flex items-center gap-3 px-3 py-2.5">
-      <div className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-md ring-1 ring-white/10" data-playing={playingThis ? "true" : undefined}>
+    <div className="flex items-center gap-3 px-3 py-2.5" data-flip-row={slot}>
+      <div
+        className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-md ring-1 ring-white/10"
+        data-flip-cover=""
+        data-playing={playingThis ? "true" : undefined}
+      >
         <Artwork src={release.artwork_url} artist={release.artist} title={release.title} sizes="48px" />
       </div>
       <div className="min-w-0 flex-1">
@@ -164,14 +174,21 @@ function PairRow({
           {year ? <span className="text-ink-600"> · {year}</span> : null}
           {isSubject ? <span className="text-ink-600"> · this track</span> : null}
         </p>
-        {mark != null && (
+        {markText != null && (
           <button
             onClick={onMarkJump}
             className="mt-1 rounded-md px-1.5 py-0.5 font-mono text-[10px] text-lcd hover:bg-lcd/10"
             style={{ background: "rgba(11,20,16,0.9)", textShadow: "0 0 5px rgba(126,217,174,0.45)" }}
+            // Named outright, not by its text: for about a second after the
+            // pair is seen, the flip timeline scrambles the digits below, and
+            // a screen reader would announce whatever garbage was showing.
+            aria-label={`Jump to ${markText} on YouTube`}
             title="Marked by a listener on this device — jump there on YouTube"
           >
-            ▶ {fromSeconds(mark)}
+            {/* Keyed by its text: the flip timeline's ScrambleText writes this
+                span's innerHTML, orphaning React's text node. A new mark must
+                mount a fresh span rather than update a node no longer shown. */}
+            ▶ <span key={markText} data-flip-time="">{markText}</span>
           </button>
         )}
       </div>
@@ -401,6 +418,18 @@ function SampleCard({
     ? sample.partial ? "interpolates (replayed, not lifted)" : "samples"
     : isCovers ? "covers" : "remixes";
   const connectorTone = isSampleRole ? "text-sony" : isCovers ? "text-lcd" : "text-sport";
+
+  // The pair's cable, and the "how it was flipped" timeline that replays it.
+  // The key is what the row SAYS — which records, which timings — not its
+  // cover URL, which resolves a beat later and would restart the timeline.
+  const pairRef = useRef<HTMLDivElement | null>(null);
+  const cable = useCablePath(pairRef);
+  usePairFlip(
+    pairRef,
+    `${sample.role}|${sample.artist ?? ""}|${sample.title}|${topMark ?? ""}|${bottomMark ?? ""}`
+  );
+  // The card itself fades in place, rather than rising, when motion is unwelcome.
+  const reduced = useReducedMotion();
   // The API fills `description` with boilerplate ("Samples “X” by Y") when it
   // has nothing specific; that just repeats the rows above. Keep real notes.
   const note = /^(Samples|Sampled in|Covers|Covered by|Remix of|Remixed in) \u201C/.test(sample.description)
@@ -417,9 +446,13 @@ function SampleCard({
   return (
     <motion.div
       ref={cardRef}
-      initial={{ opacity: 0, y: 18 }}
+      initial={reduced ? { opacity: 0 } : { opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.05 + Math.min(index, 6) * 0.05, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      transition={
+        reduced
+          ? { duration: DUR.instant }
+          : { delay: 0.05 + Math.min(index, 6) * 0.05, duration: 0.4, ease: EASE.out }
+      }
       className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]"
       style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)" }}
     >
@@ -469,27 +502,68 @@ function SampleCard({
             no upload) the whole card became a "Find it on YouTube" box and you
             couldn't hear either record in the app. The keys play Pulsar's
             30-second previews through the main player, which need no key. */}
-        <div className="mt-3 overflow-hidden rounded-xl border border-chrome-700/50 bg-black/25">
+        <div
+          ref={pairRef}
+          className="relative mt-3 overflow-hidden rounded-xl border border-chrome-700/50 bg-black/25"
+        >
           <PairRow
             {...top}
+            slot="flip"
             player={player}
             mark={topMark}
             onMarkJump={topMark != null ? () => jumpTo(topSide, topMark) : undefined}
           />
-          <div className="flex items-center gap-2 border-y border-white/[0.06] bg-white/[0.02] px-3 py-1.5">
-            <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-deck-600 text-ink-400">
-              <ArrowDown size={11} />
-            </span>
-            <span className={`text-[10px] font-bold uppercase tracking-[0.16em] ${connectorTone}`}>
+          <div className="flex items-center gap-3 border-y border-white/[0.06] bg-white/[0.02] px-3 py-1.5">
+            {/* The cover column, kept clear for the cable drawn over it; the
+                label then lines up with the titles above and below. */}
+            <span aria-hidden="true" className="h-5 w-12 flex-shrink-0" />
+            {/* Balanced: "interpolates (replayed, not lifted)" wraps on a
+                390px phone, and an even two-line split reads as meant. */}
+            <span className={`text-balance text-[10px] font-bold uppercase tracking-[0.16em] ${connectorTone}`}>
               {connector}
             </span>
           </div>
           <PairRow
             {...bottom}
+            slot="source"
             player={player}
             mark={bottomMark}
             onMarkJump={bottomMark != null ? () => jumpTo(bottomSide, bottomMark) : undefined}
           />
+          {/* The cable from the source's cover up into the flip's — the way
+              the sound went. Plain SVG, drawn in full: this is the finished
+              state with or without GSAP, and the timeline never touches it.
+              The trail (a brighter copy the signal lights as it climbs) and
+              the dot (the signal itself) are the timeline's additions, so
+              both stay invisible at rest. Never takes a tap. */}
+          {cable && (
+            <svg
+              aria-hidden="true"
+              className={`pointer-events-none absolute inset-0 h-full w-full overflow-visible ${connectorTone}`}
+              fill="none"
+            >
+              <path
+                data-flip-cable=""
+                d={cable}
+                stroke="currentColor"
+                strokeOpacity={0.6}
+                strokeWidth={1.5}
+                strokeLinecap="round"
+              />
+              <path
+                data-flip-trail=""
+                d={cable}
+                opacity={0}
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+              />
+              <g data-flip-dot="" opacity={0}>
+                <circle r={6} fill="currentColor" fillOpacity={0.22} />
+                <circle r={2.5} fill="currentColor" />
+              </g>
+            </svg>
+          )}
         </div>
 
         {/* What's actually taken, when the catalogue says — the "element" line. */}
@@ -714,6 +788,7 @@ export function SamplePage({
   // panel's Tab trap kept keyboard users out of it entirely.
   useBackClose(Boolean(subject), onClose);
   const dialogRef = useDialog<HTMLDivElement>(Boolean(subject), { modal: true });
+  const reduced = useReducedMotion();
 
   const subjArtist = subject?.artist;
   const subjTitle = subject?.title;
@@ -801,10 +876,10 @@ export function SamplePage({
   return (
     <Portal>
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={reduced ? { opacity: 0 } : { opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 20 }}
-      transition={{ type: "spring", stiffness: 480, damping: 40 }}
+      exit={reduced ? { opacity: 0 } : { opacity: 0, y: 20 }}
+      transition={reduced ? { duration: DUR.instant } : SPRING}
       ref={dialogRef}
       role="dialog"
       aria-modal="true"

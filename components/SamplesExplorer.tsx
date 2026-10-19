@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Search, AudioLines, Clock, Loader2, Trophy, Sparkles, ExternalLink, ArrowRight } from "lucide-react";
 import { Portal } from "./Portal";
@@ -11,6 +12,15 @@ import { SamplePage, readMarks, type SampleRef, type SampleSubject } from "./Sam
 import { mostSampledSources, catalogSamplers, lookupCatalog } from "@/lib/samples-catalog";
 import { catalogSongs, type SongKey } from "@/lib/samples-graph";
 import type { Release } from "@/lib/types";
+
+// The explainer card is only ever seen inside this panel, and this panel is on
+// "/", so its code arrives when the panel opens rather than with the page. A
+// chunk that fails to load (offline) renders nothing instead of throwing to
+// the route's error boundary.
+const SampleExplainer = dynamic(
+  () => import("./SampleExplainer").then((m) => m.SampleExplainer, () => () => null),
+  { ssr: false, loading: () => <div className="mt-6 h-[54px]" aria-hidden /> },
+);
 
 /**
  * Samples mode — a dedicated way into the sample graph.
@@ -297,6 +307,10 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
                   </a>
                 </p>
               )}
+
+              {/* What a sample is, before the lists of them. Collapsed: its
+                  player loads only when someone opens it. */}
+              <SampleExplainer />
 
               {/* ── browse: the records everyone keeps lifting from ── */}
               <section className="mt-6">

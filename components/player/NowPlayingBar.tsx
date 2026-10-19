@@ -8,7 +8,9 @@ import { LevelMeter } from "./LevelMeter";
 import { Artwork } from "../Artwork";
 import { Visualizer } from "../Visualizer";
 import { CrateIcon } from "../CrateIcon";
+import { RiveDeck } from "../RiveDeck";
 import { inPlaylist } from "@/lib/collection";
+import { playSfx } from "@/lib/sfx";
 import type { Release } from "@/lib/types";
 
 /**
@@ -293,6 +295,11 @@ export function NowPlayingBar() {
                 </span>
               </button>
 
+              {/* The title's glass: Rive's LCD, lit by the player state.
+                  Desktop only, and it renders nothing until it can draw. It
+                  takes the shown position so its line follows the scrub. */}
+              <RiveDeck progress={shownProgress} />
+
               {/* The LCD. Time and level in one readout, the way a deck shows
                   them. It replaces two things: a grey timestamp, and a four-bar
                   "equaliser" that looped the same keyframes whatever was playing
@@ -326,8 +333,13 @@ export function NowPlayingBar() {
               </span>
 
               {/* add to crate — brown crate glyph */}
+              {/* The three keys click when interface sounds are on (lib/sfx).
+                  Close is left silent: it is deliberately not a key. */}
               <button
-                onClick={() => current && window.dispatchEvent(new CustomEvent("pulsar-crate-picker", { detail: current }))}
+                onClick={() => {
+                  playSfx("key");
+                  if (current) window.dispatchEvent(new CustomEvent("pulsar-crate-picker", { detail: current }));
+                }}
                 aria-label="Add to a crate"
                 title={inCrate ? "In a crate" : "Add to a crate"}
                 className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[10px] border shadow-key transition-[box-shadow,transform,background-color] active:translate-y-px active:shadow-keyed ${
@@ -345,7 +357,10 @@ export function NowPlayingBar() {
 
               {/* play / pause */}
               <button
-                onClick={toggle}
+                onClick={() => {
+                  playSfx("key");
+                  toggle();
+                }}
                 disabled={!hasAudio && !loading}
                 aria-label={playing ? "Pause" : "Play"}
                 // The one orange key. On a TPS-L2 the transport buttons were
@@ -370,7 +385,10 @@ export function NowPlayingBar() {
                   reachable from the track menu, and four buttons crush the
                   title on a small phone. */}
               <button
-                onClick={openVisualizer}
+                onClick={() => {
+                  playSfx("key");
+                  openVisualizer();
+                }}
                 aria-label="Open visualizer"
                 className="hidden h-11 w-11 flex-shrink-0 items-center justify-center rounded-[10px] border border-chrome-700/70 bg-deck-600 text-ink-400 shadow-key transition-[box-shadow,transform,color] hover:text-ink active:translate-y-px active:shadow-keyed sm:flex"
               >
