@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { emit, on, type PulsarEventName } from "@/lib/events";
+import { afterEach, describe, it, expect, vi } from "vitest";
+import { emit, on, onRequest, request, REQUEST_TTL_MS, type PulsarEventName } from "@/lib/events";
 import type { Release } from "@/lib/types";
 
 const release: Release = {
@@ -69,5 +69,61 @@ describe("typed event bus", () => {
       "pulsar-theme-change",
     ];
     expect(channels.length).toBeGreaterThan(15);
+  });
+});
+describe("requests that open a panel", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("replays a press made before the panel was listening, once", () => {
+    // The navbar hydrates before the page's Suspense boundary: a press then
+    // reached no listener and was lost.
+    request("pulsar-open-samples");
+    const handler = vi.fn();
+    const off = onRequest("pulsar-open-samples", handler);
+    expect(handler).toHaveBeenCalledTimes(1);
+    off();
+    // Taken: a second listener (a remount) doesn't open it again.
+    const again = vi.fn();
+    const off2 = onRequest("pulsar-open-samples", again);
+    expect(again).not.toHaveBeenCalled();
+    off2();
+  });
+
+  it("carries the payload through the wait", () => {
+    request("pulsar-open-crate", "favorites");
+    const handler = vi.fn();
+    const off = onRequest("pulsar-open-crate", handler);
+    expect(handler).toHaveBeenCalledWith("favorites");
+    off();
+  });
+
+  it("delivers live to a mounted listener, and leaves nothing waiting", () => {
+    const handler = vi.fn();
+    const off = onRequest("pulsar-ai-activate", handler);
+    request("pulsar-ai-activate");
+    expect(handler).toHaveBeenCalledTimes(1);
+    off();
+    const later = vi.fn();
+    const off2 = onRequest("pulsar-ai-activate", later);
+    expect(later).not.toHaveBeenCalled();
+    off2();
+  });
+
+  it("still hears plain events from other senders (the sidebar)", () => {
+    const handler = vi.fn();
+    const off = onRequest("pulsar-open-crate", handler);
+    emit("pulsar-open-crate", "playlist");
+    expect(handler).toHaveBeenCalledWith("playlist");
+    off();
+  });
+
+  it("drops a press that has waited too long", () => {
+    vi.useFakeTimers();
+    request("pulsar-open-samples");
+    vi.advanceTimersByTime(REQUEST_TTL_MS + 1);
+    const handler = vi.fn();
+    const off = onRequest("pulsar-open-samples", handler);
+    expect(handler).not.toHaveBeenCalled();
+    off();
   });
 });

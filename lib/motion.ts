@@ -1,17 +1,47 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { Variants } from "motion/react";
-import { useReducedMotion } from "motion/react";
+import { useReducedMotion as useReducedMotionAtMount } from "motion/react";
+
+const REDUCE_QUERY = "(prefers-reduced-motion: reduce)";
 
 /**
- * Re-exported so there is ONE reduced-motion hook in the codebase. Several
- * components already import framer's; adding a second implementation would
- * guarantee the two drift.
+ * The app's reduced-motion hook. Use this one, not Motion's.
  *
- * Note it returns `boolean | null` — null before the first client frame — so
- * every helper below takes `Reduced` rather than `boolean`.
+ * Motion's `useReducedMotion` reads the setting once, when the component
+ * mounts (its source has a TODO about updating). That's fine for a sheet that
+ * opens and closes. It's wrong for anything mounted for the whole visit: the
+ * dock, the Visualizer and the Rive deck in the player bar. Someone who turns
+ * on Reduce Motion partway through a visit saw them keep moving until a reload.
+ *
+ * So this starts from Motion's reading, which keeps the first render and the
+ * hydration exactly as before, and then follows the media query live.
+ *
+ * Note it returns `boolean | null` — null when there is no reading yet (on
+ * the server) — so every helper below takes `Reduced` rather than `boolean`.
  */
-export { useReducedMotion };
+export function useReducedMotion(): boolean | null {
+  const atMount = useReducedMotionAtMount();
+  const [live, setLive] = useState<boolean | null>(null);
+  useEffect(() => {
+    const mq = typeof window === "undefined" ? undefined : window.matchMedia?.(REDUCE_QUERY);
+    if (!mq) return;
+    const sync = () => setLive(mq.matches);
+    // A flip between the first render and this effect would otherwise be missed.
+    if (atMount !== null && mq.matches !== atMount) sync();
+    // Safari < 14 only has the deprecated listener API.
+    if (typeof mq.addEventListener === "function") {
+      mq.addEventListener("change", sync);
+      return () => mq.removeEventListener("change", sync);
+    }
+    mq.addListener(sync);
+    return () => mq.removeListener(sync);
+    // atMount is a useState snapshot inside Motion's hook: it never changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return live ?? atMount;
+}
 
 /** framer's hook is null until it has measured; treat that as "allow motion". */
 export type Reduced = boolean | null | undefined;

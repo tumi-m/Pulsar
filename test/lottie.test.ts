@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import {
@@ -8,12 +9,14 @@ import {
   LOOP_FRAMES,
   LOOP_SECONDS,
   MAX_BYTES,
+  NOTICE_FILE,
   OUT_DIR,
   REELS,
   SPOKES,
   WASM_FILE,
   WIDTH,
   buildTapeLoader,
+  lottieNotice,
   reelTurns,
   runtimeWasmPath,
   tapePath,
@@ -179,5 +182,16 @@ describe("self-hosted dotLottie renderer", () => {
     // than a 1.2 MB buffer diff.
     expect(served.byteLength).toBe(installed.byteLength);
     expect(served.equals(installed)).toBe(true);
+  });
+
+  it("ships with the NOTICE its MIT licence requires, matching the installed package", () => {
+    // The binary is LottieFiles' work: the copy needs its copyright and
+    // permission notice beside it. Written by npm run motion:lottie.
+    const committed = readFileSync(path.join(OUT_DIR, NOTICE_FILE), "utf8");
+    expect(committed).toBe(lottieNotice());
+    const sha = createHash("sha256").update(readFileSync(path.join(OUT_DIR, WASM_FILE))).digest("hex");
+    expect(committed).toContain(sha);
+    expect(committed).toContain("Copyright (c) 2023 LottieFiles.com");
+    expect(committed).toContain("MIT");
   });
 });

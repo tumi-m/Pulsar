@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Shuffle, Sparkles, AudioLines } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
 import { usePlayer } from "./player/PlayerProvider";
+import { request } from "@/lib/events";
 
 export function Navbar() {
   const { scrollY } = useScroll();
@@ -121,8 +122,11 @@ export function Navbar() {
         >
           <Shuffle size={15} className="flex-shrink-0" />
         </button>
+        {/* These three open panels inside the page, which can still be
+            hydrating when this header already takes taps: request() keeps the
+            press until the panel is listening (see lib/events). */}
         <button
-          onClick={() => window.dispatchEvent(new CustomEvent("pulsar-ai-activate"))}
+          onClick={() => request("pulsar-ai-activate")}
           aria-label="Selector — pick music by chat or visual survey"
           // The one lit key in the header. Orange means "the thing to press",
           // so it has to be the only orange up here.
@@ -137,7 +141,7 @@ export function Navbar() {
           <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-deck">Selector</span>
         </button>
         <button
-          onClick={() => window.dispatchEvent(new CustomEvent("pulsar-open-samples"))}
+          onClick={() => request("pulsar-open-samples")}
           aria-label="Samples — songs built from other records"
           title="Samples"
           // Housing blue, not orange: after the palette swap this sat beside
@@ -153,7 +157,7 @@ export function Navbar() {
         {/* data-crate-target is where flyToCrate() lands a saved record. A data
             attribute, so the animation never has to import this component. */}
         <button
-          onClick={() => window.dispatchEvent(new CustomEvent("pulsar-open-crate", { detail: "playlist" }))}
+          onClick={() => request("pulsar-open-crate", "playlist")}
           aria-label="Open your crate"
           data-crate-target=""
           className="flex min-h-9 items-center gap-2 rounded-[11px] border border-[#c08a4e]/45 bg-[#c08a4e]/[0.12] px-4 py-2 shadow-key transition-[box-shadow,transform,background-color] hover:bg-[#c08a4e]/20 active:translate-y-px active:shadow-keyed"

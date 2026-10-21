@@ -78,6 +78,8 @@ const GLASS = { x: 145, y: 89, w: 210, h: 108 };
  * nobody sees, thousands of canvas calls a second for as long as the bar was up.
  */
 const SETTLE_MS = 500;
+/** How many positions the progress line has under reduced motion. */
+export const REDUCED_STEPS = 20;
 
 /** Folds that NFKD leaves alone, onto letters the segment font has. */
 const FOLD: Record<string, string> = {
@@ -155,7 +157,10 @@ export function deckInputs(s: DeckSnapshot, reduced: boolean): DeckInputs {
     isPlaying,
     // Whole percent: a 30s preview moves 0.3s per step, finer than the
     // line can show at this size, and Rive isn't re-poked on every tick.
-    trackProgress: Math.round(progress * 100),
+    // Under reduced motion the line steps in twentieths instead (1.5s apart on
+    // a 30s preview), well over SETTLE_MS, so between steps the state machine
+    // really is paused rather than woken again every 0.3s.
+    trackProgress: reduced ? Math.round(progress * REDUCED_STEPS) * (100 / REDUCED_STEPS) : Math.round(progress * 100),
     track: fitted.padEnd(LCD_CHARS, " "),
     artist: lcdCut(lcdText(s.artist), ARTIST_CHARS),
   };
@@ -233,13 +238,40 @@ function makeCanvas(kit: Kit): ComponentType<CanvasProps> {
     // Run it on every change; unless the tape is running in full motion, stop
     // it again once it has settled (SETTLE_MS) and hold that frame. Declared
     // after the writes so they land first.
+    //
+    // One timer, armed once. Progress ticks while a preview plays under
+    // reduced motion arrive faster than SETTLE_MS, and restarting the timer on
+    // each one meant it never fired: the hidden 500×500 artboard redrew every
+    // frame for the whole preview. A tick now only restarts a machine that has
+    // already settled; it never pushes a pending pause back.
+    const settle = useRef(0);
+    const holdStill = !isPlaying || reduced;
     useEffect(() => {
       if (!rive) return;
       if (!rive.isPlaying) rive.play(STATE_MACHINE);
-      if (isPlaying && !reduced) return;
-      const t = window.setTimeout(() => rive.pause(STATE_MACHINE), SETTLE_MS);
-      return () => window.clearTimeout(t);
-    }, [rive, reduced, track, artist, isPlaying, trackProgress]);
+      if (!holdStill) return;
+      settle.current = window.setTimeout(() => {
+        settle.current = 0;
+        rive.pause(STATE_MACHINE);
+      }, SETTLE_MS);
+      return () => {
+        window.clearTimeout(settle.current);
+        settle.current = 0;
+      };
+    }, [rive, holdStill, track, artist, isPlaying]);
+    useEffect(() => {
+      // The timer above still counting down: the machine is running and will
+      // draw this tick before it pauses.
+      if (!rive || !holdStill || settle.current) return;
+      rive.play(STATE_MACHINE);
+      settle.current = window.setTimeout(() => {
+        settle.current = 0;
+        rive.pause(STATE_MACHINE);
+      }, SETTLE_MS);
+      // Cleared by the effect above (track, artist or play state changed, or
+      // unmount), never by the next tick.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [trackProgress]);
 
     return (
       <span

@@ -14,8 +14,8 @@ promo use. Meant for Stories/Reels/TikTok on a phone.
 
 ## Format
 1080×1920, 30 fps. ~2 s intro + ~1.6 s per record (max 12) + ~2 s outro, so
-8–24 s. Soundtrack: `public/sfx/recap-bed.mp3` (80 BPM, 24 s, seamless loop),
-optional.
+5.6–23.2 s (1–12 records; a bigger crate is capped at 12). Soundtrack:
+`public/sfx/recap-bed.mp3` (80 BPM, 24 s, seamless loop), optional.
 
 ## Feeling
 Warm, tactile, a little nostalgic — dubbing a mixtape for a friend. Reference:

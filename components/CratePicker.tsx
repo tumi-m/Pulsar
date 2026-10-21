@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence, useReducedMotion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { X, Plus } from "lucide-react";
 import type { Release } from "@/lib/types";
 import { getCrates, createCrate, toggleInCrate, inCrate, type Crate } from "@/lib/collection";
@@ -11,6 +11,7 @@ import { useScrollLock } from "@/lib/useScrollLock";
 import { useBackClose } from "@/lib/useBackClose";
 import { useDialog } from "@/lib/useDialog";
 import { Portal } from "./Portal";
+import { sheet, useReducedMotion } from "@/lib/motion";
 
 /**
  * A global "add to crate" picker. Any crate button dispatches the
@@ -61,10 +62,9 @@ export function CratePicker() {
               picker's top-left corner to the middle of the screen. */}
           <div className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center p-4">
           <motion.div
-            initial={{ opacity: 0, y: 16, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.97 }}
-            transition={{ type: "spring", stiffness: 520, damping: 40 }}
+            // A centred dialog at every size; under reduced motion it fades in
+            // place instead of rising and scaling.
+            {...sheet(reduce, false)}
             ref={dialogRef}
             role="dialog"
             aria-modal="true"

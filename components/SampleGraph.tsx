@@ -376,8 +376,9 @@ export function SampleGraph({
   const pendingRevealRef = useRef<RevealJob | null>(null);
   const revealsRef = useRef(new Set<Reveal>());
   const [revealSeq, setRevealSeq] = useState(0);
-  // Bumped per load, so an expand that resolves after the panel moved on to
-  // another record can tell it would be grafting onto the wrong graph.
+  // Bumped per load and again on unmount, so an expand that resolves after the
+  // panel moved on to another record — or closed the graph — can tell it would
+  // be grafting onto a graph that's gone.
   const genRef = useRef(0);
   const graftSeqRef = useRef(0);
 
@@ -619,6 +620,9 @@ export function SampleGraph({
     })();
     return () => {
       cancelled = true;
+      // Retires any expand still in flight: its reply must neither graft onto
+      // this graph nor wake the simulation on a component that's gone.
+      genRef.current += 1;
       cancelAnimationFrame(rafRef.current);
       runningRef.current = false;
       stopReveals();
@@ -688,8 +692,13 @@ export function SampleGraph({
       // Offline or a malformed reply: the button simply comes back to try again.
     } finally {
       node.loading = false;
-      setTick((t) => t + 1);
-      relayout();
+      // After an unmount or a record change this node belongs to a graph that
+      // no longer exists: waking the loop would run the layout on it every
+      // frame until it came to rest, for nothing on screen.
+      if (gen === genRef.current) {
+        setTick((t) => t + 1);
+        relayout();
+      }
     }
   };
 

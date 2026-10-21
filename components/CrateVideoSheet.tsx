@@ -1,27 +1,26 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion, useIsPresent } from "motion/react";
+import { motion } from "motion/react";
 import { Player, type PlayerRef } from "@remotion/player";
-import { Download, Share2, Square, X } from "lucide-react";
-import type { Release } from "@/lib/types";
-import { useDialog } from "@/lib/useDialog";
-import { useBackClose } from "@/lib/useBackClose";
+import { Download, Share2, Square } from "lucide-react";
 import { useReducedMotion, EASE, DUR } from "@/lib/motion";
 import { useIsTouch } from "@/lib/useIsTouch";
 import { playSfx } from "@/lib/sfx";
 import { CrateRecap } from "@/remotion/CrateRecap";
-import { normalizeRecapProps, recapDurationInFrames, slugify } from "@/remotion/props";
+import { normalizeRecapProps, recapDurationInFrames, recapPosterFrame, slugify } from "@/remotion/props";
 import { recapPropsFromReleases } from "@/remotion/from-releases";
 import { browserCanEncode, chooseExportTarget, exportFilename } from "@/remotion/export-target";
 import { RECAP_COMPOSITION_ID, RECAP_FPS, RECAP_HEIGHT, RECAP_WIDTH } from "@/remotion/tokens";
+import { PREVIEW_BOX, VideoSheetHeader, type CrateVideoProps } from "./CrateVideoFrame";
 
 /**
  * "Video" in the crate panel: a live preview of the Crate Recap and a button
- * that renders it to a file on this device.
+ * that renders it to a file on this device. These are the sheet's contents;
+ * the sheet itself (backdrop, panel, Back/Escape, focus) is CrateVideoFrame.
  *
- * Everything heavy is behind a door. FloatingDock loads this file with
- * next/dynamic only when Video is pressed, so the Player and the composition
+ * Everything heavy is behind a door. CrateVideoFrame imports this file only
+ * when Video is pressed (or about to be), so the Player and the composition
  * never touch the home page's first load; the web renderer (and Mediabunny
  * under it) is a further dynamic import inside the Download handler, so
  * previewing doesn't download an encoder.
@@ -67,26 +66,13 @@ type Phase =
 
 const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
-export function CrateVideoSheet({
-  crateName,
-  releases,
-  onClose,
-}: {
-  crateName: string;
-  releases: Release[];
-  onClose: () => void;
-}) {
+export function CrateVideoSheet({ crateName, releases, onClose }: CrateVideoProps) {
   const reduce = useReducedMotion();
   const isTouch = useIsTouch();
-  // Inside AnimatePresence: stop owning Back/Escape and focus the moment the
-  // exit starts, not when the exit animation has finished.
-  const isPresent = useIsPresent();
-  useBackClose(isPresent, onClose);
-  const dialogRef = useDialog<HTMLDivElement>(isPresent, { modal: true });
 
   const [withAudio, setWithAudio] = useState(true);
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
-  // Client-only (FloatingDock loads this with ssr: false), so no hydration to match.
+  // Client-only (CrateVideoFrame imports it in the browser), so no hydration to match.
   const [canEncode] = useState(browserCanEncode);
   const playerRef = useRef<PlayerRef>(null);
   const resultRef = useRef<HTMLDivElement>(null);
@@ -95,9 +81,13 @@ export function CrateVideoSheet({
   const cancelRef = useRef<HTMLButtonElement>(null);
   const saveAgainRef = useRef<HTMLAnchorElement>(null);
 
+  // Under reduced motion the composition's own reduced form: the same beats,
+  // with every entrance and exit an opacity fade in place. The download is
+  // rendered from these same props, so the file is the video previewed here.
+  const reducedMotion = reduce === true;
   const props = useMemo(
-    () => normalizeRecapProps(recapPropsFromReleases(crateName, releases, withAudio)),
-    [crateName, releases, withAudio]
+    () => normalizeRecapProps({ ...recapPropsFromReleases(crateName, releases, withAudio), reducedMotion }),
+    [crateName, releases, withAudio, reducedMotion]
   );
   const durationInFrames = recapDurationInFrames(props.records.length, RECAP_FPS);
   const seconds = (durationInFrames / RECAP_FPS).toFixed(1);
@@ -262,189 +252,162 @@ export function CrateVideoSheet({
 
   return (
     <>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: reduce ? DUR.instant : DUR.fast }}
-        onClick={onClose}
-        className="absolute inset-0 z-10 bg-deck/70 backdrop-blur-sm"
+      <VideoSheetHeader
+        title={props.crateName}
+        meta={
+          <>
+            {props.records.length} record{props.records.length === 1 ? "" : "s"}
+            {props.totalRecords > props.records.length ? ` (first ${props.records.length} of ${props.totalRecords})` : ""} ·{" "}
+            {seconds}s · 1080×1920
+          </>
+        }
+        onClose={onClose}
       />
-      <motion.div
-        ref={dialogRef}
-        role="dialog"
-        aria-label="Crate recap video"
-        initial={reduce ? { opacity: 0 } : { opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={reduce ? { opacity: 0 } : { opacity: 0, y: 16 }}
-        transition={reduce ? { duration: DUR.instant } : { type: "spring", stiffness: 460, damping: 34 }}
-        className="absolute inset-x-3 bottom-3 top-16 z-20 overflow-y-auto overscroll-contain rounded-2xl border border-chrome-700/60 bg-[#151b21]/[0.98] p-4 backdrop-blur-2xl sm:inset-x-4 sm:top-20"
-        style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 24px 60px rgba(0,0,0,0.6)" }}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-ink-400">Video</p>
-            <p className="mt-0.5 truncate text-[15px] font-bold text-ink">{props.crateName} · Crate recap</p>
-            <p className="mt-0.5 font-mono text-[10.5px] text-ink-400">
-              {props.records.length} record{props.records.length === 1 ? "" : "s"}
-              {props.totalRecords > props.records.length ? ` (first ${props.records.length} of ${props.totalRecords})` : ""} ·{" "}
-              {seconds}s · 1080×1920
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Close video"
-            className="-mr-1 -mt-1 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-ink/60 hover:bg-white/10 hover:text-ink"
-          >
-            <X size={18} />
-          </button>
-        </div>
 
-        {/* preview — a 9:16 frame sized to the sheet's height, never wider than it */}
-        <div
-          className="mx-auto mt-3 overflow-hidden rounded-xl border border-white/10 bg-deck shadow-key"
-          style={{ width: "min(100%, calc(50dvh * 9 / 16))", aspectRatio: "9 / 16" }}
+      {/* preview — a 9:16 frame sized to the sheet's height, never wider than it */}
+      <div {...PREVIEW_BOX}>
+        <Player
+          ref={playerRef}
+          component={CrateRecap}
+          inputProps={props}
+          durationInFrames={durationInFrames}
+          compositionWidth={RECAP_WIDTH}
+          compositionHeight={RECAP_HEIGHT}
+          fps={RECAP_FPS}
+          style={{ width: "100%", height: "100%" }}
+          controls
+          loop
+          // Motion the visitor asked not to get doesn't start by itself, and
+          // what waits paused is a settled frame — the title card landed,
+          // the deck up — not frame 0, where the entrance hasn't begun.
+          autoPlay={!reducedMotion}
+          initialFrame={reducedMotion ? recapPosterFrame(RECAP_FPS) : 0}
+          // Starts quiet: a sheet that opens talking is rude. The bar's
+          // speaker button brings the soundtrack in.
+          initiallyMuted
+          alwaysShowControls={isTouch}
+          clickToPlay
+          doubleClickToFullscreen={false}
+          spaceKeyToPlayOrPause={false}
+          acknowledgeRemotionLicense
+        />
+      </div>
+
+      <div className="mt-3 flex flex-col gap-2">
+        <button
+          onClick={() => setWithAudio((v) => !v)}
+          aria-pressed={withAudio}
+          disabled={busy}
+          className="flex min-h-11 items-center justify-between rounded-xl border border-chrome-700/50 bg-deck-700/70 px-3 text-left text-[11px] font-bold uppercase tracking-widest text-ink shadow-key transition-colors hover:bg-deck-600 active:translate-y-px active:shadow-keyed disabled:opacity-50"
         >
-          <Player
-            ref={playerRef}
-            component={CrateRecap}
-            inputProps={props}
-            durationInFrames={durationInFrames}
-            compositionWidth={RECAP_WIDTH}
-            compositionHeight={RECAP_HEIGHT}
-            fps={RECAP_FPS}
-            style={{ width: "100%", height: "100%" }}
-            controls
-            loop
-            // Motion the visitor asked not to get doesn't start by itself.
-            autoPlay={!reduce}
-            // Starts quiet: a sheet that opens talking is rude. The bar's
-            // speaker button brings the soundtrack in.
-            initiallyMuted
-            alwaysShowControls={isTouch}
-            clickToPlay
-            doubleClickToFullscreen={false}
-            spaceKeyToPlayOrPause={false}
-            acknowledgeRemotionLicense
-          />
-        </div>
+          Soundtrack
+          <span className="flex items-center gap-2 font-mono text-[10px] text-ink-400">
+            {withAudio ? "On" : "Off"}
+            <span
+              aria-hidden
+              className={`h-2 w-2 rounded-full ${withAudio ? "bg-lcd shadow-[0_0_8px_rgba(126,217,174,0.85)]" : "bg-deck-600 ring-1 ring-chrome-700"}`}
+            />
+          </span>
+        </button>
 
-        <div className="mt-3 flex flex-col gap-2">
-          <button
-            onClick={() => setWithAudio((v) => !v)}
-            aria-pressed={withAudio}
-            disabled={busy}
-            className="flex min-h-11 items-center justify-between rounded-xl border border-chrome-700/50 bg-deck-700/70 px-3 text-left text-[11px] font-bold uppercase tracking-widest text-ink shadow-key transition-colors hover:bg-deck-600 active:translate-y-px active:shadow-keyed disabled:opacity-50"
-          >
-            Soundtrack
-            <span className="flex items-center gap-2 font-mono text-[10px] text-ink-400">
-              {withAudio ? "On" : "Off"}
-              <span
-                aria-hidden
-                className={`h-2 w-2 rounded-full ${withAudio ? "bg-lcd shadow-[0_0_8px_rgba(126,217,174,0.85)]" : "bg-deck-600 ring-1 ring-chrome-700"}`}
-              />
-            </span>
-          </button>
-
-          {phase.kind === "rendering" || phase.kind === "checking" ? (
-            <div className="rounded-xl border border-sony/30 bg-deck-700/70 p-3">
-              <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-widest text-ink">
-                <span>{phase.kind === "checking" ? "Checking encoder…" : `Rendering ${Math.round(phase.progress * 100)}%`}</span>
-                {phase.kind === "rendering" && (
-                  <span className="font-mono text-[10px] font-normal text-ink-400">
-                    {phase.frames}/{durationInFrames}
-                  </span>
-                )}
-              </div>
-              <div
-                className="mt-2 h-2 overflow-hidden rounded-full bg-deck"
-                role="progressbar"
-                aria-label="Render progress"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={phase.kind === "rendering" ? Math.round(phase.progress * 100) : 0}
-              >
-                <div
-                  className="h-full rounded-full bg-transport transition-[width] duration-200 ease-settle motion-reduce:transition-none"
-                  style={{ width: `${phase.kind === "rendering" ? Math.max(2, phase.progress * 100) : 2}%` }}
-                />
-              </div>
-              <button
-                ref={cancelRef}
-                onClick={cancel}
-                className="mt-3 flex min-h-10 w-full items-center justify-center gap-1.5 rounded-[10px] border border-chrome-700/70 bg-deck-600 text-[10px] font-bold uppercase tracking-widest text-ink shadow-key active:translate-y-px active:shadow-keyed"
-              >
-                <Square size={11} fill="currentColor" /> Cancel
-              </button>
+        {phase.kind === "rendering" || phase.kind === "checking" ? (
+          <div className="rounded-xl border border-sony/30 bg-deck-700/70 p-3">
+            <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-widest text-ink">
+              <span>{phase.kind === "checking" ? "Checking encoder…" : `Rendering ${Math.round(phase.progress * 100)}%`}</span>
+              {phase.kind === "rendering" && (
+                <span className="font-mono text-[10px] font-normal text-ink-400">
+                  {phase.frames}/{durationInFrames}
+                </span>
+              )}
             </div>
-          ) : (
+            <div
+              className="mt-2 h-2 overflow-hidden rounded-full bg-deck"
+              role="progressbar"
+              aria-label="Render progress"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={phase.kind === "rendering" ? Math.round(phase.progress * 100) : 0}
+            >
+              <div
+                className="h-full rounded-full bg-transport transition-[width] duration-200 ease-settle motion-reduce:transition-none"
+                style={{ width: `${phase.kind === "rendering" ? Math.max(2, phase.progress * 100) : 2}%` }}
+              />
+            </div>
             <button
-              ref={primaryRef}
-              data-dialog-autofocus
-              onClick={render}
-              disabled={!canEncode}
-              className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[#b84516] bg-transport text-[12px] font-bold uppercase tracking-widest text-deck shadow-key transition-[box-shadow,transform] active:translate-y-px active:shadow-keyed disabled:cursor-not-allowed disabled:opacity-40"
+              ref={cancelRef}
+              onClick={cancel}
+              className="mt-3 flex min-h-10 w-full items-center justify-center gap-1.5 rounded-[10px] border border-chrome-700/70 bg-deck-600 text-[10px] font-bold uppercase tracking-widest text-ink shadow-key active:translate-y-px active:shadow-keyed"
             >
-              <Download size={15} />
-              {phase.kind === "done" ? "Render again" : "Download video"}
+              <Square size={11} fill="currentColor" /> Cancel
             </button>
-          )}
+          </div>
+        ) : (
+          <button
+            ref={primaryRef}
+            data-dialog-autofocus
+            onClick={render}
+            disabled={!canEncode}
+            className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[#b84516] bg-transport text-[12px] font-bold uppercase tracking-widest text-deck shadow-key transition-[box-shadow,transform] active:translate-y-px active:shadow-keyed disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Download size={15} />
+            {phase.kind === "done" ? "Render again" : "Download video"}
+          </button>
+        )}
 
-          {phase.kind === "done" && (
-            <motion.div
-              ref={resultRef}
-              initial={reduce ? { opacity: 0 } : { opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: reduce ? DUR.instant : DUR.base, ease: EASE.out }}
-              className="rounded-xl border border-lcd/30 bg-lcd/10 p-3"
-            >
-              <p className="text-[11px] font-bold uppercase tracking-widest text-lcd">Video ready</p>
-              <p className="mt-0.5 truncate font-mono text-[10.5px] text-ink-400">
-                {phase.filename} · {mb(phase.size)}
-              </p>
-              {phase.note && <p className="mt-1.5 text-[11px] leading-relaxed text-ink-400">{phase.note}</p>}
-              <div className={`mt-2 grid gap-2 ${canShareFile ? "grid-cols-2" : "grid-cols-1"}`}>
-                {/* A real link, not only the automatic save: a browser that blocked
-                    the download, or a visitor who dismissed it, can save again. */}
-                <a
-                  ref={saveAgainRef}
-                  href={phase.url}
-                  download={phase.filename}
+        {phase.kind === "done" && (
+          <motion.div
+            ref={resultRef}
+            initial={reduce ? { opacity: 0 } : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduce ? DUR.instant : DUR.base, ease: EASE.out }}
+            className="rounded-xl border border-lcd/30 bg-lcd/10 p-3"
+          >
+            <p className="text-[11px] font-bold uppercase tracking-widest text-lcd">Video ready</p>
+            <p className="mt-0.5 truncate font-mono text-[10.5px] text-ink-400">
+              {phase.filename} · {mb(phase.size)}
+            </p>
+            {phase.note && <p className="mt-1.5 text-[11px] leading-relaxed text-ink-400">{phase.note}</p>}
+            <div className={`mt-2 grid gap-2 ${canShareFile ? "grid-cols-2" : "grid-cols-1"}`}>
+              {/* A real link, not only the automatic save: a browser that blocked
+                  the download, or a visitor who dismissed it, can save again. */}
+              <a
+                ref={saveAgainRef}
+                href={phase.url}
+                download={phase.filename}
+                className="flex min-h-10 items-center justify-center gap-1.5 rounded-[10px] border border-chrome-700/70 bg-deck-600 text-[10px] font-bold uppercase tracking-widest text-ink shadow-key active:translate-y-px active:shadow-keyed"
+              >
+                <Download size={12} /> Save again
+              </a>
+              {canShareFile ? (
+                <button
+                  onClick={() => share(phase.blob, phase.filename)}
                   className="flex min-h-10 items-center justify-center gap-1.5 rounded-[10px] border border-chrome-700/70 bg-deck-600 text-[10px] font-bold uppercase tracking-widest text-ink shadow-key active:translate-y-px active:shadow-keyed"
                 >
-                  <Download size={12} /> Save again
-                </a>
-                {canShareFile ? (
-                  <button
-                    onClick={() => share(phase.blob, phase.filename)}
-                    className="flex min-h-10 items-center justify-center gap-1.5 rounded-[10px] border border-chrome-700/70 bg-deck-600 text-[10px] font-bold uppercase tracking-widest text-ink shadow-key active:translate-y-px active:shadow-keyed"
-                  >
-                    <Share2 size={12} /> Share
-                  </button>
-                ) : null}
-              </div>
-            </motion.div>
-          )}
+                  <Share2 size={12} /> Share
+                </button>
+              ) : null}
+            </div>
+          </motion.div>
+        )}
 
-          {(phase.kind === "failed" || !canEncode) && (
-            <p role="alert" className="rounded-xl border border-vu/40 bg-vu/10 px-3 py-2.5 text-[11px] leading-relaxed text-ink">
-              {phase.kind === "failed"
-                ? phase.message
-                : "This browser can't encode video (it has no WebCodecs). The preview still plays; to download, use recent Chrome, Edge or Firefox, or Safari 26."}
-            </p>
-          )}
-          {phase.kind === "cancelled" && <p className="text-[11px] text-ink-400">Cancelled — nothing was saved.</p>}
-          {/* Mounted from the start: a live region that appears with its text
-              in it is often not read at all. */}
-          <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-            {announcement}
+        {(phase.kind === "failed" || !canEncode) && (
+          <p role="alert" className="rounded-xl border border-vu/40 bg-vu/10 px-3 py-2.5 text-[11px] leading-relaxed text-ink">
+            {phase.kind === "failed"
+              ? phase.message
+              : "This browser can't encode video (it has no WebCodecs). The preview still plays; to download, use recent Chrome, Edge or Firefox, or Safari 26."}
           </p>
+        )}
+        {phase.kind === "cancelled" && <p className="text-[11px] text-ink-400">Cancelled — nothing was saved.</p>}
+        {/* Mounted from the start: a live region that appears with its text
+            in it is often not read at all. */}
+        <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {announcement}
+        </p>
 
-          <p className="text-[10px] leading-relaxed text-ink-600">
-            Made on this device — the video isn&apos;t uploaded anywhere. Keep this sheet open while it renders.
-          </p>
-        </div>
-      </motion.div>
+        <p className="text-[10px] leading-relaxed text-ink-600">
+          Made on this device — the video isn&apos;t uploaded anywhere. Keep this sheet open while it renders.
+        </p>
+      </div>
     </>
   );
 }

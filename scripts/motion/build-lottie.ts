@@ -31,7 +31,13 @@
  * components/TapeLoader.tsx points the player at it. test/lottie.test.ts fails
  * if a dependency bump leaves the copy stale — the glue code and the binary
  * must match.
+ *
+ * THE NOTICE. That binary is LottieFiles' (MIT), and the MIT licence travels
+ * with every copy, so this also writes public/lottie/NOTICE.md from the
+ * installed package: its version, the binary's SHA-256 and the package's own
+ * LICENSE text. The test fails if the committed NOTICE drifts from it.
  */
+import { createHash } from "node:crypto";
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -41,6 +47,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 export const OUT_DIR = path.join(ROOT, "public", "lottie");
 export const ANIMATION_FILE = "tape-loader.json";
 export const WASM_FILE = "dotlottie-player.wasm";
+export const NOTICE_FILE = "NOTICE.md";
 
 export const FPS = 30;
 export const LOOP_SECONDS = 2;
@@ -473,6 +480,50 @@ export function runtimeWasmPath(): string {
   return path.join(path.dirname(fromReact.resolve("@lottiefiles/dotlottie-web")), WASM_FILE);
 }
 
+/**
+ * public/lottie/NOTICE.md, as this script writes it for the installed
+ * runtime. Everything in it is read from the package, so a dependency bump
+ * that refreshes the binary refreshes its notice in the same run.
+ */
+export function lottieNotice(wasmPath: string = runtimeWasmPath()): string {
+  const pkgDir = path.dirname(path.dirname(wasmPath)); // …/dotlottie-web/dist/x.wasm → …/dotlottie-web
+  const pkg = JSON.parse(readFileSync(path.join(pkgDir, "package.json"), "utf8")) as {
+    name: string;
+    version: string;
+    license: string;
+  };
+  const licence = readFileSync(path.join(pkgDir, "LICENSE"), "utf8").trim();
+  const sha = createHash("sha256").update(readFileSync(wasmPath)).digest("hex");
+  const quoted = licence
+    .split("\n")
+    .map((line) => (line ? `  > ${line}` : "  >"))
+    .join("\n");
+  return `# public/lottie — third-party notices
+
+Written by \`npm run motion:lottie\` (scripts/motion/build-lottie.ts), which
+also writes \`${ANIMATION_FILE}\` (Pulsar's own, generated in code) and copies
+the file below. \`test/lottie.test.ts\` fails if the copy or this notice drifts
+from the installed package.
+
+Used by \`components/TapeLoader.tsx\` (the cassette loader in the Selector).
+
+## ${WASM_FILE}
+
+- **What:** the WebAssembly renderer of \`${pkg.name}\` ${pkg.version}, which
+  \`@lottiefiles/dotlottie-react\` loads. Byte-identical to
+  \`${path.relative(ROOT, wasmPath).split(path.sep).join("/")}\`; not modified.
+- **SHA-256:** \`${sha}\`
+- **Why it is copied here:** by default the runtime fetches this file from
+  jsDelivr. A loader that waits on a third-party CDN shows nothing exactly when
+  the network is slow or blocked.
+- **Source:** https://github.com/LottieFiles/dotlottie-web (\`packages/web\`),
+  package https://www.npmjs.com/package/${pkg.name}.
+- **Licence:** ${pkg.license}, from the package's \`LICENSE\`:
+
+${quoted}
+`;
+}
+
 const kb = (bytes: number) => `${(bytes / 1024).toFixed(1)} KB`;
 
 function main() {
@@ -488,11 +539,13 @@ function main() {
   const wasmFrom = runtimeWasmPath();
   copyFileSync(wasmFrom, path.join(OUT_DIR, WASM_FILE));
   const wasmBytes = readFileSync(wasmFrom).byteLength;
+  writeFileSync(path.join(OUT_DIR, NOTICE_FILE), lottieNotice(wasmFrom));
 
   const turns = reelTurns();
   console.table([
     { file: ANIMATION_FILE, size: kb(bytes), note: `${WIDTH}x${HEIGHT}, ${LOOP_FRAMES} frames @ ${FPS} fps` },
     { file: WASM_FILE, size: kb(wasmBytes), note: `copied from ${path.relative(ROOT, wasmFrom)}` },
+    { file: NOTICE_FILE, size: "", note: "its licence (MIT) and SHA-256" },
   ]);
   console.log(`  reels per loop: supply ${turns.supply}°, take-up ${turns.takeup}°`);
   console.log(`\n✓ ${path.relative(ROOT, OUT_DIR)}/`);

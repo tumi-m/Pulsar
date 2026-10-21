@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "motion/react";
 import { Heart, X, Trash2, Sparkles, Shuffle, Play, Share2, Upload, Plus, Pencil, Clapperboard } from "lucide-react";
 import { CrateIcon } from "./CrateIcon";
@@ -24,7 +23,7 @@ import { usePlayer } from "./player/PlayerProvider";
 import { useScrollLock } from "@/lib/useScrollLock";
 import { useDialog } from "@/lib/useDialog";
 import { useBackClose } from "@/lib/useBackClose";
-import { useReducedMotion } from "@/lib/motion";
+import { DUR, useReducedMotion } from "@/lib/motion";
 import { Portal } from "./Portal";
 import { useIsTouch } from "@/lib/useIsTouch";
 import { PlaylistBuildOverlay } from "./PlaylistBuildOverlay";
@@ -40,11 +39,12 @@ import {
 } from "@/lib/dsp";
 import { readPending } from "@/lib/dsp/shared";
 import { playSfx } from "@/lib/sfx";
-
-// The recap video sheet carries Remotion's Player and the composition — far
-// too heavy for the home page's first load, and most visitors never open it.
-// Fetched the first time Video is pressed.
-const CrateVideoSheet = dynamic(() => import("./CrateVideoSheet").then((m) => m.CrateVideoSheet), { ssr: false });
+import { onRequest, request } from "@/lib/events";
+// The recap video sheet: its frame is light and drawn at once; Remotion's
+// Player and the composition inside it are fetched the first time Video is
+// pressed (or hovered), and a failed fetch is a retryable message in the
+// sheet rather than an error that takes the page down.
+import { CrateVideoFrame, preloadCrateVideo } from "./CrateVideoFrame";
 
 interface FloatingDockProps {
   format: MediaFormat;
@@ -268,19 +268,17 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
   useEffect(() => {
     refresh();
     const h = () => refresh();
-    const openFromSidebar = (e: Event) => {
-      const which = (e as CustomEvent<"favorites" | "playlist">).detail;
-      setPanel(which);
-    };
     const onNavHidden = (e: Event) => setNavHidden((e as CustomEvent<boolean>).detail);
     const onDetail = (e: Event) => setDetailOpen((e as CustomEvent<boolean>).detail);
     window.addEventListener("pulsar-collection-change", h);
-    window.addEventListener("pulsar-open-crate", openFromSidebar);
+    // The navbar's Crate key and the sidebar. onRequest also takes a navbar
+    // press made before this mounted (lib/events).
+    const offOpenCrate = onRequest("pulsar-open-crate", (which) => setPanel(which));
     window.addEventListener("pulsar-nav-hidden", onNavHidden);
     window.addEventListener("pulsar-detail-open", onDetail);
     return () => {
       window.removeEventListener("pulsar-collection-change", h);
-      window.removeEventListener("pulsar-open-crate", openFromSidebar);
+      offOpenCrate();
       window.removeEventListener("pulsar-nav-hidden", onNavHidden);
       window.removeEventListener("pulsar-detail-open", onDetail);
     };
@@ -467,7 +465,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -18, scale: 0.6 }}
                 transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                onClick={() => window.dispatchEvent(new CustomEvent("pulsar-ai-activate"))}
+                onClick={() => request("pulsar-ai-activate")}
                 aria-label="Curator"
                 className="flex h-14 w-14 items-center justify-center rounded-full"
                 style={{
@@ -540,10 +538,12 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               ref={dialogRef}
               role="dialog"
               aria-label="Your crate"
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", stiffness: 340, damping: 36 }}
+              // Under reduced motion the panel fades in where it sits instead
+              // of rising from below the screen.
+              initial={reduceMotion ? { opacity: 0 } : { y: "100%" }}
+              animate={reduceMotion ? { opacity: 1 } : { y: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { y: "100%" }}
+              transition={reduceMotion ? { duration: DUR.instant } : { type: "spring", stiffness: 340, damping: 36 }}
               // Grows while the export or video sheet is open: at 55% of a phone
               // screen the sheet's four services, CSV keys and setup notes were a
               // cramped scroll inside a scroll, and the preview a postage stamp.
@@ -587,6 +587,12 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                     {items.length > 0 && (
                       <button
                         onClick={() => setVideoFor(videoKey)}
+                        // Start the ~270 kB of Player and composition on the
+                        // way to the tap, so the preview is usually there by
+                        // the time the sheet is. Not on focus: opening
+                        // Favorites focuses this key (the first control in the
+                        // header), which would fetch it on every open.
+                        onPointerEnter={preloadCrateVideo}
                         aria-label={`Make a recap video of ${items.length} record${items.length === 1 ? "" : "s"}`}
                         // Icon-only on a phone: with Export and Close beside it there
                         // is no room left for the crate's name otherwise.
@@ -680,10 +686,10 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
                       className="absolute inset-0 z-10 bg-deck/70 backdrop-blur-sm"
                     />
                     <motion.div
-                      initial={{ opacity: 0, y: 16 }}
+                      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 16 }}
-                      transition={{ type: "spring", stiffness: 460, damping: 34 }}
+                      exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
+                      transition={reduceMotion ? { duration: DUR.instant } : { type: "spring", stiffness: 460, damping: 34 }}
                       role="dialog"
                       aria-label="Export this crate"
                       className="absolute inset-x-3 bottom-3 top-16 z-20 overflow-y-auto overscroll-contain rounded-2xl border border-chrome-700/60 bg-[#151b21]/[0.98] p-4 backdrop-blur-2xl sm:inset-x-4 sm:bottom-auto sm:top-20 sm:max-h-[calc(100%-6rem)]"
@@ -718,7 +724,7 @@ export function FloatingDock({ format, onOpen }: FloatingDockProps) {
               {/* crate → recap video sheet */}
               <AnimatePresence>
                 {videoOpen && items.length > 0 && (
-                  <CrateVideoSheet
+                  <CrateVideoFrame
                     key="video"
                     crateName={crateName()}
                     releases={items}

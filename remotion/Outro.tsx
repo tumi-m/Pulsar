@@ -11,16 +11,20 @@ const AREA_TOP = 100;
 
 /**
  * The sign-off: the whole crate laid out as a wall of covers, then
- * "Made with Pulsar" over the transport-key gradient.
+ * "Made with Pulsar" over the transport-key gradient. Under reduced motion
+ * the covers and the sign-off fade in at their final size and place.
  */
 export function Outro({
   records,
   crateName,
   total,
+  reducedMotion = false,
 }: {
   records: NormalizedRecord[];
   crateName: string;
   total: number;
+  /** No travel, zoom or wipe: opacity only. */
+  reducedMotion?: boolean;
 }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -32,16 +36,15 @@ export function Outro({
   // Centred in the band between the top safe area and the deck.
   const gridTop = Math.round(AREA_TOP + (DECK_TOP - AREA_TOP - wallHeight - BRAND_HEIGHT) / 2);
   const brandTop = gridTop + wallHeight;
+  const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
   const rise = (delay: number) => ({
-    opacity: interpolate(frame, [delay * fps, (delay + 0.3) * fps], [0, 1], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    }),
-    translate: interpolate(frame, [delay * fps, (delay + 0.45) * fps], ["0px 30px", "0px 0px"], {
-      easing: Easing.bezier(0.22, 1, 0.36, 1),
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    }),
+    opacity: interpolate(frame, [delay * fps, (delay + 0.3) * fps], [0, 1], clamp),
+    translate: reducedMotion
+      ? undefined
+      : interpolate(frame, [delay * fps, (delay + 0.45) * fps], ["0px 30px", "0px 0px"], {
+          easing: Easing.bezier(0.22, 1, 0.36, 1),
+          ...clamp,
+        }),
   });
 
   return (
@@ -66,16 +69,14 @@ export function Outro({
               overflow: "hidden",
               backgroundColor: COLOR.deck700,
               boxShadow: "0 16px 30px rgba(0, 0, 0, 0.5)",
-              opacity: interpolate(frame, [delay * fps, (delay + 0.2) * fps], [0, 1], {
-                extrapolateLeft: "clamp",
-                extrapolateRight: "clamp",
-              }),
-              scale: interpolate(frame, [delay * fps, (delay + 0.5) * fps], [0.6, 1], {
-                easing: Easing.spring({ damping: 14, stiffness: 140 }),
-                extrapolateLeft: "clamp",
-                extrapolateRight: "clamp",
-                output: "perceptual-scale",
-              }),
+              opacity: interpolate(frame, [delay * fps, (delay + 0.2) * fps], [0, 1], clamp),
+              scale: reducedMotion
+                ? undefined
+                : interpolate(frame, [delay * fps, (delay + 0.5) * fps], [0.6, 1], {
+                    easing: Easing.spring({ damping: 14, stiffness: 140 }),
+                    ...clamp,
+                    output: "perceptual-scale",
+                  }),
             }}
           >
             <CoverArt record={r} size={thumb} />
@@ -125,11 +126,14 @@ export function Outro({
             marginTop: 22,
             height: 12,
             borderRadius: 6,
-            width: interpolate(frame, [0.6 * fps, 1.1 * fps], [0, 460], {
-              easing: Easing.bezier(0.22, 1, 0.36, 1),
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            }),
+            ...(reducedMotion
+              ? { width: 460, opacity: interpolate(frame, [0.6 * fps, 0.9 * fps], [0, 1], clamp) }
+              : {
+                  width: interpolate(frame, [0.6 * fps, 1.1 * fps], [0, 460], {
+                    easing: Easing.bezier(0.22, 1, 0.36, 1),
+                    ...clamp,
+                  }),
+                }),
             backgroundColor: COLOR.sony,
             backgroundImage: "linear-gradient(118deg, #f2662c 0%, #ff8c39 46%, #ffce0a 100%)",
           }}

@@ -14,6 +14,7 @@ import { Artwork } from "./Artwork";
 import { useScrollLock } from "@/lib/useScrollLock";
 import { useDialog } from "@/lib/useDialog";
 import { useBackClose } from "@/lib/useBackClose";
+import { onRequest } from "@/lib/events";
 import { Portal } from "./Portal";
 import { PLATFORMS } from "./platforms";
 import { MiniPlayer } from "./player/MiniPlayer";
@@ -66,11 +67,8 @@ export function AiChat({ releases }: AiChatProps) {
   }, []);
 
   // The navbar AI button fires "pulsar-ai-activate" → show the chooser first.
-  useEffect(() => {
-    const activate = () => setView("choose");
-    window.addEventListener("pulsar-ai-activate", activate);
-    return () => window.removeEventListener("pulsar-ai-activate", activate);
-  }, []);
+  // onRequest also takes a press made before this mounted (lib/events).
+  useEffect(() => onRequest("pulsar-ai-activate", () => setView("choose")), []);
 
   // Keep the thread pinned to the newest message as it arrives.
   useEffect(() => {

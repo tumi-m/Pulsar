@@ -59,14 +59,18 @@ Workflow({ name: "motion-loop", args: { brief: "a 15s vertical teaser of the Sam
 | Interface sound, fades | **Howler.js** behind `lib/sfx.ts` | `new Audio()` per click |
 | Editable video from React | **Remotion** — `remotion/` (`CrateRecap`), Studio: `npm run motion:studio` | screen recordings |
 | Encoding/conversion in the browser | **Mediabunny** (directly, or via `@remotion/web-renderer`) | uploading to a server |
-| Diagrams and explainers | **Motion Canvas** — standalone project in `explainers/`, embedded with `@motion-canvas/player` | Remotion for a diagram |
+| Diagrams and explainers | **Motion Canvas** — standalone project in `explainers/` (own package and pins); its player is bundled into `public/explainers/project.js` by that project and loaded at runtime by `components/SampleExplainer.tsx`. The app never imports `@motion-canvas/*` | Remotion for a diagram |
 | Final encode, resize, inspect | **FFmpeg** — `npx remotion ffmpeg` / `npx remotion ffprobe` (bundled; no system FFmpeg needed) | guessing from file size |
 
 ## Rules every motion change follows
 
 - **Reduced motion is not optional.** Every animation has a
   `prefers-reduced-motion: reduce` form: final state, no travel. Motion:
-  `useReducedMotion` from `lib/motion.ts`. GSAP: `gsap.matchMedia()`.
+  `useReducedMotion` from `lib/motion.ts` (it follows the OS setting live;
+  Motion's own hook only reads it once). GSAP: check the preference before
+  building, inside `gsap.context()`, and revert on change — never one
+  `gsap.matchMedia()` per element: GSAP 3.15 never removes its media-query
+  listeners (see `components/samples/usePairFlip.ts`).
   Remotion: a `reducedMotion` render prop or static frame. R3F: skip the
   simulation, place bodies settled.
 - **Touch.** No Motion `whileTap` and no focus-triggered reveals on anything
@@ -115,7 +119,7 @@ npm run motion:studio      # Remotion Studio on remotion/index.ts
 npm run motion:render      # render CrateRecap → motion/out/crate-recap.mp4
 npm run motion:review      # ffprobe checks + contact sheet for a render
 npm run motion:sfx         # regenerate public/sfx/* (deterministic)
-npm run motion:lottie      # regenerate public/lottie/tape-loader.json
+npm run motion:lottie      # regenerate public/lottie/tape-loader.json; copy the dotLottie wasm + its NOTICE
 npm run motion:cards       # sample Satori cards → motion/out/cards (SVGO'd)
 npm run motion:svg         # optimise every SVG in public/
 npm run motion:explainers  # build the Motion Canvas explainer → public/explainers

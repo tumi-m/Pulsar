@@ -35,6 +35,13 @@ export type CrateRecapProps = {
   withAudio?: boolean;
   /** How many records the crate really holds, when more than fit the video. */
   totalRecords?: number;
+  /**
+   * The prefers-reduced-motion form: nothing travels, tilts or zooms — cards,
+   * text and the deck cut in and out with short opacity fades, and the
+   * backdrop's sheen holds still. The reels still turn in place (the tape is
+   * playing) and the counter still ticks.
+   */
+  reducedMotion?: boolean;
 };
 
 /** What the composition actually draws: every field present and bounded. */
@@ -51,6 +58,7 @@ export type NormalizedRecapProps = {
   records: NormalizedRecord[];
   withAudio: boolean;
   totalRecords: number;
+  reducedMotion: boolean;
 };
 
 const CRATE_NAME_MAX = 48;
@@ -107,6 +115,7 @@ export function normalizeRecapProps(input: Partial<CrateRecapProps> | null | und
     records: usable.slice(0, MAX_RECORDS),
     withAudio: input?.withAudio === true,
     totalRecords,
+    reducedMotion: input?.reducedMotion === true,
   };
 }
 
@@ -142,6 +151,18 @@ export function recapTimeline(recordCount: number, fps: number = RECAP_FPS): Rec
 
 export function recapDurationInFrames(recordCount: number, fps: number = RECAP_FPS): number {
   return recapTimeline(recordCount, fps).total;
+}
+
+/**
+ * A frame to show while the video isn't playing — the Player's poster under
+ * reduced motion, where it doesn't autoplay. Frame 0 is the first frame of
+ * the entrance (the title card still below the frame, the deck not yet in);
+ * by 1 s the intro has settled in both forms: the card has landed, its name
+ * and record count are in, the deck is up, and the header (from intro −
+ * 0.25 s) hasn't started.
+ */
+export function recapPosterFrame(fps: number = RECAP_FPS): number {
+  return Math.round(1 * fps);
 }
 
 /** Which record the header's counter shows at `frame` (1-based), or 0 outside the records. */

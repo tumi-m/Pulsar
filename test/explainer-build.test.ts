@@ -80,6 +80,15 @@ describe("built explainer bundle", () => {
     const notice = read("NOTICE.md");
     expect(notice).toContain("SIL Open Font License");
     expect(notice).toContain("Copyright (c) 2022 motion-canvas");
+    // @motion-canvas/core bundles chroma-js: BSD-3-Clause, with its
+    // ColorBrewer palettes under Apache-2.0, whose text must travel too.
+    if (read("project.js").includes("chroma.js")) {
+      expect(notice).toContain("Copyright (c) 2011-2019, Gregor Aisch");
+      expect(notice).toContain("Copyright (c) 2002 Cynthia Brewer");
+      expect(notice).toContain("TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION");
+    }
+    // It names only files the build ships (see the single-module test above).
+    expect(notice).not.toMatch(/player\.js|chunks\//);
   });
 
   it("stays small", () => {

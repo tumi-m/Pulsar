@@ -7,12 +7,14 @@ const CARD_W = 900;
  * The title card: one big J-card with the crate's name written on it, the
  * record count beneath — the label you'd write before dubbing the tape.
  * It drops in, holds, and sinks away as the first record deals over it.
+ * Under reduced motion it fades in where it lands and fades out in place.
  */
 export function Intro({
   crateName,
   shown,
   total,
   exitAt,
+  reducedMotion = false,
 }: {
   crateName: string;
   /** Records in the video. */
@@ -21,14 +23,38 @@ export function Intro({
   total: number;
   /** Local frame at which the card starts to leave. */
   exitAt: number;
+  /** No travel, tilt or zoom: opacity only. */
+  reducedMotion?: boolean;
 }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const nameSize = crateName.length <= 10 ? 150 : crateName.length <= 18 ? 120 : crateName.length <= 30 ? 96 : 76;
   const count =
     total === 0 ? "EMPTY CRATE" : `${total} RECORD${total === 1 ? "" : "S"}`;
-  const fade = (from: number, to: number) =>
-    interpolate(frame, [from * fps, to * fps], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
+  const fade = (from: number, to: number) => interpolate(frame, [from * fps, to * fps], [0, 1], clamp);
+  // The card's movement, or under reduced motion its settled pose: it fades in
+  // where it lands and out where it stands.
+  const card = reducedMotion
+    ? {
+        opacity: interpolate(frame, [0, 0.3 * fps, exitAt, exitAt + 0.34 * fps], [0, 1, 1, 0], clamp),
+      }
+    : {
+        translate: interpolate(frame, [0, 0.7 * fps, exitAt, exitAt + 0.34 * fps], ["0px 1300px", "0px 0px", "0px 0px", "0px -90px"], {
+          easing: [Easing.spring({ damping: 16, stiffness: 110 }), Easing.linear, Easing.bezier(0.4, 0, 1, 1)],
+          ...clamp,
+        }),
+        rotate: interpolate(frame, [0, 0.7 * fps], ["-6deg", "0deg"], {
+          easing: Easing.spring({ damping: 16, stiffness: 110 }),
+          ...clamp,
+        }),
+        scale: interpolate(frame, [exitAt, exitAt + 0.34 * fps], [1, 0.88], {
+          easing: Easing.bezier(0.4, 0, 1, 1),
+          ...clamp,
+          output: "perceptual-scale",
+        }),
+        opacity: interpolate(frame, [exitAt, exitAt + 0.34 * fps], [1, 0], clamp),
+      };
 
   return (
     <>
@@ -66,26 +92,7 @@ export function Intro({
           top: 330,
           width: CARD_W,
           transformOrigin: "50% 100%",
-          translate: interpolate(frame, [0, 0.7 * fps, exitAt, exitAt + 0.34 * fps], ["0px 1300px", "0px 0px", "0px 0px", "0px -90px"], {
-            easing: [Easing.spring({ damping: 16, stiffness: 110 }), Easing.linear, Easing.bezier(0.4, 0, 1, 1)],
-            extrapolateLeft: "clamp",
-            extrapolateRight: "clamp",
-          }),
-          rotate: interpolate(frame, [0, 0.7 * fps], ["-6deg", "0deg"], {
-            easing: Easing.spring({ damping: 16, stiffness: 110 }),
-            extrapolateLeft: "clamp",
-            extrapolateRight: "clamp",
-          }),
-          scale: interpolate(frame, [exitAt, exitAt + 0.34 * fps], [1, 0.88], {
-            easing: Easing.bezier(0.4, 0, 1, 1),
-            extrapolateLeft: "clamp",
-            extrapolateRight: "clamp",
-            output: "perceptual-scale",
-          }),
-          opacity: interpolate(frame, [exitAt, exitAt + 0.34 * fps], [1, 0], {
-            extrapolateLeft: "clamp",
-            extrapolateRight: "clamp",
-          }),
+          ...card,
           borderRadius: 26,
           overflow: "hidden",
           backgroundColor: COLOR.cream,
@@ -151,11 +158,12 @@ export function Intro({
               color: COLOR.labelInk,
               overflowWrap: "anywhere",
               opacity: fade(0.4, 0.7),
-              translate: interpolate(frame, [0.4 * fps, 0.8 * fps], ["0px 24px", "0px 0px"], {
-                easing: Easing.bezier(0.22, 1, 0.36, 1),
-                extrapolateLeft: "clamp",
-                extrapolateRight: "clamp",
-              }),
+              translate: reducedMotion
+                ? undefined
+                : interpolate(frame, [0.4 * fps, 0.8 * fps], ["0px 24px", "0px 0px"], {
+                    easing: Easing.bezier(0.22, 1, 0.36, 1),
+                    ...clamp,
+                  }),
             }}
           >
             {crateName}

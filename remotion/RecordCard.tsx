@@ -13,18 +13,23 @@ import { CARD_TOP, CARD_WIDTH, COLOR, FONT, MONO, RECAP_WIDTH } from "./tokens";
  * It deals in from below the deck with a spring, turned a few degrees (to
  * alternate sides, like cards dealt from a hand), then sinks back while the
  * next one lands on top of it. Every value is a function of the frame.
+ * Under reduced motion it fades in already in place and fades out where it
+ * stands, so consecutive records cross-fade without travelling.
  */
 export function RecordCard({
   record,
   index,
   count,
   slot,
+  reducedMotion = false,
 }: {
   record: NormalizedRecord;
   index: number;
   count: number;
   /** Frames this record owns before the next one starts dealing in. */
   slot: number;
+  /** No travel, tilt or zoom: opacity only. */
+  reducedMotion?: boolean;
 }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -38,6 +43,29 @@ export function RecordCard({
   const artistLine = Math.ceil(ARTIST_SIZES[0] * 1.1);
   const land = 0.62 * fps;
   const sideLabel = `SIDE ${index % 2 === 0 ? "A" : "B"} · ${String(index + 1).padStart(2, "0")}/${String(count).padStart(2, "0")}`;
+  const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
+  const deal = [Easing.spring({ damping: 15, stiffness: 120 }), Easing.linear, Easing.bezier(0.4, 0, 1, 1)];
+  const motion = reducedMotion
+    ? {
+        // Over the previous card, which fades out beneath it meanwhile.
+        opacity: interpolate(frame, [0, 0.25 * fps, slot, slot + 0.34 * fps], [0, 1, 1, 0], clamp),
+      }
+    : {
+        translate: interpolate(frame, [0, land, slot, slot + 0.34 * fps], ["0px 1240px", "0px 0px", "0px 0px", "0px -70px"], {
+          easing: deal,
+          ...clamp,
+        }),
+        rotate: interpolate(frame, [0, land, slot, slot + 0.34 * fps], [`${tilt}deg`, "0deg", "0deg", `${-tilt * 0.4}deg`], {
+          easing: deal,
+          ...clamp,
+        }),
+        scale: interpolate(frame, [slot, slot + 0.34 * fps], [1, 0.88], {
+          easing: Easing.bezier(0.4, 0, 1, 1),
+          ...clamp,
+          output: "perceptual-scale",
+        }),
+        opacity: interpolate(frame, [slot, slot + 0.34 * fps], [1, 0], clamp),
+      };
 
   return (
     <div
@@ -49,26 +77,7 @@ export function RecordCard({
         display: "flex",
         flexDirection: "column",
         transformOrigin: "50% 100%",
-        translate: interpolate(frame, [0, land, slot, slot + 0.34 * fps], ["0px 1240px", "0px 0px", "0px 0px", "0px -70px"], {
-          easing: [Easing.spring({ damping: 15, stiffness: 120 }), Easing.linear, Easing.bezier(0.4, 0, 1, 1)],
-          extrapolateLeft: "clamp",
-          extrapolateRight: "clamp",
-        }),
-        rotate: interpolate(frame, [0, land, slot, slot + 0.34 * fps], [`${tilt}deg`, "0deg", "0deg", `${-tilt * 0.4}deg`], {
-          easing: [Easing.spring({ damping: 15, stiffness: 120 }), Easing.linear, Easing.bezier(0.4, 0, 1, 1)],
-          extrapolateLeft: "clamp",
-          extrapolateRight: "clamp",
-        }),
-        scale: interpolate(frame, [slot, slot + 0.34 * fps], [1, 0.88], {
-          easing: Easing.bezier(0.4, 0, 1, 1),
-          extrapolateLeft: "clamp",
-          extrapolateRight: "clamp",
-          output: "perceptual-scale",
-        }),
-        opacity: interpolate(frame, [slot, slot + 0.34 * fps], [1, 0], {
-          extrapolateLeft: "clamp",
-          extrapolateRight: "clamp",
-        }),
+        ...motion,
       }}
     >
       <div
@@ -118,15 +127,13 @@ export function RecordCard({
           style={{
             padding: "22px 44px 28px",
             boxSizing: "border-box",
-            opacity: interpolate(frame, [0.3 * fps, 0.55 * fps], [0, 1], {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            }),
-            translate: interpolate(frame, [0.3 * fps, 0.6 * fps], ["0px 18px", "0px 0px"], {
-              easing: Easing.bezier(0.22, 1, 0.36, 1),
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-            }),
+            opacity: interpolate(frame, [0.3 * fps, 0.55 * fps], [0, 1], clamp),
+            translate: reducedMotion
+              ? undefined
+              : interpolate(frame, [0.3 * fps, 0.6 * fps], ["0px 18px", "0px 0px"], {
+                  easing: Easing.bezier(0.22, 1, 0.36, 1),
+                  ...clamp,
+                }),
           }}
         >
           <div

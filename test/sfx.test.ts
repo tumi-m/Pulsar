@@ -126,6 +126,11 @@ type Sfx = typeof import("@/lib/sfx");
 let now = 10_000;
 let current: Sfx | null = null;
 async function fresh(): Promise<Sfx> {
+  // An import("howler") the previous copy still has in flight must land
+  // first: vi.resetModules drops the bookkeeping vi.dynamicImportSettled
+  // waits on, so an import caught by the reset arrived later, uncounted by
+  // any settle(), and was counted against whichever test was running then.
+  await settle();
   // The previous copy's document listeners outlive vi.resetModules; switching
   // it off removes them so they can't answer this test's taps. The stored
   // setting is put back: some tests reload on purpose to read it.
@@ -152,7 +157,10 @@ async function flush() {
 const howl = (name: string) => h.howls.filter((x) => x.opts.src[0].includes(`/${name}.`)).at(-1)!;
 const loadAll = () => h.howls.forEach((x) => x._state === "loading" && x.loaded());
 
-beforeEach(() => {
+beforeEach(async () => {
+  // Belt and braces with afterEach: nothing from an earlier test may still be
+  // on its way into the counters this resets.
+  await settle();
   h.imports = 0;
   h.failImport = false;
   h.webkit = false;
@@ -166,8 +174,16 @@ beforeEach(() => {
   vi.stubGlobal("AudioContext", FakeCtx);
 });
 
-afterEach(() => {
-  act(() => current?.setSfxEnabled(false));
+afterEach(async () => {
+  // A test that switched sounds on and ended without settling (persists the
+  // choice, storage refusing writes) left import("howler") in flight. Landing
+  // after the next test's beforeEach, it counted as that test's import: the
+  // returning-listener test saw 1 at page load under a loaded CPU. Let it
+  // land here, while this test's stubs are still in place.
+  await act(async () => {
+    current?.setSfxEnabled(false);
+    await settle();
+  });
   current = null;
   vi.useRealTimers();
   vi.unstubAllGlobals();

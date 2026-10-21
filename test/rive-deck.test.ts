@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   ARTIST_CHARS,
   LCD_CHARS,
+  REDUCED_STEPS,
   RIVE_WASM,
   deckInputs,
   lcdCut,
@@ -65,6 +66,21 @@ describe("deckInputs", () => {
     expect(deckInputs(snap({ progress: 1.4 }), false).trackProgress).toBe(100);
     expect(deckInputs(snap({ progress: -0.2 }), false).trackProgress).toBe(0);
     expect(deckInputs(snap({ progress: Number.NaN }), false).trackProgress).toBe(0);
+  });
+
+  it("steps the line in coarse twentieths under reduced motion, so the deck can settle between steps", () => {
+    // Whole-percent ticks arrive every 0.3s on a 30s preview, faster than
+    // SETTLE_MS, so the state machine never paused while a preview played.
+    const step = 100 / REDUCED_STEPS;
+    expect(step).toBe(5);
+    expect(deckInputs(snap({ progress: 0.426, playing: true }), true).trackProgress).toBe(45);
+    expect(deckInputs(snap({ progress: 0.41, playing: true }), true).trackProgress).toBe(40);
+    expect(deckInputs(snap({ progress: 1.4, playing: true }), true).trackProgress).toBe(100);
+    expect(deckInputs(snap({ progress: Number.NaN }), true).trackProgress).toBe(0);
+    // Over a 30s preview the reduced line moves at most once per 1.5s.
+    const values = new Set<number>();
+    for (let t = 0; t <= 30; t += 0.3) values.add(deckInputs(snap({ progress: t / 30, playing: true }), true).trackProgress);
+    expect(values.size).toBeLessThanOrEqual(REDUCED_STEPS + 1);
   });
 
   it("pads short titles to the window so the marquee leaves them still", () => {

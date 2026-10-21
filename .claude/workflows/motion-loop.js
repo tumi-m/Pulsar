@@ -219,7 +219,7 @@ const ship = await agent(`${GROUND}
 ## Stage: ship
 Brief: ${JSON.stringify(brief)}
 Outstanding review findings: ${JSON.stringify(findings)}
-Run the full gate from the repo root: npx tsc --noEmit -p . ; npx vitest run ; npx eslint . (0 errors) ; npx next build (record the "/" First Load JS) ; the Playwright e2e specs in test/e2e against the production build. Mark ready only if all pass and no major finding is outstanding. List every changed file and propose a commit message — do NOT commit or push; the session that ran this workflow decides.`,
+Run the full gate from the repo root: npx tsc --noEmit -p . ; npx vitest run ; npx eslint . (0 errors) ; npx next build (record the "/" First Load JS; that line is the production-build check) ; then npx playwright test, which boots its own dev server on :3000 with the offline fetch mock (test/e2e/fetch-mock.cjs) preloaded. Stop anything else listening on :3000 first: Playwright reuses an existing server there, and one without the mock sends the specs to the real network. Mark ready only if all pass and no major finding is outstanding. List every changed file and propose a commit message — do NOT commit or push; the session that ran this workflow decides.`,
   { label: 'ship', phase: 'Ship', schema: SHIP_SCHEMA })
 
 return { brief, design: { winner: judged.winner, scores: judged.scores }, work: { animated, built, sound, rendered }, review: { rounds: reviewRound, outstanding: findings }, ship }

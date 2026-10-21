@@ -8,6 +8,7 @@ import { Portal } from "./Portal";
 import { useScrollLock } from "@/lib/useScrollLock";
 import { useDialog } from "@/lib/useDialog";
 import { useBackClose } from "@/lib/useBackClose";
+import { onRequest } from "@/lib/events";
 import { SamplePage, readMarks, type SampleRef, type SampleSubject } from "./SamplePage";
 import { mostSampledSources, catalogSamplers, lookupCatalog } from "@/lib/samples-catalog";
 import { catalogSongs, type SongKey } from "@/lib/samples-graph";
@@ -49,11 +50,8 @@ export function SamplesExplorer({ releases }: { releases: Release[] }) {
   const picks = useMemo(() => catalogSamplers(10), []);
   const songs = useMemo(() => catalogSongs(), []);
 
-  useEffect(() => {
-    const activate = () => setOpen(true);
-    window.addEventListener("pulsar-open-samples", activate);
-    return () => window.removeEventListener("pulsar-open-samples", activate);
-  }, []);
+  // onRequest also takes a navbar press made before this mounted (lib/events).
+  useEffect(() => onRequest("pulsar-open-samples", () => setOpen(true)), []);
 
   // The panel covers the right half on desktop; broadcast so the Pulsar
   // letterhead and navbar shift into the space that's still visible.

@@ -4,10 +4,11 @@ import { reelAngle, reelPack, recordIndexAt, type RecapTimeline } from "./props"
 import { COLOR, DECK_HEIGHT, DECK_TOP, FONT, MONO, RECAP_WIDTH, SAFE_X } from "./tokens";
 
 /**
- * The room the tape plays in: a dark housing with one slow sheen across it.
+ * The room the tape plays in: a dark housing with one slow sheen across it
+ * (held still under reduced motion).
  * One linear gradient per element — the browser exporter draws exactly one.
  */
-export function Backdrop() {
+export function Backdrop({ reducedMotion = false }: { reducedMotion?: boolean }) {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
   return (
@@ -28,7 +29,7 @@ export function Backdrop() {
           width: 1400,
           height: 2400,
           rotate: "18deg",
-          translate: interpolate(frame, [0, durationInFrames], ["-200px 0px", "600px 0px"]),
+          translate: reducedMotion ? "200px 0px" : interpolate(frame, [0, durationInFrames], ["-200px 0px", "600px 0px"]),
           backgroundImage:
             "linear-gradient(90deg, rgba(242,102,44,0) 0%, rgba(242,102,44,0.07) 50%, rgba(242,102,44,0) 100%)",
         }}
@@ -39,9 +40,18 @@ export function Backdrop() {
 
 /**
  * Top bar while the records play: the crate's name, and a Walkman-style LCD
- * reading which record this is.
+ * reading which record this is. Under reduced motion it fades in without
+ * dropping.
  */
-export function Header({ crateName, timeline }: { crateName: string; timeline: RecapTimeline }) {
+export function Header({
+  crateName,
+  timeline,
+  reducedMotion = false,
+}: {
+  crateName: string;
+  timeline: RecapTimeline;
+  reducedMotion?: boolean;
+}) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const n = recordIndexAt(frame, timeline);
@@ -64,11 +74,13 @@ export function Header({ crateName, timeline }: { crateName: string; timeline: R
         justifyContent: "space-between",
         gap: 30,
         opacity,
-        translate: interpolate(frame, [showAt, showAt + 0.4 * fps], ["0px -20px", "0px 0px"], {
-          easing: Easing.bezier(0.22, 1, 0.36, 1),
-          extrapolateLeft: "clamp",
-          extrapolateRight: "clamp",
-        }),
+        translate: reducedMotion
+          ? undefined
+          : interpolate(frame, [showAt, showAt + 0.4 * fps], ["0px -20px", "0px 0px"], {
+              easing: Easing.bezier(0.22, 1, 0.36, 1),
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            }),
       }}
     >
       <div style={{ minWidth: 0, flex: 1 }}>
@@ -126,9 +138,11 @@ export function Header({ crateName, timeline }: { crateName: string; timeline: R
  * The deck along the bottom, always running: a tape window whose reels wind
  * from left to right over the whole video, a tape counter, and a play lamp.
  * Cards deal in from behind it — it is drawn after them — so each record
- * reads as coming out of the machine.
+ * reads as coming out of the machine. It slides up at the start, or under
+ * reduced motion fades in in place; its reels turn either way — in place,
+ * as the tape plays.
  */
-export function Deck() {
+export function Deck({ reducedMotion = false }: { reducedMotion?: boolean }) {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   const progress = Math.min(1, frame / Math.max(1, durationInFrames - 1));
@@ -155,11 +169,15 @@ export function Deck() {
         border: "2px solid rgba(255,255,255,0.09)",
         boxSizing: "border-box",
         boxShadow: "0 -20px 60px rgba(0,0,0,0.55)",
-        translate: interpolate(frame, [0, 0.5 * fps], ["0px 380px", "0px 0px"], {
-          easing: Easing.bezier(0.22, 1, 0.36, 1),
-          extrapolateLeft: "clamp",
-          extrapolateRight: "clamp",
-        }),
+        ...(reducedMotion
+          ? { opacity: interpolate(frame, [0, 0.3 * fps], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) }
+          : {
+              translate: interpolate(frame, [0, 0.5 * fps], ["0px 380px", "0px 0px"], {
+                easing: Easing.bezier(0.22, 1, 0.36, 1),
+                extrapolateLeft: "clamp",
+                extrapolateRight: "clamp",
+              }),
+            }),
       }}
     >
       {/* tape window */}

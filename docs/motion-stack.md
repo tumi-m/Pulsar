@@ -59,7 +59,7 @@ with licences and caveats in `.claude/skills/THIRD_PARTY.md`. Pulsar's own
 |---|---|---|
 | 11 | [mrdoob/three.js](https://github.com/mrdoob/three.js) | renderer, geometry, canvas-drawn sleeves/discs/tapes |
 | 12 | [pmndrs/react-three-fiber](https://github.com/pmndrs/react-three-fiber) | the scene as React (`components/three/*`) |
-| 13 | [pmndrs/drei](https://github.com/pmndrs/drei) | cameras, contact shadow, helpers |
+| 13 | [pmndrs/drei](https://github.com/pmndrs/drei) | two performance helpers only, in `Experience3D.tsx`: `<AdaptiveDpr>`, and the `<PerformanceMonitor>` that drops DPR to 1 when frames decline (back to the tier cap when they recover) and, if it keeps flip-flopping, drops the fx tier to lite (no postprocessing). The camera rig (`Observatory.tsx`) and the crate's contact shadow (`CrateScene.tsx`) are hand-written on R3F/three, not Drei. |
 | 14 | [pmndrs/react-three-rapier](https://github.com/pmndrs/react-three-rapier) | "dig the crate": the visitor's own records drop into a crate and can be flicked (`RecordsPhysics.tsx`; wasm loads only when the set-piece starts) |
 | 15 | [pmndrs/react-postprocessing](https://github.com/pmndrs/react-postprocessing) | bloom, vignette, grain finish (`Finish.tsx`), skipped on low-tier devices (`lib/three/quality.ts`) |
 
@@ -95,7 +95,7 @@ npm run motion:studio       # Remotion Studio
 npm run motion:render       # CrateRecap → motion/out/crate-recap.mp4
 npm run motion:review       # ffprobe checks + contact sheet → motion/out/
 npm run motion:sfx          # regenerate public/sfx (deterministic)
-npm run motion:lottie       # regenerate public/lottie/tape-loader.json
+npm run motion:lottie       # regenerate public/lottie/tape-loader.json; copy the dotLottie wasm + its NOTICE
 npm run motion:cards        # sample Satori cards → motion/out/cards
 npm run motion:svg          # optimise SVGs in public/
 npm run motion:explainers   # rebuild the Motion Canvas explainer
@@ -122,9 +122,28 @@ Canvas player all arrive by dynamic import when a listener reaches the feature.
   set `NEXT_PUBLIC_REMOTION_LICENSE_KEY` to your public licence key and
   redeploy.
 - **GSAP** is free including every plugin (standard licence since 3.13).
-- **Mediabunny** is MPL-2.0 (used unmodified). **Rive** asset: MIT, with an
-  embedded OFL font — `public/rive/NOTICE.md`. **Motion Canvas**: MIT — fonts
-  and notice in `public/explainers/NOTICE.md`.
+- **Mediabunny** and its three encoder extensions, which `@remotion/web-renderer`
+  pulls in (`@mediabunny/aac-encoder`, `mp3-encoder` and `flac-encoder`), are
+  MPL-2.0 and used unmodified. The libraries compiled into the extensions'
+  wasm are not MPL: FFmpeg's AAC encoder (libavcodec, LGPL-2.1+), LAME 3.100
+  (LGPL-2.0+) and libFLAC (BSD-3-Clause, Xiph.Org). They ship as lazy chunks
+  under `/_next/static`, not as files in `public/`, and the browser fetches one
+  only when its WebCodecs can't encode that codec. Their notice, upstream
+  sources and the LGPL text are served from `public/licenses/` (`NOTICE.md`,
+  `LGPL-2.1.txt`), and `test/encoder-notices.test.ts` fails when an upgrade
+  changes a package or the library version inside it. This is separate from
+  the FFmpeg CLI under Remotion's compositor (#20), which never reaches the
+  browser.
+- **Rive** asset: MIT, with an embedded OFL font — `public/rive/NOTICE.md`.
+  **dotLottie**: the player's wasm renderer is copied into `public/lottie/` by
+  `npm run motion:lottie`; MIT, notice in `public/lottie/NOTICE.md` (written by
+  the same script).
+  **Motion Canvas**: the one bundle `public/explainers/project.js` is Motion
+  Canvas 3.17.2 (MIT) plus chroma-js 2.4.2, which `@motion-canvas/core` pulls
+  in: BSD-3-Clause, with ColorBrewer palette data under Apache-2.0. Its fonts
+  are OFL. All of these notices, and the Apache-2.0 text, are in
+  `public/explainers/NOTICE.md` (edit `explainers/public/NOTICE.md`; the build
+  copies it).
 - The **Motion MCP servers** in `.mcp.json` need network access to
   `mcp.motion.dev`; Claude Code asks before using them.
 - Remotion's CLI warns that zod 4.5.4 is expected; the app stays on zod 3 and

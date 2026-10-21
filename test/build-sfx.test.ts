@@ -1,4 +1,7 @@
+import { readdirSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { RECAP_BED } from "../remotion/tokens";
 import {
   BED,
   SOUNDS,
@@ -8,6 +11,7 @@ import {
   encodeWav,
   mulberry32,
   readWav24,
+  sfxFiles,
   synthBed,
   synthBedBody,
   synthDrop,
@@ -56,6 +60,20 @@ describe("build-sfx synthesis", () => {
     expect(SOUNDS[0].maxBytes).toBeLessThanOrEqual(400 * 1024);
     // Whole bars, so the loop seam falls on a downbeat.
     expect((BED.bars * BED.beatsPerBar * 60) / BED.bpm).toBe(BED.seconds);
+  });
+
+  it("encodes each sound only to the files something loads", () => {
+    // The UI sounds: Howler is offered webm, then mp3 (lib/sfx.ts).
+    for (const s of SOUNDS.slice(1)) expect(s.formats).toEqual(["webm", "mp3"]);
+    // The bed has one consumer, the Crate Recap, and it loads the mp3. A webm
+    // of it was ~280 KB in git and in every deploy that nothing played.
+    expect(SOUNDS[0].formats).toEqual(["mp3"]);
+    expect(`sfx/${SOUNDS[0].name}.${SOUNDS[0].formats[0]}`).toBe(RECAP_BED);
+  });
+
+  it("leaves public/sfx holding exactly the manifest's files, no orphans", () => {
+    const shipped = readdirSync(path.join(__dirname, "..", "public", "sfx")).sort();
+    expect(shipped).toEqual([...sfxFiles()].sort());
   });
 
   it(

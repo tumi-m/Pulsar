@@ -8,6 +8,7 @@ import {
   reelAngle,
   reelPack,
   recapDurationInFrames,
+  recapPosterFrame,
   recapTimeline,
   recordIndexAt,
   secondaryAccentFor,
@@ -155,6 +156,30 @@ describe("normalizeRecapProps", () => {
   it("only turns audio on when asked", () => {
     expect(normalizeRecapProps({ crateName: "x", records: [], withAudio: true }).withAudio).toBe(true);
     expect(normalizeRecapProps({ crateName: "x", records: [], withAudio: "yes" as unknown as boolean }).withAudio).toBe(false);
+  });
+
+  it("only uses the reduced-motion form when asked", () => {
+    expect(normalizeRecapProps({ crateName: "x", records: [] }).reducedMotion).toBe(false);
+    expect(normalizeRecapProps({ crateName: "x", records: [], reducedMotion: true }).reducedMotion).toBe(true);
+    expect(normalizeRecapProps({ crateName: "x", records: [], reducedMotion: 1 as unknown as boolean }).reducedMotion).toBe(false);
+    const once = normalizeRecapProps({ crateName: "x", records: [rec("A")], reducedMotion: true });
+    expect(normalizeRecapProps(once)).toEqual(once);
+  });
+});
+
+describe("recapPosterFrame", () => {
+  it("is inside the intro, after its entrance has settled and before the header comes in", () => {
+    for (const fps of [24, 30, 60]) {
+      const t = recapTimeline(0, fps);
+      const poster = recapPosterFrame(fps);
+      // Intro.tsx: the card lands by 0.7 s, the record count is in by 0.9 s;
+      // the deck is up by 0.5 s.
+      expect(poster).toBeGreaterThanOrEqual(Math.ceil(0.9 * fps));
+      // Deck.tsx: the header starts at intro − 0.25 s; Intro.tsx: the
+      // wordmark starts to leave at exitAt − 0.5 s = intro − 0.6 s.
+      expect(poster).toBeLessThan(t.intro - 0.6 * fps);
+      expect(poster).toBeLessThan(recapDurationInFrames(0, fps));
+    }
   });
 });
 

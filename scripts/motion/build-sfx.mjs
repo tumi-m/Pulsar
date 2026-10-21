@@ -15,9 +15,12 @@
  *      so nothing gets resampled on the way in)
  *   2. normalise (see LOUDNESS below)
  *   3. write a 32-bit float WAV to a temp dir
- *   4. encode to .webm (Opus) and .mp3 in public/sfx/ — Opus is smaller and
- *      better at these bitrates; mp3 is the fallback for Safari builds that
- *      can't decode Opus-in-WebM
+ *   4. encode to the sound's formats in public/sfx/. The UI sounds get .webm
+ *      (Opus) and .mp3 — Opus is smaller and better at these bitrates; mp3 is
+ *      the fallback for Safari builds that can't decode Opus-in-WebM. The bed
+ *      gets .mp3 only: the Crate Recap is its one consumer and loads that file
+ *      (RECAP_BED in remotion/tokens.ts), so a .webm of it was ~280 KB that
+ *      nothing played
  *   5. ffprobe every output and fail if anything is missing, mis-encoded,
  *      the wrong length, too loud or over budget
  *
@@ -673,14 +676,24 @@ function encode(wav, outFile, fmt, nCh) {
  *
  * maxBytes are per file. Short sounds stay under 15 KB so preloading all four
  * on enable costs less than one album thumbnail.
+ *
+ * formats are the files each sound is encoded to: only what something loads.
+ * lib/sfx.ts offers Howler webm then mp3 for the UI sounds; the recap loads
+ * the bed's mp3, which every browser and Remotion's renderers decode.
  */
+const UI_FORMATS = ["webm", "mp3"];
 export const SOUNDS = [
-  { name: "recap-bed", synth: synthBed, seconds: BED.seconds, channels: 2, maxBytes: 400 * 1024, loudness: "lufs" },
-  { name: "key", synth: () => [synthKey()], seconds: 0.07, channels: 1, maxBytes: 15 * 1024, loudness: "peak" },
-  { name: "drop", synth: () => [synthDrop()], seconds: 0.18, channels: 1, maxBytes: 15 * 1024, loudness: "peak" },
-  { name: "success", synth: () => [synthSuccess()], seconds: 0.6, channels: 1, maxBytes: 15 * 1024, loudness: "peak" },
-  { name: "error", synth: () => [synthError()], seconds: 0.3, channels: 1, maxBytes: 15 * 1024, loudness: "peak" },
+  { name: "recap-bed", synth: synthBed, seconds: BED.seconds, channels: 2, maxBytes: 400 * 1024, loudness: "lufs", formats: ["mp3"] },
+  { name: "key", synth: () => [synthKey()], seconds: 0.07, channels: 1, maxBytes: 15 * 1024, loudness: "peak", formats: UI_FORMATS },
+  { name: "drop", synth: () => [synthDrop()], seconds: 0.18, channels: 1, maxBytes: 15 * 1024, loudness: "peak", formats: UI_FORMATS },
+  { name: "success", synth: () => [synthSuccess()], seconds: 0.6, channels: 1, maxBytes: 15 * 1024, loudness: "peak", formats: UI_FORMATS },
+  { name: "error", synth: () => [synthError()], seconds: 0.3, channels: 1, maxBytes: 15 * 1024, loudness: "peak", formats: UI_FORMATS },
 ];
+
+/** Every file the manifest produces, relative to public/sfx/. */
+export function sfxFiles() {
+  return SOUNDS.flatMap((s) => s.formats.map((fmt) => `${s.name}.${fmt}`));
+}
 
 /**
  * Duration checks, two ways. The decoded length is what plays, and must match
@@ -733,7 +746,11 @@ function main() {
         console.log(`${s.name}: measured ${lufs.toFixed(1)} LUFS / ${truePeakDb.toFixed(1)} dBTP, applied ${gainDb >= 0 ? "+" : ""}${gainDb.toFixed(2)} dB`);
       }
 
-      for (const fmt of Object.keys(FORMATS)) {
+      // A format this sound no longer gets (the bed's .webm) is removed, so a
+      // rerun can't leave an orphan behind for the deploy to carry.
+      for (const fmt of Object.keys(FORMATS))
+        if (!s.formats.includes(fmt)) rmSync(path.join(OUT, `${s.name}.${fmt}`), { force: true });
+      for (const fmt of s.formats) {
         const file = path.join(OUT, `${s.name}.${fmt}`);
         // A stale file from an earlier run must not pass for a fresh encode.
         rmSync(file, { force: true });
