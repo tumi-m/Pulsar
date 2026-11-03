@@ -5,7 +5,7 @@
  * Regenerate with:  npm run grammy
  * Source: Wikidata (award received → Grammy Award and all category subclasses).
  *
- * 1336 winners.
+ * 1345 winners.
  */
 
 export const GRAMMY_ARTISTS: string[] = [
@@ -155,6 +155,7 @@ export const GRAMMY_ARTISTS: string[] = [
   "Bobbie Gentry",
   "Bobby Bland",
   "Bobby Darin",
+  "Bobby Ingano",
   "Bobby McFerrin",
   "Bobby Rush",
   "Bon Iver",
@@ -256,9 +257,11 @@ export const GRAMMY_ARTISTS: string[] = [
   "Christopher Cross",
   "Christopher Reeve",
   "Christopher Rouse",
+  "Christopher Stewart",
   "Christopher Tin",
   "Chucho Valdés",
   "Chuck Berry",
+  "Ciara",
   "Clarence \"Gatemouth\" Brown",
   "Clark Terry",
   "Claudio Abbado",
@@ -508,6 +511,7 @@ export const GRAMMY_ARTISTS: string[] = [
   "Gojira",
   "Gordon Goodwin",
   "Gordon Jenkins",
+  "Gotye",
   "Graham Nash",
   "Grandmaster Flash and the Furious Five",
   "Grateful Dead",
@@ -611,6 +615,7 @@ export const GRAMMY_ARTISTS: string[] = [
   "Jay Graydon",
   "Jay Rock",
   "Jay-Z",
+  "JAŸ‐Z",
   "Jazmine Sullivan",
   "Jeff Beck",
   "Jeff Scott",
@@ -731,6 +736,7 @@ export const GRAMMY_ARTISTS: string[] = [
   "Kraftwerk",
   "Kris Kristofferson",
   "Kristen Anderson-Lopez",
+  "Kronos Quartet",
   "Krzysztof Penderecki",
   "La Capella Reial de Catalunya",
   "La Mafia",
@@ -766,6 +772,7 @@ export const GRAMMY_ARTISTS: string[] = [
   "Leonard Slatkin",
   "Leontyne Price",
   "Leopold Stokowski",
+  "Les Leverett",
   "Les Paul",
   "LeVar Burton",
   "Lightnin' Hopkins",
@@ -984,6 +991,7 @@ export const GRAMMY_ARTISTS: string[] = [
   "Patton Oswalt",
   "Patty Griffin",
   "Pau Casals",
+  "Paul Boutin",
   "Paul Buckmaster",
   "Paul Epworth",
   "Paul Jacobs",
@@ -1203,6 +1211,7 @@ export const GRAMMY_ARTISTS: string[] = [
   "Tasha Cobbs Leonard",
   "Taylor Swift",
   "Taylor York",
+  "Teddy Abrams",
   "Tedeschi Trucks Band",
   "Tems",
   "Tenacious D",
