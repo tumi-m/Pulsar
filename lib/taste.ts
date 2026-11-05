@@ -154,6 +154,14 @@ export function loadProfile(): TasteProfile | null {
     if (!p || typeof p !== "object" || !p.genres || !p.moods) return null;
     return p as TasteProfile;
   } catch {
+    // Unparsable value: don't silently discard the user's profile — keep the
+    // raw bytes under a backup key so a future migration can attempt repair.
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) localStorage.setItem(`${STORAGE_KEY}.corrupt`, raw);
+    } catch {
+      /* noop */
+    }
     return null;
   }
 }

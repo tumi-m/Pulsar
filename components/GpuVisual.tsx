@@ -365,13 +365,12 @@ export function GpuVisual({
       gl.deleteShader(vs);
       gl.deleteShader(fs);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [release]);
 
   if (failed) {
     return (
       <div className={`${className} flex items-center justify-center bg-[#05050b]`}>
-        <span className="text-[10px] font-mono uppercase tracking-widest text-star-white/30">GPU unavailable</span>
+        <span className="text-[10px] font-mono uppercase tracking-widest text-ink/30">GPU unavailable</span>
       </div>
     );
   }

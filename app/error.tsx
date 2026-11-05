@@ -27,7 +27,7 @@ export default function Error({
       <h1
         className="text-4xl font-bold tracking-tight md:text-6xl"
         style={{
-          background: "linear-gradient(120deg, #ffe8c9 0%, #ff9d5c 22%, #ff5fa2 48%, #9b5de5 72%, #00d4ff 100%)",
+          backgroundImage: "var(--grad-faceplate)",
           WebkitBackgroundClip: "text",
           backgroundClip: "text",
           WebkitTextFillColor: "transparent",
@@ -35,20 +35,20 @@ export default function Error({
       >
         Pulsar
       </h1>
-      <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-star-white/45">
+      <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-ink/45">
         Something skipped
       </p>
-      <p className="max-w-sm text-[13px] leading-relaxed text-star-white/55">
+      <p className="max-w-sm text-[13px] leading-relaxed text-ink/55">
         The page hit an error while loading. Trying again usually clears it.
       </p>
 
       <div className="mt-2 flex flex-col items-center gap-2">
         <button
           onClick={reset}
-          className="min-h-[44px] rounded-full px-6 py-2.5 text-[11px] font-bold uppercase tracking-widest text-white transition-transform hover:scale-105 active:scale-95"
+          className="min-h-[44px] rounded-full px-6 py-2.5 text-[11px] font-bold uppercase tracking-widest text-deck transition-transform hover:scale-105 active:scale-95"
           style={{
-            background: "linear-gradient(120deg, #9b5de5, #ff5fa2 60%, #ffb347)",
-            boxShadow: "0 6px 18px rgba(155,93,229,0.4)",
+            background: "var(--grad-transport)",
+            boxShadow: "0 6px 18px rgba(242,102,44,0.4)",
           }}
         >
           Try again
@@ -57,22 +57,29 @@ export default function Error({
           onClick={() => {
             // Locally-stored state (a corrupt crate, a stale grid zoom) is a
             // plausible cause, so offer a clean slate as a last resort.
+            // Narrowly scoped: never wipe auth verifiers/tokens or the whole
+            // store — only PULSAR-namespaced UI keys.
             try {
-              localStorage.clear();
+              const drop: string[] = [];
+              for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && k.startsWith("pulsar")) drop.push(k);
+              }
+              drop.forEach((k) => localStorage.removeItem(k));
               sessionStorage.clear();
             } catch {
               /* storage unavailable */
             }
             window.location.href = "/";
           }}
-          className="py-1 text-[10px] font-bold uppercase tracking-widest text-star-white/35 hover:text-star-white/70"
+          className="py-1 text-[10px] font-bold uppercase tracking-widest text-ink/35 hover:text-ink/70"
         >
           Reset saved data &amp; reload
         </button>
       </div>
 
       {error.digest && (
-        <p className="mt-4 font-mono text-[10px] text-star-white/25">ref: {error.digest}</p>
+        <p className="mt-4 font-mono text-[10px] text-ink/25">ref: {error.digest}</p>
       )}
     </div>
   );

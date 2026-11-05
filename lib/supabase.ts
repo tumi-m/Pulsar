@@ -5,8 +5,14 @@ import type { Release, AgentRelease } from "./types";
 const resolved = Promise.resolve({ data: [], error: null, count: 0 });
 const buildTimeStub: unknown = new Proxy(resolved, {
   get(target, prop) {
-    if (prop === "then" || prop === "catch" || prop === "finally") {
-      return (target as Promise<unknown>)[prop as "then"].bind(target);
+    if (prop === "then") {
+      return (target as Promise<unknown>).then.bind(target);
+    }
+    if (prop === "catch") {
+      return (target as Promise<unknown>).catch.bind(target);
+    }
+    if (prop === "finally") {
+      return (target as Promise<unknown>).finally.bind(target);
     }
     return () => buildTimeStub;
   },
@@ -53,20 +59,32 @@ export const supabaseAdmin = () =>
     auth: { persistSession: false },
   });
 
+export const MAX_RELEASES_LIMIT = 100;
+export const MAX_SEARCH_LIMIT = 60;
+
+function clampLimit(value: number | undefined, max: number): number | undefined {
+  if (value == null) return undefined;
+  if (!Number.isFinite(value) || value <= 0) return undefined;
+  return Math.min(Math.floor(value), max);
+}
+
 export async function getReleases(opts?: {
   limit?: number;
   mood?: string;
   date?: string;
 }): Promise<Release[]> {
+  const limit = clampLimit(opts?.limit, MAX_RELEASES_LIMIT);
+  const mood = opts?.mood?.trim().slice(0, 64) || undefined;
+  const date = opts?.date?.trim().slice(0, 32) || undefined;
   let query = supabase
     .from("releases")
     .select("*")
     .order("release_date", { ascending: false })
     .order("created_at", { ascending: false });
 
-  if (opts?.mood) query = query.eq("mood", opts.mood);
-  if (opts?.date) query = query.eq("release_date", opts.date);
-  if (opts?.limit) query = query.limit(opts.limit);
+  if (mood) query = query.eq("mood", mood);
+  if (date) query = query.eq("release_date", date);
+  if (limit) query = query.limit(limit);
 
   const { data, error } = await query;
   if (error) throw new Error(`Failed to fetch releases: ${error.message}`);
@@ -87,36 +105,110 @@ export async function getTodaysReleases(): Promise<Release[]> {
   return (data as Release[]) ?? [];
 }
 
-export async function saveRelease(
-  release: AgentRelease
-): Promise<Release> {
-  const db = supabaseAdmin();
+
+/**
+ * Build the upsert payload for a release.
+ *
+ * The subtlety is what is DELIBERATELY OMITTED. PostgREST's upsert only writes
+ * the columns present in the payload — `ON CONFLICT DO UPDATE SET col =
+ * EXCLUDED.col` for those columns and no others — so leaving a key out means
+ * "keep whatever is already stored".
+ *
+ * That matters because the ingest pipeline enriches only ENRICH_LIMIT releases
+ * per run and then saves ALL of them. Writing `curator_note: null` and
+ * `tags: []` for the unenriched majority wiped the curator notes and sonic
+ * descriptors of every release enriched on a previous run — so enrichment
+ * could never accumulate, and the descriptors the Selector now matches against
+ * would be erased nightly for everything outside the newest slice.
+ *
+ * Enrichment fields are therefore written only when they carry something.
+ * Factual fields (artwork, links, dates) are always written, because a fresh
+ * value from the feed should win.
+ */
+export function upsertPayload(release: AgentRelease): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    artist: release.artist,
+    title: release.title,
+    type: release.type,
+    artwork_url: release.artwork_url,
+    release_date: release.release_date,
+    genre: release.genre ?? null,
+    spotify: release.spotify,
+    apple_music: release.apple_music,
+    tidal: release.tidal,
+    soundcloud: release.soundcloud,
+    youtube_music: release.youtube_music,
+    boomplay: release.boomplay ?? null,
+  };
+  // Only overwrite enrichment when this run actually produced some.
+  if (release.tags && release.tags.length > 0) payload.tags = release.tags;
+  if (release.mood) payload.mood = release.mood;
+  if (release.curator_note) payload.curator_note = release.curator_note;
+  return payload;
+}
+
+type Db = ReturnType<typeof supabaseAdmin>;
+
+/** The oldest row matching case-insensitively, or null. Errors read as "none". */
+async function findExistingId(db: Db, release: AgentRelease): Promise<string | null> {
   const { data, error } = await db
     .from("releases")
-    .upsert(
-      {
-        artist: release.artist,
-        title: release.title,
-        type: release.type,
-        artwork_url: release.artwork_url,
-        release_date: release.release_date,
-        genre: release.genre ?? null,
-        tags: release.tags ?? [],
-        mood: release.mood ?? null,
-        spotify: release.spotify,
-        apple_music: release.apple_music,
-        tidal: release.tidal,
-        soundcloud: release.soundcloud,
-        youtube_music: release.youtube_music,
-        curator_note: release.curator_note ?? null,
-      },
-      { onConflict: "artist,title" }
-    )
+    .select("id")
+    .ilike("artist", release.artist)
+    .ilike("title", release.title)
+    .order("created_at", { ascending: true })
+    .limit(1);
+  if (error) return null;
+  return (data as { id: string }[] | null)?.[0]?.id ?? null;
+}
+
+async function updateById(db: Db, id: string, release: AgentRelease): Promise<Release> {
+  const { data, error } = await db
+    .from("releases")
+    .update(upsertPayload(release))
+    .eq("id", id)
     .select()
     .single();
-
   if (error) throw new Error(`Failed to save release: ${error.message}`);
   return data as Release;
+}
+
+/**
+ * Insert a release, or update the row it duplicates.
+ *
+ * This used to finish with `.upsert(..., { onConflict: "artist,title" })`.
+ * Migration 0003 replaced the plain (artist, title) unique constraint with a
+ * unique EXPRESSION index on (lower(artist), lower(title)) — and Postgres can
+ * only infer an ON CONFLICT target from an index whose columns match it
+ * exactly. With the constraint gone, `ON CONFLICT (artist, title)` raises
+ * 42P10 ("no unique or exclusion constraint matching the ON CONFLICT
+ * specification") at plan time, whether or not any row conflicts. Every NEW
+ * release failed to save; only updates to rows that already existed worked,
+ * which is why the nightly run could report "found N, saved none" while the
+ * site looked healthy.
+ *
+ * The case-insensitive lookup below was already the real dedupe, so the
+ * write is now a plain insert. The lower() unique index stays as the backstop:
+ * if a concurrent writer lands a case variant between our lookup and our
+ * insert, Postgres raises 23505 and we update that row instead. This works
+ * whether or not 0003 has been applied.
+ */
+export async function saveRelease(release: AgentRelease, db: Db = supabaseAdmin()): Promise<Release> {
+  const existing = await findExistingId(db, release);
+  if (existing) return updateById(db, existing, release);
+
+  const { data, error } = await db
+    .from("releases")
+    .insert(upsertPayload(release))
+    .select()
+    .single();
+  if (!error) return data as Release;
+
+  if ((error as { code?: string }).code === "23505") {
+    const raced = await findExistingId(db, release);
+    if (raced) return updateById(db, raced, release);
+  }
+  throw new Error(`Failed to save release: ${error.message}`);
 }
 
 export async function releaseExists(artist: string, title: string): Promise<boolean> {
@@ -140,16 +232,20 @@ export async function releaseExists(artist: string, title: string): Promise<bool
 export async function searchReleases(q: string, limit = 60): Promise<Release[]> {
   const term = q.trim().slice(0, 120);
   if (!term) return [];
-  // Supabase `.or()` with ilike patterns. Escape the pattern metacharacters a
-  // user could type so a stray % or _ doesn't turn into a wildcard match-all.
-  const esc = term.replace(/[%_\\]/g, "");
+  // PostgREST .or() grammar uses commas and parentheses as control characters,
+  // and % / _ are LIKE wildcards. Strip ALL of them: the term is a search
+  // substring, so punctuation carries no signal and a crafted query like
+  // "a),title.eq.pwned(" could otherwise inject extra filter clauses.
+  // (Parentheses are the injection vector — commas split clauses.)
+  const esc = term.replace(/[%_\\,()"']/g, " ").trim();
   if (!esc) return [];
+  const safeLimit = clampLimit(limit, MAX_SEARCH_LIMIT) ?? MAX_SEARCH_LIMIT;
   const { data, error } = await supabase
     .from("releases")
     .select("*")
     .or(`artist.ilike.%${esc}%,title.ilike.%${esc}%,genre.ilike.%${esc}%`)
     .order("release_date", { ascending: false })
-    .limit(limit);
+    .limit(safeLimit);
   if (error) return [];
   return (data as Release[]) ?? [];
 }

@@ -252,14 +252,20 @@ export interface ArtistRow {
 /** Most-sampled source artists — the crate-digger canon. */
 export function mostSampledArtists(limit = 10): ArtistRow[] {
   getGraph();
+  // Keyed on the normalised name, the same identity the rest of the graph
+  // uses. Keyed on the raw spelling, "Sly and the Family Stone" and "Sly & the
+  // Family Stone" were two artists, each with half the count. The first-seen
+  // spelling is kept for display.
   const rows = new Map<string, ArtistRow>();
   for (const c of SAMPLE_CATALOG) {
-    const r = rows.get(c.sourceArtist) ?? { artist: c.sourceArtist, sampledCount: 0, samplingCount: 0 };
+    const rk = norm(c.sourceArtist);
+    const r = rows.get(rk) ?? { artist: c.sourceArtist, sampledCount: 0, samplingCount: 0 };
     r.sampledCount += 1;
-    rows.set(c.sourceArtist, r);
-    const s = rows.get(c.artist) ?? { artist: c.artist, sampledCount: 0, samplingCount: 0 };
+    rows.set(rk, r);
+    const sk = norm(c.artist);
+    const s = rows.get(sk) ?? { artist: c.artist, sampledCount: 0, samplingCount: 0 };
     s.samplingCount += 1;
-    rows.set(c.artist, s);
+    rows.set(sk, s);
   }
   return Array.from(rows.values())
     .filter((r) => r.sampledCount > 0)
@@ -298,4 +304,160 @@ export function catalogSongs(): SongKey[] {
     out.push(s);
   }
   return out;
+}
+
+/** ── 4. artist profile — WhoSampled's artist page, offline ──── */
+
+export interface ArtistEdge {
+  /** The other song in the relationship. */
+  artist: string;
+  title: string;
+  /** "samples" = this artist's song lifts from it; "sampledBy" = it lifts from this artist. */
+  role: "samples" | "sampledBy";
+  year: string | null;
+  partial: boolean;
+  note?: string;
+}
+
+export interface ArtistProfile {
+  artist: string;
+  /** Songs by this artist that contain samples, with each source they lift. */
+  samples: ArtistEdge[];
+  /** Songs by this artist that were themselves sampled, with each taker. */
+  sampledBy: ArtistEdge[];
+  /** Distinct songs by this artist that appear in the graph at all. */
+  songs: SongKey[];
+  /** How many times this artist's records were lifted from (as source). */
+  sampledCount: number;
+  /** How many times this artist lifted from others. */
+  samplingCount: number;
+}
+
+/**
+ * Everything the graph knows about one artist, in both directions — the
+ * WhoSampled artist page distilled to a pure function. `samples` lists every
+ * source the artist's songs lift from; `sampledBy` lists every song that lifts
+ * from the artist. Empty arrays when the artist isn't in the curated graph.
+ */
+export function artistProfile(artist: string): ArtistProfile {
+  getGraph();
+  const want = norm(artist);
+  const samples: ArtistEdge[] = [];
+  const sampledBy: ArtistEdge[] = [];
+  const songSet = new Map<string, SongKey>();
+
+  for (const e of SAMPLE_CATALOG) {
+    const isSampler = norm(e.artist) === want || norm(e.artist).includes(want) || want.includes(norm(e.artist));
+    const isSource = norm(e.sourceArtist) === want || norm(e.sourceArtist).includes(want) || want.includes(norm(e.sourceArtist));
+    if (!isSampler && !isSource) continue;
+
+    if (isSampler) {
+      songSet.set(`${norm(e.artist)}::${norm(e.title)}`, { artist: e.artist, title: e.title });
+      samples.push({
+        artist: e.sourceArtist,
+        title: e.sourceTitle,
+        role: "samples",
+        year: e.sourceYear,
+        partial: Boolean(e.partial),
+        note: e.note,
+      });
+    }
+    if (isSource) {
+      songSet.set(`${norm(e.sourceArtist)}::${norm(e.sourceTitle)}`, { artist: e.sourceArtist, title: e.sourceTitle });
+      sampledBy.push({
+        artist: e.artist,
+        title: e.title,
+        role: "sampledBy",
+        year: null,
+        partial: Boolean(e.partial),
+        note: e.note,
+      });
+    }
+  }
+
+  return {
+    artist,
+    samples,
+    sampledBy,
+    songs: Array.from(songSet.values()),
+    sampledCount: sampledBy.length,
+    samplingCount: samples.length,
+  };
+}
+
+/** ── 5. related tracks — songs that share sample DNA ─────────── */
+
+export interface RelatedSong extends SongKey {
+  /** The records both songs lift from (shared DNA). */
+  sharedSources: SongKey[];
+  /** true when the two songs sample each other's lineage directly. */
+  direct: boolean;
+}
+
+/**
+ * Songs related to a given track through shared sample DNA — the WhoSampled
+ * "related tracks" strip. A song is related when it samples at least one of the
+ * same records (shared sources), or when it sits one hop away in the graph
+ * (samples the subject, or is sampled by the subject). Ranked by how much DNA
+ * they share, most first.
+ */
+export function relatedSongs(artist: string, title: string, limit = 6): RelatedSong[] {
+  const g = getGraph();
+  const key = resolveKey(artist, title);
+  if (!key) return [];
+  const node = g.get(key);
+  if (!node) return [];
+
+  const myUps = new Set(node.up.map((u) => u.key));
+  const myDowns = new Set(node.down.map((d) => d.key));
+
+  const scored = new Map<string, RelatedSong>();
+  const bump = (otherKey: string, shared: SongKey, direct: boolean) => {
+    if (otherKey === key) return;
+    const song = songCache.get(otherKey);
+    if (!song) return;
+    const existing = scored.get(otherKey);
+    if (existing) {
+      if (shared && !existing.sharedSources.some((s) => s.title === shared.title && s.artist === shared.artist)) {
+        existing.sharedSources.push(shared);
+      }
+      if (direct) existing.direct = true;
+      return;
+    }
+    scored.set(otherKey, {
+      ...song,
+      sharedSources: shared ? [shared] : [],
+      direct,
+    });
+  };
+
+  // Direct neighbours: what it samples and what samples it.
+  for (const u of node.up) bump(u.key, songCache.get(u.key)!, true);
+  for (const d of node.down) bump(d.key, songCache.get(d.key)!, true);
+
+  // Shared DNA: any other song that samples one of the same records.
+  for (const upKey of myUps) {
+    const src = g.get(upKey);
+    if (!src) continue;
+    for (const { key: takerKey } of src.down) {
+      if (takerKey === key) continue;
+      bump(takerKey, songCache.get(upKey)!, false);
+    }
+  }
+  // And any song that is itself sampled by one of the songs that sampled us.
+  for (const downKey of myDowns) {
+    const taker = g.get(downKey);
+    if (!taker) continue;
+    for (const { key: srcKey } of taker.up) {
+      if (srcKey === key) continue;
+      bump(srcKey, songCache.get(srcKey)!, false);
+    }
+  }
+
+  return Array.from(scored.values())
+    .sort((a, b) => {
+      const score = (r: RelatedSong) => r.sharedSources.length * 2 + (r.direct ? 1 : 0);
+      return score(b) - score(a);
+    })
+    .slice(0, limit);
 }

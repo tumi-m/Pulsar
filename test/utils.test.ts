@@ -101,3 +101,38 @@ describe("isToday / isYesterday", () => {
     expect(isYesterday("2026-07-26")).toBe(false);
   });
 });
+describe("Fresh and Today use the viewer's calendar day, not UTC's", () => {
+  const withTZ = (tz: string, fn: () => void) => {
+    const prev = process.env.TZ;
+    process.env.TZ = tz;
+    try { fn(); } finally { process.env.TZ = prev; }
+  };
+
+  it("in Los Angeles at 18:30, today is still the 9th (UTC has rolled to the 10th)", async () => {
+    const { localISODate, isToday } = await import("@/lib/utils");
+    withTZ("America/Los_Angeles", () => {
+      const now = Date.parse("2026-03-10T01:30:00Z");
+      expect(localISODate(now)).toBe("2026-03-09");
+      expect(isToday("2026-03-10", now)).toBe(false);
+      expect(isToday("2026-03-09", now)).toBe(true);
+    });
+  });
+
+  it("in Johannesburg at 01:30, today is already the 10th (UTC is still the 9th)", async () => {
+    const { localISODate, isYesterday } = await import("@/lib/utils");
+    withTZ("Africa/Johannesburg", () => {
+      const now = Date.parse("2026-03-09T23:30:00Z");
+      expect(localISODate(now)).toBe("2026-03-10");
+      expect(isYesterday("2026-03-09", now)).toBe(true);
+    });
+  });
+
+  it("steps back a calendar day across a DST change, not 24 hours", async () => {
+    const { localISODate } = await import("@/lib/utils");
+    withTZ("America/New_York", () => {
+      // 2026-03-08 is the spring-forward day: it is 23 hours long.
+      const now = Date.parse("2026-03-09T04:30:00Z"); // 00:30 EDT on the 9th
+      expect(localISODate(now, -1)).toBe("2026-03-08");
+    });
+  });
+});

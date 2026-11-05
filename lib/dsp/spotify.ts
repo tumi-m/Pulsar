@@ -5,6 +5,7 @@
  */
 
 import type { Release } from "../types";
+import { normaliseArtist } from "../match";
 import {
   base64url,
   clearToken,
@@ -17,15 +18,23 @@ import {
   setAuthError,
   sha256,
   searchTerm,
+  plainTitle,
+  sameTitle,
+  catalogId,
   takeAuthError,
   type BuildResult,
   type DspProvider,
   type ProgressFn,
+  newOAuthState,
+  rememberAuthClient,
+  authClient,
+  checkOAuthState,
 } from "./shared";
 
 // Start from the build-time inline; /api/dsp-config overlays the live server
 // value at runtime (see ensureDspConfig in ./index.ts) so a client id set in
-// Vercel works immediately — no redeploy, no INVALID_CLIENT screen.
+// Vercel reaches the client from the next deployment without a rebuild of the
+// client bundle. (Vercel itself still needs a redeploy for env changes.)
 let CLIENT_ID = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ?? "";
 export function setSpotifyClientId(id: string) {
   if (id) CLIENT_ID = id;
@@ -43,6 +52,7 @@ const SCOPE_KEY = "pulsar_spotify_scopes";
 // otherwise strands the user in a redirect loop.
 const VERIFIER_KEY = "pulsar_spotify_verifier";
 const JUST_AUTHED = "pulsar_spotify_just_authed";
+const FORCE_DIALOG = "pulsar_spotify_force_dialog";
 
 function setVerifier(v: string) {
   try {
@@ -119,15 +129,23 @@ async function beginAuth() {
   const verifier = randomString(48);
   const challenge = base64url(await sha256(verifier));
   setVerifier(verifier);
+  rememberAuthClient("spotify", CLIENT_ID);
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     response_type: "code",
     redirect_uri: redirectUri(),
     scope: SCOPES,
-    state: "spotify",
+    state: newOAuthState("spotify"),
     code_challenge_method: "S256",
     code_challenge: challenge,
   });
+  // After "Reconnect", make Spotify show its account picker. Without
+  // show_dialog it silently re-authorises whoever is signed in to Spotify, so
+  // reconnecting could never switch to a different (allow-listed) account.
+  if (safeGet(FORCE_DIALOG)) {
+    params.set("show_dialog", "true");
+    safeRemove(FORCE_DIALOG);
+  }
   window.location.href = `https://accounts.spotify.com/authorize?${params.toString()}`;
 }
 
@@ -136,7 +154,50 @@ class SpotifyAuthError extends Error {}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function api(path: string, token: string, init?: RequestInit, attempt = 0): Promise<any> {
+/** Minimal shapes of the Spotify API responses this code reads. */
+interface SpotifyArtist {
+  name?: string;
+}
+interface SpotifyAlbumItem {
+  id?: string;
+  name?: string;
+  artists?: SpotifyArtist[];
+}
+interface SpotifyTrackItem {
+  uri?: string;
+  name?: string;
+  artists?: SpotifyArtist[];
+}
+interface SpotifyPlaylist {
+  id?: string;
+  external_urls?: { spotify?: string };
+  uri?: string;
+}
+
+interface ApiOpts {
+  /**
+   * Read a 403 as "this account isn't allow-listed". Only true for the calls
+   * that establish who the user is (/me, creating a playlist). A 403 anywhere
+   * else used to produce the same allow-list advice — including from the
+   * retired /tracks endpoint, which sent even the app's owner to the dashboard.
+   */
+  allowlist403?: boolean;
+}
+
+/** An HTTP failure with its status, so callers can fall back on 404s. */
+class SpotifyHttpError extends Error {
+  constructor(readonly status: number, path: string) {
+    super(`Spotify API ${status} at ${path.split("?")[0]}`);
+  }
+}
+
+async function api(
+  path: string,
+  token: string,
+  init?: RequestInit,
+  opts: ApiOpts = {},
+  attempt = 0
+): Promise<Record<string, unknown>> {
   const res = await fetch(`https://api.spotify.com/v1${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init?.headers ?? {}) },
@@ -147,35 +208,44 @@ async function api(path: string, token: string, init?: RequestInit, attempt = 0)
   if (res.status === 429 && attempt < 3) {
     const wait = Number(res.headers.get("Retry-After") ?? "2");
     await sleep(Math.min(Math.max(wait, 1), 10) * 1000);
-    return api(path, token, init, attempt + 1);
+    return api(path, token, init, opts, attempt + 1);
   }
   if (res.status === 401) {
     clearToken("spotify");
     throw new SpotifyAuthError("Spotify session expired — tap export again to reconnect.");
   }
-  if (res.status === 403) {
-    // Almost always the Development-mode allow-list: a Spotify app that hasn't
-    // been through extension review only works for accounts explicitly listed
-    // under Users & Access. Retrying with the same token can never succeed, so
-    // the message points at the two things that actually resolve it.
+  if (res.status === 403 && !opts.allowlist403) {
+    // Still fatal — retrying with this token can't help — but not described as
+    // an allow-list problem, which it usually isn't for these calls.
+    throw new SpotifyAuthError(`Spotify refused the request at ${path.split("?")[0]} (403).`);
+  }
+  if (res.status === 403 && opts.allowlist403) {
+    // Development Mode: since February 2026 Spotify caps an app that hasn't
+    // been granted extended quota at 5 allow-listed accounts (and extended
+    // quota now goes only to large organisations), so for most visitors this
+    // is permanent. Say it in words a listener can act on, and keep the owner's
+    // fix in the same message.
     throw new SpotifyAuthError(
-      "Spotify refused the request (403). Your app is most likely in Development mode, " +
-        "which only works for accounts you've allow-listed. Add the Spotify account you're " +
-        "signed in as under Users & Access in the developer dashboard — or reconnect below " +
-        "if you signed in with a different account."
+      "Spotify only lets this Pulsar create playlists for accounts its owner has approved " +
+        "(Spotify limits apps like this to 5). Use Copy list or Download CSV instead. " +
+        "If this is your Pulsar: add this Spotify account under Users & Access in the " +
+        "developer dashboard, then reconnect."
     );
   }
-  // Transient server errors: one quick retry before giving up.
-  if (res.status >= 500 && attempt < 2) {
+  // Transient server errors: one quick retry, for reads only. Retrying a POST
+  // that may have succeeded server-side makes a duplicate playlist.
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (res.status >= 500 && attempt < 2 && method === "GET") {
     await sleep(600 * (attempt + 1));
-    return api(path, token, init, attempt + 1);
+    return api(path, token, init, opts, attempt + 1);
   }
-  if (!res.ok) throw new Error(`Spotify API ${res.status}`);
-  return res.status === 204 ? null : res.json();
+  if (!res.ok) throw new SpotifyHttpError(res.status, path);
+  // 204 = no content (some POSTs) — callers only branch on `?.id` etc.
+  return res.status === 204 ? {} : ((await res.json()) as Record<string, unknown>);
 }
 
 const normalise = (s: string) =>
-  s.toLowerCase().replace(/\(.*?\)|\[.*?\]/g, "").replace(/[^a-z0-9]/g, "");
+  normaliseArtist(s.replace(/\(.*?\)|\[.*?\]/g, ""));
 
 /** Does a Spotify result actually belong to the artist we asked for? */
 export function artistMatches(want: string, credits: { name?: string }[] | undefined): boolean {
@@ -188,31 +258,68 @@ export function artistMatches(want: string, credits: { name?: string }[] | undef
 
 /**
  * Resolve one saved release to Spotify track URIs.
+ *
  * Albums/EPs expand to their full tracklist; singles resolve to one track.
- * Matches are artist-verified so a crate never fills up with the wrong record.
- * Auth errors propagate — silently skipping them would build a half-empty
- * playlist with no explanation.
+ * Both the ARTIST and the TITLE must match. This used to fall back to the
+ * artist's first album whenever the title check failed — and feed titles like
+ * "Love - EP" failed it constantly — so up to 50 tracks of the wrong record
+ * were added and counted as found. Singles took the artist's top hit with no
+ * title check at all. A "not found" is better than the wrong record.
+ *
+ * Searches with Spotify's field filters first (artist:/album:/track:), then
+ * plain text. Auth errors propagate.
  */
-export async function urisForRelease(r: Release, token: string): Promise<string[]> {
-  const term = searchTerm(r);
+export async function urisForRelease(
+  r: Release,
+  token: string,
+  onError?: (e: Error) => void
+): Promise<string[]> {
+  const title = plainTitle(r).replace(/["]/g, "");
+  const artist = r.artist.replace(/["]/g, "");
   const wantAlbum = r.type === "album" || r.type === "ep";
+  const queries = (field: "album" | "track") => [
+    `${field}:"${title}" artist:"${artist}"`,
+    searchTerm(r),
+  ];
+
+  // The release already names its Spotify item: use it.
+  const direct = catalogId(r, "spotify");
+  if (direct?.kind === "track") return [`spotify:track:${direct.id}`];
+  if (direct?.kind === "album") {
+    try {
+      const page = await api(`/albums/${direct.id}/tracks?limit=50`, token);
+      const uris = ((page?.items as { uri?: string }[] | undefined) ?? []).map((t) => t.uri).filter(Boolean) as string[];
+      if (uris.length) return uris;
+    } catch (e) {
+      if (e instanceof SpotifyAuthError) throw e;
+      /* fall back to search */
+    }
+  }
+
+  const search = async <T,>(q: string, type: "album" | "track"): Promise<T[]> => {
+    // A 403 on search is the first sign of an account that isn't allow-listed.
+    const found = await api(`/search?q=${encodeURIComponent(q)}&type=${type}&limit=5`, token, undefined, {
+      allowlist403: true,
+    });
+    const bucket = found?.[`${type}s`] as { items?: T[] } | undefined;
+    return bucket?.items ?? [];
+  };
 
   if (wantAlbum) {
     try {
-      const found = await api(
-        `/search?q=${encodeURIComponent(term)}&type=album&limit=5`,
-        token
-      );
-      const items = found?.albums?.items ?? [];
-      const album =
-        items.find(
-          (a: any) =>
-            artistMatches(r.artist, a.artists) &&
-            normalise(a.name ?? "").includes(normalise(r.title).slice(0, 12))
-        ) ?? items.find((a: any) => artistMatches(r.artist, a.artists));
-      if (album?.id) {
-        const tracks = await api(`/albums/${album.id}/tracks?limit=50`, token);
-        const uris = (tracks?.items ?? []).map((t: { uri: string }) => t.uri).filter(Boolean);
+      for (const q of queries("album")) {
+        const items = await search<SpotifyAlbumItem>(q, "album");
+        const album = items.find((a) => artistMatches(r.artist, a.artists) && sameTitle(r, a.name));
+        if (!album?.id) continue;
+        // Paged: albums over 50 tracks were cut off at 50.
+        const uris: string[] = [];
+        let next: string | null = `/albums/${album.id}/tracks?limit=50`;
+        while (next && uris.length < 300) {
+          const page = await api(next, token);
+          for (const t of (page?.items as { uri?: string }[] | undefined) ?? []) if (t?.uri) uris.push(t.uri);
+          const n = page?.next as string | null | undefined;
+          next = n ? n.replace("https://api.spotify.com/v1", "") : null;
+        }
         if (uris.length) return uris;
       }
     } catch (e) {
@@ -222,15 +329,17 @@ export async function urisForRelease(r: Release, token: string): Promise<string[
   }
 
   try {
-    const found = await api(
-      `/search?q=${encodeURIComponent(term)}&type=track&limit=5`,
-      token
-    );
-    const items = found?.tracks?.items ?? [];
-    const track = items.find((t: any) => artistMatches(r.artist, t.artists)) ?? null;
-    return track?.uri ? [track.uri] : [];
+    for (const q of queries("track")) {
+      const items = await search<SpotifyTrackItem>(q, "track");
+      const track = items.find((t) => artistMatches(r.artist, t.artists) && sameTitle(r, t.name));
+      if (track?.uri) return [track.uri];
+    }
+    return [];
   } catch (e) {
     if (e instanceof SpotifyAuthError) throw e;
+    // A failed lookup isn't "not on Spotify". Report it, so a dropped network
+    // or exhausted rate limit can't masquerade as a list of missing records.
+    onError?.(e instanceof Error ? e : new Error(String(e)));
     return [];
   }
 }
@@ -241,7 +350,7 @@ export const spotifyProvider: DspProvider = {
   configured: () => CLIENT_ID.length > 0,
 
   async createPlaylist(name, releases, onProgress?: ProgressFn): Promise<BuildResult | "redirecting"> {
-    let token = readToken("spotify");
+    let token = readToken("spotify", 5 * 60_000); // enough to outlast a big crate
 
     // A token granted before the scope list changed can't do what we now need.
     // Discard it and re-consent silently rather than surfacing a 403 the user
@@ -273,41 +382,22 @@ export const spotifyProvider: DspProvider = {
     // attempt can't make the NEXT export throw spuriously.
     safeRemove(JUST_AUTHED);
 
-    const body = JSON.stringify({
-      name,
-      public: false,
-      description: "Made with Pulsar — music discovery.",
-    });
-
-    // The documented way to create a playlist is POST /v1/users/{id}/playlists,
-    // which needs the id from GET /v1/me. If that profile read is refused for
-    // any reason, fall back to POST /v1/me/playlists rather than failing the
-    // whole export — Spotify accepts it and infers the user from the token.
-    let playlist: any = null;
-    try {
-      const me = await api("/me", token.access_token);
-      if (me?.id) {
-        playlist = await api(`/users/${encodeURIComponent(me.id)}/playlists`, token.access_token, {
-          method: "POST",
-          body,
-        });
-      }
-    } catch (e) {
-      if (e instanceof SpotifyAuthError && /expired/i.test(e.message)) throw e; // 401 is fatal
-      /* 403 on the profile read — try the token-inferred route below */
-    }
-
-    if (!playlist?.id) {
-      playlist = await api("/me/playlists", token.access_token, { method: "POST", body });
-    }
-    if (!playlist?.id) throw new Error("Spotify didn't return a playlist.");
-
+    // Match FIRST, create second. This used to create the playlist and then go
+    // looking for tracks — so a crate where nothing matched, or a session that
+    // died halfway through matching, left an empty "Made with Pulsar" playlist
+    // on the user's account and still showed a success card.
     const seen = new Set<string>();
     const allUris: string[] = [];
     let addedReleases = 0;
+    const unmatched: string[] = [];
+    const lookup: { errors: number; last: Error | null } = { errors: 0, last: null };
     for (let i = 0; i < releases.length; i++) {
-      const uris = await urisForRelease(releases[i], token.access_token);
+      const uris = await urisForRelease(releases[i], token.access_token, (e) => {
+        lookup.errors++;
+        lookup.last = e;
+      });
       if (uris.length) addedReleases++;
+      else unmatched.push(`${releases[i].artist} — ${releases[i].title}`);
       // De-duplicate so the same track never lands twice.
       for (const u of uris) {
         if (!seen.has(u)) {
@@ -317,12 +407,58 @@ export const spotifyProvider: DspProvider = {
       }
       onProgress?.(i + 1, releases.length);
     }
+    if (allUris.length === 0 && lookup.errors > 0 && lookup.last) {
+      throw new Error(`Couldn't search Spotify — ${lookup.last.message}. Check your connection and try again.`);
+    }
+    if (allUris.length === 0) {
+      throw new Error(
+        `None of the ${releases.length} record${releases.length === 1 ? "" : "s"} in this crate could be found on Spotify, so no playlist was created.`
+      );
+    }
 
+    const body = JSON.stringify({
+      name,
+      public: false,
+      description: "Made with Pulsar — music discovery.",
+    });
+
+    // Spotify's February 2026 changes (applied to existing apps from 9 March
+    // 2026) retired POST /users/{id}/playlists and renamed the add-tracks call
+    // from /playlists/{id}/tracks to /playlists/{id}/items. This code used the
+    // old add call, so since March every export created a playlist and then
+    // failed to put anything in it. The current endpoints come first; the old
+    // ones are tried only on a 404, for apps still on the previous API.
+    let playlist: SpotifyPlaylist;
+    try {
+      playlist = (await api(
+        "/me/playlists",
+        token.access_token,
+        { method: "POST", body },
+        { allowlist403: true }
+      )) as SpotifyPlaylist;
+    } catch (e) {
+      if (!(e instanceof SpotifyHttpError && (e.status === 404 || e.status === 405))) throw e;
+      const me = (await api("/me", token.access_token, undefined, { allowlist403: true })) as { id?: string };
+      if (!me?.id) throw new Error("Spotify didn't say which account this is.");
+      playlist = (await api(
+        `/users/${encodeURIComponent(me.id)}/playlists`,
+        token.access_token,
+        { method: "POST", body },
+        { allowlist403: true }
+      )) as SpotifyPlaylist;
+    }
+    if (!playlist?.id) throw new Error("Spotify didn't return a playlist.");
+
+    let itemsPath = `/playlists/${playlist.id}/items`;
     for (let i = 0; i < allUris.length; i += 100) {
-      await api(`/playlists/${playlist.id}/tracks`, token.access_token, {
-        method: "POST",
-        body: JSON.stringify({ uris: allUris.slice(i, i + 100) }),
-      });
+      const chunk = JSON.stringify({ uris: allUris.slice(i, i + 100) });
+      try {
+        await api(itemsPath, token.access_token, { method: "POST", body: chunk });
+      } catch (e) {
+        if (!(e instanceof SpotifyHttpError && e.status === 404) || itemsPath.endsWith("/tracks")) throw e;
+        itemsPath = `/playlists/${playlist.id}/tracks`;
+        await api(itemsPath, token.access_token, { method: "POST", body: chunk });
+      }
     }
     return {
       provider: "spotify",
@@ -331,12 +467,27 @@ export const spotifyProvider: DspProvider = {
       addedReleases,
       totalReleases: releases.length,
       trackCount: allUris.length,
+      unmatched,
     };
+  },
+
+  disconnect() {
+    clearToken("spotify");
+    clearVerifier();
+    safeSet(FORCE_DIALOG, "1");
   },
 
   async completeRedirect(): Promise<boolean> {
     const url = new URL(window.location.href);
-    if (url.searchParams.get("state") !== "spotify") return false;
+    const stateCheck = checkOAuthState("spotify", url.searchParams.get("state"));
+    if (stateCheck === "other") return false;
+    if (stateCheck === "mismatch") {
+      // Not a sign-in this browser started. Don't spend the code.
+      cleanUrl();
+      clearVerifier();
+      setAuthError("spotify", "Spotify sign-in couldn't be verified. Please try exporting again.");
+      return false;
+    }
 
     // Spotify reports consent denial / misconfiguration here.
     const oauthError = url.searchParams.get("error");
@@ -376,7 +527,7 @@ export const spotifyProvider: DspProvider = {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
-          client_id: CLIENT_ID,
+          client_id: authClient("spotify", CLIENT_ID),
           grant_type: "authorization_code",
           code,
           redirect_uri: redirectUri(),
@@ -397,7 +548,7 @@ export const spotifyProvider: DspProvider = {
           reason === "invalid_client"
             ? "Spotify doesn't recognize this app's Client ID. Re-copy it from the app's page " +
               "in the Spotify developer dashboard into your deployment's SPOTIFY_CLIENT_ID " +
-              "(then reconnect — no redeploy needed)."
+              "(then redeploy — Vercel applies env changes only to new deployments — and reconnect)."
             : reason === "invalid_grant"
               ? "Spotify couldn't finish the sign-in (the one-time code was already spent or " +
                 "expired). Most often this means the Redirect URI in the dashboard isn't an " +

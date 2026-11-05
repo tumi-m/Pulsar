@@ -38,3 +38,6 @@ Thumbs.db
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# motion renders (FFmpeg / Remotion output, review contact sheets)
+motion/out/

@@ -25,6 +25,7 @@ create table if not exists releases (
   tidal         text,
   soundcloud    text,
   youtube_music text,
+  boomplay      text,
   curator_note  text,
   created_at    timestamptz default now(),
 
@@ -103,16 +104,20 @@ create table if not exists crate_items (
   id         uuid primary key default uuid_generate_v4(),
   crate_id   uuid not null references crates (id) on delete cascade,
   release    jsonb not null,            -- full Release snapshot
+  -- A real column for the release id, so both the unique constraint and
+  -- PostgREST's on_conflict can name it (neither accepts a JSON expression).
+  release_id text generated always as (release->>'id') stored,
   added_at   timestamptz default now(),
-  unique (crate_id, (release->>'id'))   -- one copy of a release per crate
+  unique (crate_id, release_id)         -- one copy of a release per crate
 );
 
 create table if not exists favorites (
   id         uuid primary key default uuid_generate_v4(),
   user_id    uuid not null references auth.users (id) on delete cascade,
   release    jsonb not null,            -- full Release snapshot
+  release_id text generated always as (release->>'id') stored,
   added_at   timestamptz default now(),
-  unique (user_id, (release->>'id'))
+  unique (user_id, release_id)
 );
 
 create table if not exists listen_history (
@@ -148,3 +153,10 @@ create index if not exists listen_history_user_idx on listen_history (user_id, p
 -- drop them once:
 --   delete from releases where artwork_url like '%placeholder%';
 -- ─────────────────────────────────────────────
+
+-- ─────────────────────────────────────────────
+-- Migrations for databases created before a column existed.
+-- `create table if not exists` above is a no-op on an existing database, so a
+-- new column has to be added explicitly or every write silently drops it.
+-- ─────────────────────────────────────────────
+alter table releases add column if not exists boomplay text;

@@ -20,7 +20,14 @@ export async function GET(req: NextRequest) {
     const releases = await searchReleases(q, 60);
     return NextResponse.json(
       { releases, count: releases.length },
-      { headers: { "Cache-Control": "public, max-age=60" } }
+      {
+        headers: {
+          "Cache-Control": "public, max-age=60",
+          // Netlify caches functions by PATH only unless this is set — without
+          // it every distinct ?q= would serve the first query's cached body.
+          "Netlify-Vary": "query",
+        },
+      }
     );
   } catch {
     return NextResponse.json({ releases: [], count: 0 });

@@ -15,22 +15,29 @@
  * found" is always better than confidently showing the wrong album.
  */
 
+/**
+ * Fold accents and case. Everything below keeps letters and digits of ANY
+ * script: the old `[^a-z0-9]` filter reduced a Japanese or Korean title to an
+ * empty string — which can never match — and turned "Beyoncé" into "beyonc".
+ */
+export function fold(s: string): string {
+  return (s ?? "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
 /** Lowercase, drop bracketed asides and punctuation, collapse whitespace. */
 export function normaliseTitle(s: string): string {
-  return (s ?? "")
-    .toLowerCase()
+  return fold(s)
     .replace(/\(.*?\)|\[.*?\]/g, "") // (Deluxe Edition), [Explicit]
     .replace(/&/g, "and")
     .replace(/\s*[-–—]\s*(deluxe|expanded|remaster\w*|anniversary|edition|explicit|clean|single|ep|album)\b.*$/i, "")
-    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
 }
 
 export function normaliseArtist(s: string): string {
-  return (s ?? "")
-    .toLowerCase()
+  return fold(s)
     .replace(/&/g, "and")
-    .replace(/[^a-z0-9]+/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, "")
     .trim();
 }
 

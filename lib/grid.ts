@@ -1,3 +1,4 @@
+import { localISODate } from "./utils";
 /**
  * Pulsar — Grid helpers (pure)
  *
@@ -69,8 +70,9 @@ export function buildDateSections(
 ): DateSection[] {
   if (grouping === "none") return [];
 
-  const today = new Date(now).toISOString().slice(0, 10);
-  const yesterday = new Date(now - 86_400_000).toISOString().slice(0, 10);
+  // The viewer's calendar day, not UTC's — see localISODate.
+  const today = localISODate(now);
+  const yesterday = localISODate(now, -1);
 
   const bucketOf = (d: string): string => {
     if (!d || d.startsWith("1900")) return "undated";

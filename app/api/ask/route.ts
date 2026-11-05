@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guard } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -33,6 +34,10 @@ const SYSTEM = `You are Pulsar's music Selector. From the user's free-form reque
 If a field has nothing, return an empty array. Never invent fields.`;
 
 export async function POST(req: NextRequest) {
+  // Each hit here is a paid Ollama cloud call — keep a hard ceiling per IP.
+  const limited = guard(req, "ask", { limit: 10, windowMs: 3_600_000 });
+  if (limited) return limited;
+
   const { prompt } = (await req.json().catch(() => ({}))) as { prompt?: string };
   const text = (prompt ?? "").trim().slice(0, 500);
   const empty = { moods: [], genres: [], decades: [], freeText: "" };
